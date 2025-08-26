@@ -19,3 +19,15 @@ python seed_links.py --prefix INV --count 100   --dest https://example.com/landi
 ```
 
 **Privacy note:** This code does **not** store IPs. User-agent/referrer may still be considered personal data depending on context—use TTL and keep retention minimal if you need raw per-hit logs.
+
+
+Example cli command:
+
+python seed_links.py \
+  --business-file "/path/to/businesses.xlsx" \
+  --base-url "https://europe-west3-gb-qr-tracker.cloudfunctions.net/redirector" \
+  --dest "https://groessig.de/weiterbildung-plus-lohnzuschuss" \
+  --campaign "groessig-01" \
+  --customer "groessig" \
+  --limit 3 \
+  --prefix "GROE-"

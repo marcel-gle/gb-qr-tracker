@@ -175,6 +175,8 @@ def redirector(request: Request):
     data = snap.to_dict() or {}
     if not data.get('active', True):
         return ('Link is inactive.', 410)
+    
+    #print("Redirector data:", data)
 
     destination = data.get('destination')
     if not destination or not _is_safe_url(destination):
@@ -223,6 +225,7 @@ def redirector(request: Request):
             'business_id': data.get('business_id'),
             'campaign': data.get('campaign'),
             'template': data.get('template'),
+            "customer": data.get("customer"),
             'ts': firestore.SERVER_TIMESTAMP,
             'user_agent': ua_str[:1024],  # cap length
             'device_type': dev,
