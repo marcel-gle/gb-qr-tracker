@@ -158,6 +158,8 @@ def _lookup_geo(ip: str) -> dict | None:
         return geo
     return None
 
+
+
 def redirector(request: Request):
     # Health probe
     if request.path.strip('/') == 'health':
@@ -225,7 +227,8 @@ def redirector(request: Request):
             'business_id': data.get('business_id'),
             'campaign': data.get('campaign'),
             'template': data.get('template'),
-            "customer": data.get("customer"),
+            #"customer": data.get("customer"),
+            "owner_id": data.get("owner_id"),
             'ts': firestore.SERVER_TIMESTAMP,
             'user_agent': ua_str[:1024],  # cap length
             'device_type': dev,

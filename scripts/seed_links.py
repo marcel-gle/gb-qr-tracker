@@ -98,7 +98,8 @@ def csv_fieldnames_union(rows: List[dict]) -> List[str]:
 # Firestore writes
 # ---------------------------
 def create_or_merge_link(doc_id: str, destination: str,
-                         customer: str,
+                         #customer: str,
+                         owner_id: str,
                          active: bool = True,
                          business_name: Optional[str] = None,
                          campaign: Optional[str] = None,
@@ -114,13 +115,14 @@ def create_or_merge_link(doc_id: str, destination: str,
         'hit_count': 0,
         'created_at': firestore.SERVER_TIMESTAMP,
         'last_hit_at': None,
+        'owner_id': owner_id,
     }
-    if customer == '' or customer is None:
-        print("Error no customer provided")
+    if owner_id == '' or owner_id is None:
+        print("Error no owner_id provided")
         return
 
-    if customer:
-        payload['customer'] = str(customer)
+    #if customer:
+    #    payload['customer'] = str(customer)
     if business_name:
         payload['business_name'] = business_name
     if campaign:
@@ -201,7 +203,7 @@ def geocode_mapbox(address: str, token: str, country_hint: Optional[str] = "DE")
         return None
 
 
-def upsert_business_from_row(row: dict, customer_all: str, mapbox_token: Optional[str]) -> firestore.DocumentReference:
+def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str]) -> firestore.DocumentReference:
     """
     Create or update businesses/{bizId}. Returns the DocumentReference.
     No letters array; links are discoverable by querying links where business == bizRef.
@@ -247,11 +249,11 @@ def upsert_business_from_row(row: dict, customer_all: str, mapbox_token: Optiona
     try:
         create_payload = dict(payload)
         create_payload["created_at"] = firestore.SERVER_TIMESTAMP
-        create_payload["customers"] = [customer_all] 
+        create_payload["ownerIds"] = [ownerId] 
         biz_ref.create(create_payload)
     except AlreadyExists:
         biz_ref.set(payload, merge=True)
-        biz_ref.set({"customers": ArrayUnion([customer_all])}, merge=True)
+        biz_ref.set({"ownerIds": ArrayUnion([ownerId])}, merge=True)
 
     return biz_ref
 
@@ -332,14 +334,14 @@ def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
 def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
                                     dest_default: Optional[str], campaign: Optional[str],
                                     prefix: Optional[str],
-                                    customer_all: str,
+                                    ownerId: str,
                                     limit: int,
                                     mapbox_token: Optional[str]):
     created, skipped, errors = 0, 0, 0
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
 
-    print("assign_links_from_business_file customer_all:", customer_all)
+    print("assign_links_from_business_file ownerId:", ownerId)
 
     if is_excel:
         if pd is None:
@@ -366,7 +368,7 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
                 derive_fields_for_business_row(row, dest_default)
 
             # Business upsert first → get a stable ref
-            biz_ref = upsert_business_from_row(row, customer_all, mapbox_token)
+            biz_ref = upsert_business_from_row(row, ownerId, mapbox_token)
             biz_id = biz_ref.id
 
             # Link doc id resolution
@@ -391,7 +393,7 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
             try:
                 create_or_merge_link(
                     doc_id, dest,
-                    customer_all, True, business_name, campaign, adjusted_template,
+                    ownerId, True, business_name, campaign, adjusted_template,
                     business_ref=biz_ref,
                     business_id=biz_id
                 )
@@ -469,7 +471,7 @@ if __name__ == '__main__':
     # Business-file mode
     p.add_argument('--business-file', help='CSV or XLSX of businesses to assign tracking links to')
     p.add_argument('--base-url', help='Base URL for tracking links, e.g. https://qr.example.com')
-    p.add_argument('--customer', help='Customer identifier to attach to ALL rows in the business file')
+    p.add_argument('--ownerId', help='Customer identifier to attach to ALL rows in the business file')
     p.add_argument('--limit', type=int, default=0, help='Only process/upload the first X rows from the file (0 = all)')
     p.add_argument('--mapbox-token', default=os.environ.get("MAPBOX_TOKEN"),
                    help='Mapbox API token for geocoding (or set env MAPBOX_TOKEN).')
@@ -479,8 +481,8 @@ if __name__ == '__main__':
     if args.business_file:
         if not args.base_url:
             p.error('--base-url is required when using --business-file')
-        if not args.customer:
-            p.error('--customer is required when using --business-file')
+        if not args.ownerId:
+            p.error('--ownerId is required when using --business-file')
         assign_links_from_business_file(
             path=args.business_file,
             base_url=args.base_url,
@@ -488,7 +490,7 @@ if __name__ == '__main__':
             dest_default=args.dest,
             campaign=args.campaign,
             prefix=args.prefix,
-            customer_all=args.customer,
+            ownerId=args.ownerId,
             limit=args.limit,
             mapbox_token=args.mapbox_token,
         )

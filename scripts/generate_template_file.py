@@ -6,7 +6,7 @@ import re
 FILE_A = "/Users/marcelgleich/Downloads/branchenliste_wzcodes_groessig (1).csv"   # simple list of WZ codes (first column)
 FILE_B_XLSX = "/Users/marcelgleich/Downloads/Gleich___Brother_GmbH_b2bselfservice_UY915052_20250820_131101.xlsx"  # Excel file with columns "Branchencode WZ" and "Template"
 B_SHEET = "Export-20.08.2025-Einmal"  # or a sheet name like "Contacts"
-OUTPUT_XLSX = "file_b_with_templates.xlsx"
+OUTPUT_XLSX = "data/file_b_with_templates.xlsx"
 TEMPLATE_PREFIX = "template_"   # change to "temple_" if that's what you want
 TEMPLATE_SUFFIX = ".pdf"
 DEFAULT_TEMPLATE = f"{TEMPLATE_PREFIX}standart{TEMPLATE_SUFFIX}"  # fallback if no match
