@@ -20,6 +20,21 @@ python seed_links.py --prefix INV --count 100   --dest https://example.com/landi
 
 **Privacy note:** This code does **not** store IPs. User-agent/referrer may still be considered personal data depending on context—use TTL and keep retention minimal if you need raw per-hit logs.
 
+Update google cloud functions:
+
+Check active project:
+- gcloud config get-value project
+
+
+DEV:
+gcloud functions deploy redirector --gen2 --runtime=python311 --region=europe-west3 \
+  --entry-point=redirector --source=. --trigger-http --allow-unauthenticated \
+  --set-env-vars='HIT_TTL_DAYS=30,GEOIP_API_URL=https://ipapi.co/{ip}/json/,STORE_IP_HASH=1,IP_HASH_SALT=4hinbwhifi3adc42cr2r2334c43cc2ipt8k8,LOG_HIT_ERRORS=1'
+
+
+PROD:
+
+
 
 Example cli command:
 
@@ -31,3 +46,16 @@ python seed_links.py \
   --customer "groessig" \
   --limit 3 \
   --prefix "GROE-"
+
+
+NEW Example CLI command to deploy redirector:
+ gcloud functions deploy redirector \
+  --gen2 \
+  --runtime=python311 \
+  --region=europe-west3 \
+  --entry-point=redirector \
+  --source=functions/redirector \
+  --trigger-http \
+  --allow-unauthenticated \
+  --set-env-vars=HIT_TTL_DAYS=30,GEOIP_API_URL=https://ipapi.co/{ip}/json/,STORE_IP_HASH=1,IP_HASH_SALT=4hinbwhifi3adc42cr2r2334c43cc2ipt8k8,LOG_HIT_ERRORS=1
+

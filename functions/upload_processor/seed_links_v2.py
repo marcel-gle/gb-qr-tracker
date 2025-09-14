@@ -1,11 +1,19 @@
-# seed_links.py
-# - Upserts businesses/{bizId} from your XLSX/CSV
-# - Creates links/{linkId} with a `business` DocumentReference to businesses/{bizId}
-# - Adjusts per-row Template to "<base>_qr_track.pdf" when adding tracking_link, uploads that
-# - Writes back tracking_link (and adjusted Template) into the output file
-# - Optional Mapbox geocoding for businesses
-#
-# deps: pip install pandas openpyxl requests
+""" 
+Seed links script for expanded schema
+"""
+
+"""
+seed_links.py (targets-first schema)
+
+- Creates or reuses a campaign (campaigns/{campaignId})
+- Upserts businesses/{bizId} from your XLSX/CSV (keeps ownerIds array)
+- Creates campaigns/{campaignId}/targets/{targetId} for each imported row
+- Creates links/{linkId} with campaign_ref, business_ref, target_ref + snapshot_mailing
+- Writes back tracking_link (and adjusted Template) into the output file
+- Optional Mapbox geocoding for businesses
+
+deps: pip install pandas openpyxl requests google-cloud-firestore
+"""
 
 import argparse
 import csv
@@ -13,7 +21,6 @@ import os
 import re
 from typing import Optional, Tuple, List, Set, Dict
 from google.cloud.firestore_v1 import ArrayUnion
-
 
 try:
     import pandas as pd
@@ -29,18 +36,21 @@ from google.cloud import firestore
 from google.api_core.exceptions import AlreadyExists
 
 db = firestore.Client()
-links = db.collection('links')
-businesses = db.collection('businesses')
+COL_LINKS = db.collection('links')
+COL_BUSINESSES = db.collection('businesses')
+COL_CAMPAIGNS = db.collection('campaigns')
 
 
 # ---------------------------
 # Utilities
 # ---------------------------
 def build_tracking_link(base_url: str, doc_id: str) -> str:
+    """Return the public tracking URL by joining base_url and the link document id."""
     return f"{base_url.rstrip('/')}/{doc_id}"
 
 
 def sanitize_id(value: str) -> str:
+    """Normalize a string to a URL-safe id slug: alphanumerics joined by single dashes."""
     if value is None:
         return ""
     v = str(value).strip()
@@ -50,6 +60,7 @@ def sanitize_id(value: str) -> str:
 
 
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
+    """Ensure a template filename ends with '_qr_track.pdf' (idempotent)."""
     if not template:
         return None
     base, _ext = os.path.splitext(str(template))
@@ -59,6 +70,7 @@ def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
 
 
 def get_ci(row: dict, *names: str) -> Optional[str]:
+    """Case-insensitive getter for the first matching column name in a row."""
     lower_map = {k.lower(): k for k in row.keys()}
     for name in names:
         key = lower_map.get(name.lower())
@@ -68,6 +80,7 @@ def get_ci(row: dict, *names: str) -> Optional[str]:
 
 
 def get_ci_key(row: dict, *names: str) -> Optional[str]:
+    """Case-insensitive lookup that returns the exact column key name from the row if present."""
     lower_map = {k.lower(): k for k in row.keys()}
     for name in names:
         key = lower_map.get(name.lower())
@@ -77,6 +90,7 @@ def get_ci_key(row: dict, *names: str) -> Optional[str]:
 
 
 def csv_fieldnames_union(rows: List[dict]) -> List[str]:
+    """Compute a stable union of CSV column names, ensuring 'tracking_link' is last."""
     if not rows:
         return ['tracking_link']
     seen: Set[str] = set()
@@ -95,80 +109,19 @@ def csv_fieldnames_union(rows: List[dict]) -> List[str]:
 
 
 # ---------------------------
-# Firestore writes
+# Schema helpers
 # ---------------------------
-def create_or_merge_link(doc_id: str, destination: str,
-                         #customer: str,
-                         owner_id: str,
-                         active: bool = True,
-                         business_name: Optional[str] = None,
-                         campaign: Optional[str] = None,
-                         template: Optional[str] = None,
-                         business_ref: Optional[firestore.DocumentReference] = None,
-                         business_id: Optional[str] = None):
-    """
-    Create links/{doc_id}. If it already exists, merge business/template back so association isn't lost.
-    """
-    payload = {
-        'destination': destination,
-        'active': bool(active),
-        'hit_count': 0,
-        'created_at': firestore.SERVER_TIMESTAMP,
-        'last_hit_at': None,
-        'owner_id': owner_id,
-    }
-    if owner_id == '' or owner_id is None:
-        print("Error no owner_id provided")
-        return
-
-    #if customer:
-    #    payload['customer'] = str(customer)
-    if business_name:
-        payload['business_name'] = business_name
-    if campaign:
-        payload['campaign'] = campaign
-    if template:
-        payload['template'] = template
-    if business_ref:
-        payload['business'] = business_ref
-    if business_id:
-        payload['business_id'] = business_id
-
-    ref = links.document(doc_id)
-    try:
-        ref.create(payload)
-    except AlreadyExists:
-        # Merge in case we need to attach/refresh the business ref or template on an existing link
-        merge_fields = {}
-        if business_ref:
-            merge_fields['business'] = business_ref
-        if template:
-            merge_fields['template'] = template
-        if campaign:
-            merge_fields['campaign'] = campaign
-        if business_name:
-            merge_fields['business_name'] = business_name
-        if business_id:
-            merge_fields['business_id'] = business_id
-        if merge_fields:
-            ref.set(merge_fields, merge=True)
-        raise  # let caller handle counting/logging
-
-
-def make_business_id(business_name: Optional[str], plz: Optional[str]) -> str:
-    base = sanitize_id(business_name or "")
-    if plz:
-        base = f"{base}-{sanitize_id(plz)}" if base else sanitize_id(plz)
-    return base or "biz"
-
-
 def compose_full_address(street: Optional[str], house_no: Optional[str],
                          plz: Optional[str], city: Optional[str], country: str = "Germany") -> str:
+    """Compose a human-readable address string from individual columns."""
     parts = []
     if street:
         parts.append(street.strip())
     if house_no:
-        parts[-1] = f"{parts[-1]} {house_no.strip()}" if parts else house_no.strip()
+        if parts:
+            parts[-1] = f"{parts[-1]} {house_no.strip()}"
+        else:
+            parts.append(house_no.strip())
     line2 = " ".join(p for p in [plz, city] if p)
     if line2:
         parts.append(line2.strip())
@@ -177,7 +130,49 @@ def compose_full_address(street: Optional[str], house_no: Optional[str],
     return ", ".join(parts)
 
 
+def snapshot_mailing_from_row(row: dict, fallback_business_name: Optional[str]) -> Dict:
+    """Build the immutable mailing snapshot (copied onto links) from the CSV row."""
+    street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
+    house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
+    plz = get_ci(row, 'PLZ', 'Postleitzahl')
+    city = get_ci(row, 'Ort', 'Stadt', 'City')
+    country = get_ci(row, 'Country', 'Land') or "DE"
+    address_lines = []
+    if street or house_no:
+        line1 = " ".join([p for p in [street, house_no] if p])
+        if line1:
+            address_lines.append(line1)
+    mailing = {
+        "business_name": get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company') or fallback_business_name,
+        "recipient_name": None,
+        "address_lines": address_lines,
+        "postcode": plz or None,
+        "city": city or None,
+        "country": country
+    }
+    return mailing
+
+
+def make_business_id(business_name: Optional[str], plz: Optional[str]) -> str:
+    """Create a stable business document id from business name and postcode."""
+    base = sanitize_id(business_name or "")
+    if plz:
+        base = f"{base}-{sanitize_id(plz)}" if base else sanitize_id(plz)
+    return base or "biz"
+
+
+def dedupe_key_for_row(row: dict) -> str:
+    """Return a normalized dedupe key built from name + address parts (lowercased, dashed)."""
+    name = (get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company') or '').lower().strip()
+    street = (get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.') or '').lower().strip().replace('ß', 'ss')
+    house = (get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr') or '').lower().strip()
+    plz = (get_ci(row, 'PLZ', 'Postleitzahl') or '').lower().strip()
+    city = (get_ci(row, 'Ort', 'Stadt', 'City') or '').lower().strip()
+    return f"{re.sub(r'[^a-z0-9]+','-',name)}|{re.sub(r'[^a-z0-9]+','-',street)}-{re.sub(r'[^a-z0-9]+','-',house)}|{plz}|{re.sub(r'[^a-z0-9]+','-',city)}"
+
+
 def geocode_mapbox(address: str, token: str, country_hint: Optional[str] = "DE") -> Optional[Dict[str, float]]:
+    """Look up lat/lon for an address using Mapbox (returns {'lat','lon','source'} or None)."""
     if not token:
         return None
     if requests is None:
@@ -203,11 +198,34 @@ def geocode_mapbox(address: str, token: str, country_hint: Optional[str] = "DE")
         return None
 
 
+# ---------------------------
+# Firestore writes
+# ---------------------------
+def get_or_create_campaign(owner_id: str, code: Optional[str], name: Optional[str]) -> firestore.DocumentReference:
+    """Fetch a campaign by code if provided, otherwise create a new campaign and return its reference."""
+    if code:
+        q = COL_CAMPAIGNS.where('code', '==', code).limit(1).stream()
+        for doc in q:
+            print(f"[campaign] Reusing existing campaign '{code}' → {doc.id}")
+            return doc.reference
+
+    payload = {
+        "name": name or (code or "Untitled Campaign"),
+        "code": code or None,
+        "owner_id": owner_id,
+        "status": "draft",
+        "totals": { "targets": 0, "links": 0, "hits": 0, "unique_ips": 0 },
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP
+    }
+    ref = COL_CAMPAIGNS.document()
+    ref.set(payload)
+    print(f"[campaign] Created campaign → {ref.id} (code={code})")
+    return ref
+
+
 def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str]) -> firestore.DocumentReference:
-    """
-    Create or update businesses/{bizId}. Returns the DocumentReference.
-    No letters array; links are discoverable by querying links where business == bizRef.
-    """
+    """Create or update a business from a CSV row; ensure ownerId is present in ownerIds; return doc ref."""
     business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
     street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
     house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
@@ -226,7 +244,7 @@ def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str
     coordinate = geocode_mapbox(full_addr, mapbox_token) if mapbox_token else None
 
     biz_id = make_business_id(business_name, plz)
-    biz_ref = businesses.document(biz_id)
+    biz_ref = COL_BUSINESSES.document(biz_id)
 
     payload = {
         "business_name": business_name,
@@ -240,7 +258,7 @@ def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str
         "address": full_addr or None,
         "salutation": salutation or None,
         "updated_at": firestore.SERVER_TIMESTAMP,
-        "hit_count": 0,  # aggregate hit count for this business,
+        "hit_count": 0,
         "business_id": biz_id,
     }
     if coordinate:
@@ -249,7 +267,7 @@ def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str
     try:
         create_payload = dict(payload)
         create_payload["created_at"] = firestore.SERVER_TIMESTAMP
-        create_payload["ownerIds"] = [ownerId] 
+        create_payload["ownerIds"] = [ownerId]
         biz_ref.create(create_payload)
     except AlreadyExists:
         biz_ref.set(payload, merge=True)
@@ -258,47 +276,88 @@ def upsert_business_from_row(row: dict, ownerId: str, mapbox_token: Optional[str
     return biz_ref
 
 
-# ---------------------------
-# Legacy CSV mode (unchanged semantics)
-# ---------------------------
-def seed_from_csv(path: str, on_duplicate: str):
-    created, skipped, errors = 0, 0, 0
-    with open(path, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            doc_id = get_ci(row, 'id', 'link_id')
-            dest = get_ci(row, 'destination', 'url')
-            active = str(row.get('active', 'true')).lower() != 'false'
-            customer = get_ci(row, 'customer', 'business_id', 'company_id')
-            business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
-            campaign = get_ci(row, 'campaign')
-            template_raw = get_ci(row, 'Template', 'template')
-            adjusted_template = template_with_qr_suffix(template_raw)
-
-            if not doc_id or not dest:
-                print(f"[skip] Missing id/destination: {row}")
-                skipped += 1
-                continue
-            try:
-                create_or_merge_link(doc_id, dest, customer, active, business_name, campaign, adjusted_template or template_raw)
-                print(f"[ok] {doc_id} -> {dest}")
-                created += 1
-            except AlreadyExists:
-                print(f"[skip-duplicate] {doc_id} already exists")
-                skipped += 1
-            except Exception as e:
-                print(f"[error] {doc_id}: {e}")
-                errors += 1
-    print(f"Done. created={created} skipped={skipped} errors={errors}")
+def create_target(campaign_ref: firestore.DocumentReference,
+                  biz_ref: firestore.DocumentReference,
+                  row: dict,
+                  status: str) -> firestore.DocumentReference:
+    """Create a target (imported audience row) under a campaign and return its reference."""
+    targets = campaign_ref.collection('targets')
+    target_ref = targets.document()  # auto-id
+    payload = {
+        "business_ref": biz_ref,
+        "status": status,
+        "reason_excluded": None,
+        "link_ref": None,
+        "import_row": row,
+        "dedupe_key": dedupe_key_for_row(row),
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP
+    }
+    target_ref.set(payload)
+    COL_CAMPAIGNS.document(campaign_ref.id).set(
+        {"totals.targets": firestore.Increment(1), "updated_at": firestore.SERVER_TIMESTAMP},
+        merge=True
+    )
+    return target_ref
 
 
+def create_or_merge_link_new(link_id: str,
+                             dest: str,
+                             owner_id: str,
+                             business_ref: firestore.DocumentReference,
+                             campaign_ref: firestore.DocumentReference,
+                             target_ref: firestore.DocumentReference,
+                             business_name_for_snapshot: Optional[str],
+                             template_raw: Optional[str],
+                             active: bool = True):
+    """Create a link for a target (or merge if exists); update target.status/link_ref and campaign totals."""
+    # Read target row for snapshot (one read per link; acceptable for imports)
+    target_doc = target_ref.get()
+    target_row = target_doc.to_dict().get('import_row', {}) if target_doc.exists else {}
+
+    payload = {
+        "campaign_ref": campaign_ref,
+        "business_ref": business_ref,
+        "target_ref": target_ref,
+        "destination": dest,
+        "template_id": template_with_qr_suffix(template_raw),
+        "short_code": link_id,
+        "active": bool(active),
+        "hit_count": 0,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "last_hit_at": None,
+        "owner_id": owner_id,
+        "snapshot_mailing": snapshot_mailing_from_row(target_row, business_name_for_snapshot)
+    }
+
+    ref = COL_LINKS.document(link_id)
+    try:
+        ref.create(payload)
+    except AlreadyExists:
+        merge_fields = {
+            "campaign_ref": campaign_ref,
+            "business_ref": business_ref,
+            "target_ref": target_ref,
+            "destination": dest,
+            "template_id": payload["template_id"],
+            "owner_id": owner_id
+        }
+        ref.set(merge_fields, merge=True)
+        raise
+
+    target_ref.set({"link_ref": ref, "status": "linked", "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
+    COL_CAMPAIGNS.document(campaign_ref.id).set(
+        {"totals.links": firestore.Increment(1), "updated_at": firestore.SERVER_TIMESTAMP},
+        merge=True
+    )
+    return ref
+
+
 # ---------------------------
-# Business-file mode helpers & flow
+# File IO helpers
 # ---------------------------
 def derive_fields_for_business_row(row: dict, dest_default: Optional[str]) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
-    """
-    Returns: (doc_id_from_row, destination, business_name, template_raw, template_col_key)
-    """
+    """Extract common fields from a row: (link_id, destination, business_name, template_raw, template_col_key)."""
     doc_id_from_row = get_ci(row, 'id', 'link_id')
     dest = get_ci(row, 'destination', 'url') or dest_default
     business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
@@ -308,6 +367,7 @@ def derive_fields_for_business_row(row: dict, dest_default: Optional[str]) -> Tu
 
 
 def write_back_csv(input_path: str, rows: list, suffix="_with_links") -> str:
+    """Write updated rows to a CSV file (keeps original columns; appends 'tracking_link' last)."""
     base, _ = os.path.splitext(input_path)
     out_path = f"{base}{suffix}.csv"
     fieldnames = csv_fieldnames_union(rows)
@@ -320,6 +380,7 @@ def write_back_csv(input_path: str, rows: list, suffix="_with_links") -> str:
 
 
 def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
+    """Write updated rows to an Excel file; moves 'tracking_link' column to the end if present."""
     base, _ = os.path.splitext(input_path)
     out_path = f"{base}{suffix}.xlsx"
     cols = list(df.columns)
@@ -331,12 +392,17 @@ def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
     return out_path
 
 
-def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
-                                    dest_default: Optional[str], campaign: Optional[str],
-                                    prefix: Optional[str],
+# ---------------------------
+# Main flow
+# ---------------------------
+def assign_links_from_business_file(path: str, base_url: str,
+                                    dest_default: str,
+                                    campaign_code: str,
+                                    campaign_name: str,
                                     ownerId: str,
                                     limit: int,
-                                    mapbox_token: Optional[str]):
+                                    mapbox_token: str):
+    """End-to-end import: read CSV/XLSX → upsert businesses → create campaign targets → create links → write output file."""
     created, skipped, errors = 0, 0, 0
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
@@ -354,7 +420,9 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
             reader = csv.DictReader(f)
             rows = list(reader)
 
-    next_counter = 1
+    # Prepare / reuse campaign
+    campaign_ref = get_or_create_campaign(ownerId, campaign_code, campaign_name)
+
     total_rows = len(rows)
 
     for i, row in enumerate(rows):
@@ -369,18 +437,13 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
 
             # Business upsert first → get a stable ref
             biz_ref = upsert_business_from_row(row, ownerId, mapbox_token)
-            biz_id = biz_ref.id
 
-            # Link doc id resolution
-            doc_id = doc_id_from_row
-            if not doc_id and prefix:
-                doc_id = f"{prefix}{next_counter}"
-                next_counter += 1
-            if not doc_id:
-                base_slug = sanitize_id(business_name or "")
-                if not base_slug:
-                    base_slug = "ID"
-                doc_id = f"{base_slug}-{i+1}"
+            # Create a target for the imported row
+            target_status = "validated" if dest else "excluded"
+            target_ref = create_target(campaign_ref, biz_ref, row, target_status)
+
+            # Resolve Link doc id
+            doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1:04d}"
 
             if not dest:
                 print(f"[skip] No destination (column or --dest) for row {i+1}: {row}")
@@ -388,14 +451,17 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
                 row['tracking_link'] = ''
                 continue
 
-            adjusted_template = template_with_qr_suffix(template_raw)
-
             try:
-                create_or_merge_link(
-                    doc_id, dest,
-                    ownerId, True, business_name, campaign, adjusted_template,
+                create_or_merge_link_new(
+                    link_id=doc_id,
+                    dest=dest,
+                    owner_id=ownerId,
                     business_ref=biz_ref,
-                    business_id=biz_id
+                    campaign_ref=campaign_ref,
+                    target_ref=target_ref,
+                    business_name_for_snapshot=business_name,
+                    template_raw=template_raw,
+                    active=True
                 )
                 created += 1
             except AlreadyExists:
@@ -407,6 +473,7 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
 
             # Write back to output row
             row['tracking_link'] = build_tracking_link(base_url, doc_id)
+            adjusted_template = template_with_qr_suffix(template_raw)
             if adjusted_template:
                 if template_key:
                     row[template_key] = adjusted_template
@@ -427,52 +494,23 @@ def assign_links_from_business_file(path: str, base_url: str, on_duplicate: str,
 
     print(f"Done. created={created} skipped={skipped} errors={errors}")
     print(f"Processed/uploaded up to limit={limit if limit>0 else 'ALL'} of {total_rows} rows.")
+    print(f"Campaign ID: {campaign_ref.id}")
     print(f"Wrote updated file with 'tracking_link': {out_path}")
-
-
-# ---------------------------
-# Prefixed generation (legacy)
-# ---------------------------
-def seed_prefixed(prefix: str, count: int, dest: str, on_duplicate: str,
-                  customer: str = None, business_name: str = None,
-                  campaign: str = None, template: str = None):
-    created, skipped, errors = 0, 0, 0
-    for i in range(count):
-        doc_id = f"{prefix}{i+1}"
-        try:
-            create_or_merge_link(doc_id, dest, customer, True, business_name, campaign, template)
-            if (i+1) % 100 == 0:
-                print(f"[ok] Created {i+1} so far...")
-            created += 1
-        except AlreadyExists:
-            print(f"[skip-duplicate] {doc_id} already exists")
-            skipped += 1
-        except Exception as e:
-            print(f"[error] {doc_id}: {e}")
-            errors += 1
-    print(f"Done. created={created} skipped={skipped} errors={errors}")
 
 
 # ---------------------------
 # CLI
 # ---------------------------
 if __name__ == '__main__':
-    p = argparse.ArgumentParser(description='Seed Firestore links and businesses; update file with tracking links.')
-    # Legacy
-    p.add_argument('csv', nargs='?', help='(legacy) CSV of links: id,destination,active,customer|business_id,business_name,campaign,template')
-    p.add_argument('--prefix', help='Prefix for generated IDs, e.g. INV')
-    p.add_argument('--count', type=int, default=0, help='How many IDs to generate')
-    p.add_argument('--dest', help='Destination URL used for all generated IDs (or as default for business-file mode)')
-    p.add_argument('--campaign', help='Campaign label to attach to generated links')
-    p.add_argument('--template', help='(legacy modes only) Template label; ignored when using --business-file')
-    p.add_argument('--on-duplicate', choices=['skip','error'], default='skip',
-                   help='When a link already exists: skip (default) or raise error')
+    p = argparse.ArgumentParser(description='Import CSV/XLSX → businesses + campaign targets + links; write file with tracking links.')
 
-    # Business-file mode
-    p.add_argument('--business-file', help='CSV or XLSX of businesses to assign tracking links to')
+    p.add_argument('--business-file', help='CSV or XLSX to import')
+    p.add_argument('--dest', help='Default destination URL (used if row lacks destination/url)')
+    p.add_argument('--campaign-code', help='human code to reuse/create a campaign (e.g., ADM-01)')
+    p.add_argument('--campaign-name', help='campaign display name (falls back to code or "Untitled Campaign")')
     p.add_argument('--base-url', help='Base URL for tracking links, e.g. https://qr.example.com')
-    p.add_argument('--ownerId', help='Customer identifier to attach to ALL rows in the business file')
-    p.add_argument('--limit', type=int, default=0, help='Only process/upload the first X rows from the file (0 = all)')
+    p.add_argument('--ownerId', help='UID of the user who owns this import/campaign')
+    p.add_argument('--limit', type=int, default=0, help='Only process the first X rows (0 = all)')
     p.add_argument('--mapbox-token', default=os.environ.get("MAPBOX_TOKEN"),
                    help='Mapbox API token for geocoding (or set env MAPBOX_TOKEN).')
 
@@ -486,18 +524,12 @@ if __name__ == '__main__':
         assign_links_from_business_file(
             path=args.business_file,
             base_url=args.base_url,
-            on_duplicate=args.on_duplicate,
             dest_default=args.dest,
-            campaign=args.campaign,
-            prefix=args.prefix,
+            campaign_code=args.campaign_code,
+            campaign_name=args.campaign_name,
             ownerId=args.ownerId,
             limit=args.limit,
             mapbox_token=args.mapbox_token,
         )
-    elif args.csv:
-        seed_from_csv(args.csv, args.on_duplicate)
-    elif args.prefix and args.count > 0 and args.dest:
-        seed_prefixed(args.prefix, args.count, args.dest, args.on_duplicate,
-                      None, None, args.campaign, args.template)
     else:
-        p.error('Provide one of: (1) a links CSV, (2) --prefix + --count + --dest, or (3) --business-file + --base-url + --customer.')
+        p.error('Provide: --business-file + --base-url + --ownerId (optional: --dest, --campaign-code, --campaign-name, --limit).')
