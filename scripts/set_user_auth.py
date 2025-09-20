@@ -53,9 +53,10 @@ def set_user_claims(uid: str, is_admin: bool, credential_path: Optional[str] = N
 if __name__ == "__main__":
     # Example usage:
     credentials_local_path = "/Users/marcelgleich/Downloads/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #Dev account
-    claims = set_user_claims("2bwkVVRWekNULFKevJf9GuHWyJC3", is_admin=True, credential_path=credentials_local_path)  # uses ADC
+    uid = "NDihL9EExCO5ohwZfomwnISaIvV2"
+
+    claims = set_user_claims(uid, is_admin=False, credential_path=credentials_local_path)  # uses ADC
     # claims = set_user_claims("some-uid-123", is_admin=False, credential_path="service-account.json")
     print("Updated claims:", claims)
-    uid = "2bwkVVRWekNULFKevJf9GuHWyJC3"
     user = auth.get_user(uid)
     print("Custom claims:", user.custom_claims)  # {'isAdmin': True, 'userId': '...
