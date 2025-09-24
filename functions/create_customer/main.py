@@ -30,15 +30,31 @@ from flask import Request, jsonify  # used only for the HTTP function
 
 
 # ---------- Admin SDK init ----------
-def _init_admin():
-    """Initialize Firebase Admin once."""
+def _init_admin(project_id: Optional[str] = None, database_id: Optional[str] = None):
+    """
+    Initialize Firebase Admin once and return a Firestore client
+    bound to the given project & database.
+
+    - project_id: your GCP project (e.g. "acme-prod")
+    - database_id: Firestore database id (use "(default)" for the default)
+    """
+    # Pick sensible defaults
+    print("project_id function", project_id)
+    print("database_id", database_id)
+
     if not firebase_admin._apps:
-        # Locally: use GOOGLE_APPLICATION_CREDENTIALS.
-        # In Cloud Functions: Application Default Credentials are used automatically.
-        cred = credentials.ApplicationDefault() if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is None \
-               else credentials.Certificate(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
-        firebase_admin.initialize_app(cred)
-    return firestore.client()
+        # Locally: use service account if provided; otherwise ADC.
+        cred = (
+            credentials.Certificate(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+            if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            else credentials.ApplicationDefault()
+        )
+        # Pass projectId here so Auth & other services also bind to the right project.
+        firebase_admin.initialize_app(cred, {"projectId": project_id} if project_id else None)
+
+    # Bind Firestore explicitly to project + database (multi-DB aware).
+    return firestore.Client(project=project_id, database=database_id)
+
 
 
 # ---------- Core ops (idempotent) ----------
@@ -52,7 +68,7 @@ def ensure_user(email: str, display_name: Optional[str] = None) -> Tuple[auth.Us
         return user, True
 
 
-def ensure_claims(uid: str, set_admin: Optional[bool] = None, extra: Optional[dict] = None) -> dict:
+def ensure_claims(uid: str, set_admin: Optional[bool] = False, extra: Optional[dict] = None) -> dict:
     """
     Merge/Update custom claims. Only changes provided keys.
     Returns the new claims dict.
@@ -63,6 +79,8 @@ def ensure_claims(uid: str, set_admin: Optional[bool] = None, extra: Optional[di
         claims["isAdmin"] = bool(set_admin)
     if extra:
         claims.update(extra)
+    claims.update({"isAdmin": bool(set_admin), "userId": uid})
+    print("Setting claims for", uid, claims)
     auth.set_custom_user_claims(uid, claims)
     return claims
 
@@ -120,9 +138,11 @@ def main_cli():
     p.add_argument("--admin", type=int, default=None, help="set isAdmin claim (1/0); omit to leave unchanged")
     p.add_argument("--locale", default="de-DE")
     p.add_argument("--tz", default="Europe/Berlin")
+    p.add_argument("--project", help="GCP project ID (overrides env)")
+    p.add_argument("--database", default="(default)", help="Firestore database ID")
     args = p.parse_args()
 
-    db = _init_admin()
+    db = _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
 
     user, created_user = ensure_user(args.email, args.name)
     claims = ensure_claims(user.uid, (args.admin == 1) if args.admin is not None else None)
@@ -176,7 +196,7 @@ def create_customer_http(request: Request):
     HTTP endpoint (admin-only) to create/ensure a customer.
     Body JSON: { email, display_name?, plan? = "free", is_active? = true, set_admin? = false }
     """
-    db = _init_admin()
+    db = _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
 
     decoded = _require_admin_from_bearer(request)
     if not decoded:
@@ -221,5 +241,7 @@ def create_customer_http(request: Request):
 # ---------- Entrypoint ----------
 if __name__ == "__main__":
     # CLI mode
-    _init_admin()
+    PROJECT_ID = "gb-qr-tracker-dev"
+    DATABASE_ID = "(default)"
+    _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
     main_cli()
