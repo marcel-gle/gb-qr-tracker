@@ -55,7 +55,7 @@ except Exception:
 # Utilities
 # ---------------------------
 def build_tracking_link(base_url: str, doc_id: str) -> str:
-    return f"{base_url.rstrip('/')}/{doc_id}"
+    return f"{base_url.rstrip('/')}/?id={doc_id}"
 
 def sanitize_id(value: str) -> str:
     if value is None:
@@ -226,7 +226,7 @@ def get_or_create_campaign(owner_id: str,
 
     if not snap.exists:
         payload = {
-            "name": name or "Untitled Campaign",
+            "campaign_name": name or "Untitled Campaign",
             "code": code or None,
             "owner_id": owner_id,
             "status": "draft",
@@ -477,7 +477,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                             "created_at": firestore.SERVER_TIMESTAMP,
                             "last_hit_at": None,
                             "owner_id": ownerId,
-                            "snapshot_mailing": snapshot
+                            "snapshot_mailing": snapshot,
+                            "campaign_name": campaign_name,
                         }
                         batch.set(link_ref, link_payload, merge=True); ops += 1
                         created_links += 1
@@ -567,6 +568,8 @@ def process_business_upload(cloud_event):
     Triggered by: google.cloud.storage.object.v1.finalized
     Event data shape: https://cloud.google.com/eventarc/docs/cloudevents#storage
     """
+    # Ignore our own artifacts
+
     data = cloud_event.data
     bucket_name = data["bucket"]
     object_name = data["name"]               # e.g., uploads/job-123/businesses.xlsx
@@ -598,6 +601,11 @@ def process_business_upload(cloud_event):
         return
     if not (name.endswith(".csv") or name.endswith(".xlsx")):
         print(f"[skip] not CSV/XLSX: {name}")
+        return
+    
+    # Ignore our own artifacts
+    if "_with_links" in name:
+        print(f"[skip] artifact filename: {name}")
         return
     #logging end
 

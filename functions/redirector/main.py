@@ -190,6 +190,7 @@ def redirector(request: Request):
     target_ref   = data.get('target_ref')       # DocumentReference or None
     template_id  = data.get('template_id')      # string or None
     owner_id     = data.get('owner_id')
+    campaign_name = data.get("campaign_name")
 
     # --- Batch: update link (+ business, + campaign totals.hits) ---
     try:
@@ -243,6 +244,7 @@ def redirector(request: Request):
         'device_type': dev,
         'ua_browser': browser[:128],
         'ua_os': os_str[:128],
+        "campagin_name": campaign_name
     }
     if referer:
         hit['referer'] = referer[:512]
