@@ -54,6 +54,9 @@ except Exception:
 # ---------------------------
 # Utilities
 # ---------------------------
+class DuplicateCampaignCodeError(RuntimeError):
+    pass
+
 def build_tracking_link(base_url: str, doc_id: str) -> str:
     return f"{base_url.rstrip('/')}/?id={doc_id}"
 
@@ -210,7 +213,63 @@ def bulk_get_existing(doc_refs: List[firestore.DocumentReference]) -> Set[str]:
     return existing
 
 
+def normalize_campaign_code(code: Optional[str]) -> str:
+    if not code:
+        raise RuntimeError("campaign_code is required but missing")
+    return sanitize_id(code).upper()
+
+
+
 def get_or_create_campaign(owner_id: str,
+                           campaign_id: str,
+                           name: Optional[str],
+                           code: Optional[str] = None) -> firestore.DocumentReference:
+    if not campaign_id:
+        raise RuntimeError("campaignId is required but missing")
+
+    code_norm = sanitize_id(code).upper() if code else None
+
+    # Check if any other campaign already has this code
+    if code_norm:
+        conflict_q = COL_CAMPAIGNS.where("code", "==", code_norm).limit(1).stream()
+        for doc in conflict_q:
+            if doc.id != campaign_id:
+                raise DuplicateCampaignCodeError(
+                    f"campaign_code '{code_norm}' is already in use by campaign '{doc.id}'. "
+                    "Choose a different code."
+                )
+
+    ref = COL_CAMPAIGNS.document(campaign_id)
+    snap = ref.get()
+
+    if not snap.exists:
+        payload = {
+            "campaign_name": name or "Untitled Campaign",
+            "code": code_norm,
+            "owner_id": owner_id,
+            "status": "draft",
+            "totals": {"targets": 0, "links": 0, "hits": 0, "unique_ips": 0},
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        }
+        ref.set(payload)
+        print(f"[campaign] Created campaign with ID {campaign_id}")
+    else:
+        data = snap.to_dict() or {}
+        existing_code = data.get("code")
+        if existing_code and code_norm and existing_code != code_norm:
+            raise DuplicateCampaignCodeError(
+                f"Campaign '{campaign_id}' already has code '{existing_code}', not '{code_norm}'."
+            )
+        if not existing_code and code_norm:
+            ref.set({"code": code_norm, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
+        print(f"[campaign] Using existing campaign with ID {campaign_id}")
+
+    return ref
+
+
+
+def get_or_create_campaign_old(owner_id: str,
                            campaign_id: str,
                            name: Optional[str],
                            code: Optional[str] = None) -> firestore.DocumentReference:
@@ -406,10 +465,13 @@ def assign_links_from_business_file(path: str, base_url: str,
         })
 
     existing_ids: Set[str] = set()
+    print("PRE CHECK skip_existing:", skip_existing)
     if skip_existing:
+        print("Line 410 skip_existing", skip_existing, "precomputing existing link ids...")
         link_refs = [COL_LINKS.document(item["doc_id"]) for item in precomputed
                      if item.get("in_limit") and item.get("dest")]
         existing_ids = bulk_get_existing(link_refs)
+        print("Existing ids computed:", len(existing_ids))
         if existing_ids:
             print(f"[pre-scan] Found {len(existing_ids)} existing link ids (will skip creating those).")
 
@@ -464,31 +526,35 @@ def assign_links_from_business_file(path: str, base_url: str,
 
                 if dest:
                     if skip_existing and doc_id in existing_ids:
-                        # skip creating link, keep target status as linked
                         print("[skip] link with id", doc_id, "already exists")
-                        pass
                     else:
-                        link_payload = {
-                            "campaign_ref": campaign_ref,
-                            "business_ref": biz_ref,
-                            "target_ref": target_ref,
-                            "destination": dest,
-                            "template_id": template_with_qr_suffix(template_raw),
-                            "short_code": doc_id,
-                            "active": True,
-                            "hit_count": 0,
-                            "created_at": firestore.SERVER_TIMESTAMP,
-                            "last_hit_at": None,
-                            "owner_id": ownerId,
-                            "snapshot_mailing": snapshot,
-                            "campaign_name": campaign_name,
-                        }
-                        batch.set(link_ref, link_payload, merge=True); ops += 1
-                        created_links += 1
-                else:
-                    # excluded
-                    print("[info] No destination for row", row)
-                    pass
+                        try:
+                            # never overwrite: create will error if the doc exists
+                            batch.create(link_ref, {
+                                "campaign_ref": campaign_ref,
+                                "business_ref": biz_ref,
+                                "target_ref": target_ref,
+                                "destination": dest,
+                                "template_id": template_with_qr_suffix(template_raw),
+                                "short_code": doc_id,
+                                "active": True,
+                                "hit_count": 0,
+                                "created_at": firestore.SERVER_TIMESTAMP,
+                                "last_hit_at": None,
+                                "owner_id": ownerId,
+                                "snapshot_mailing": snapshot,
+                                "campaign_name": campaign_name,
+                            })
+                            ops += 1
+                            created_links += 1
+                        except AlreadyExists:
+                            if skip_existing:
+                                print("[skip] link with id", doc_id, "already exists")
+                            else:
+                                raise RuntimeError(
+                                    f"Link ID '{doc_id}' already exists. "
+                                    "Refusing to overwrite. Enable skip_existing to bypass."
+                                )
 
                 row['tracking_link'] = build_tracking_link(base_url, doc_id) if dest else ''
                 adjusted_template = template_with_qr_suffix(template_raw)
@@ -563,6 +629,25 @@ def _content_type_for(path: str) -> str:
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return "application/octet-stream"
 
+def _delete_prefix(bucket: storage.Bucket, prefix: str) -> int:
+    """
+    Deletes all blobs under the given prefix. Returns number of deleted blobs.
+    Safe to call multiple times. Ignores missing files.
+    """
+    print(f"[cleanup] Deleting storage prefix: {prefix}")
+    deleted = 0
+    # list_blobs paginates under the hood
+    for blob in bucket.list_blobs(prefix=prefix):
+        try:
+            blob.delete()
+            deleted += 1
+        except Exception as e:
+            # Don't block the whole function on a single delete error; just log
+            print(f"[cleanup] Warn: failed to delete {blob.name}: {e}")
+    print(f"[cleanup] Deleted {deleted} blobs under {prefix}")
+    return deleted
+
+
 # ---------------------------
 # CloudEvent entry point (Gen 2)
 # ---------------------------
@@ -577,6 +662,13 @@ def process_business_upload(cloud_event):
     data = cloud_event.data
     bucket_name = data["bucket"]
     object_name = data["name"]               # e.g., uploads/job-123/businesses.xlsx
+    # Derive the campaign root prefix: uploads/<env>/<uid>/<campaignId>/
+    parts = object_name.split("/")
+    # Expecting: ["uploads", env, uid, campaignId, "source", "file.ext" ...]
+    campaign_root_prefix = None
+    if len(parts) >= 4:
+        campaign_root_prefix = "/".join(parts[:4]).rstrip("/") + "/"
+
     content_type = data.get("contentType", "")
     metadata = data.get("metadata", {}) or {}
     #name = (data.get("name") or "").lower()
@@ -652,35 +744,97 @@ def process_business_upload(cloud_event):
         "campaign_name": manifest.get("campaign_name") or metadata.get("campaign_name"),
         "campaign_id": manifest.get("campaignId") or metadata.get("campaign_id"),
         "limit": int(manifest.get("limit", 0) or metadata.get("limit", 0) or 0),
-        "skip_existing": bool(manifest.get("skip_existing", False) or (metadata.get("skip_existing") in ("1", "true", "True"))),
+        "skip_existing": bool(manifest.get("skip_existing", True) or (metadata.get("skip_existing") in ("1", "true", "True"))),
         "geocode": bool(manifest.get("geocode", False) or (metadata.get("geocode") in ("1", "true", "True"))),
         "mapbox_token": manifest.get("mapbox_token") or metadata.get("mapbox_token") or DEFAULT_MAPBOX_TOKEN,
     }
 
-    #print("PARAMS", params)
+    campaign_code = params["campaign_code"]
+    if not campaign_code:
+        raise RuntimeError("campaign_code is required.")
+    params["campaign_code"] = normalize_campaign_code(campaign_code)
+
+
+    print("PARAMS", params)
 
     # Download uploaded file to /tmp
     local_in = os.path.join("/tmp", os.path.basename(object_name))
     _download_blob(bucket, object_name, local_in)
 
-    # Process
-    out_path = assign_links_from_business_file(
-        path=local_in,
-        base_url=base_url,
-        destination=params["destination"],
-        campaign_code=params["campaign_code"],
-        campaign_name=params["campaign_name"],
-        campaign_id=params["campaign_id"],
-        ownerId=ownerId,
-        limit=params["limit"],
-        mapbox_token=params["mapbox_token"],
-        skip_existing=params["skip_existing"],
-        geocode=params["geocode"],
-    )
+    # ---------------------------
+    # Process (with minimal changes): on DuplicateCampaignCodeError, delete folder & log
+    # ---------------------------
+    try:
+        # Process
+        out_path = assign_links_from_business_file(
+            path=local_in,
+            base_url=base_url,
+            destination=params["destination"],
+            campaign_code=params["campaign_code"],
+            campaign_name=params["campaign_name"],
+            campaign_id=params["campaign_id"],
+            ownerId=ownerId,
+            limit=params["limit"],
+            mapbox_token=params["mapbox_token"],
+            skip_existing=params["skip_existing"],
+            geocode=params["geocode"],
+        )
 
-    # Upload output next to input (same folder), with suffix
-    out_name = os.path.basename(out_path)
-    dest_blob = f"{prefix_dir}/{out_name}" if prefix_dir else out_name
-    _upload_blob(bucket, out_path, dest_blob, _content_type_for(out_path))
+        # Upload output next to input (same folder), with suffix
+        out_name = os.path.basename(out_path)
+        dest_blob = f"{prefix_dir}/{out_name}" if prefix_dir else out_name
+        _upload_blob(bucket, out_path, dest_blob, _content_type_for(out_path))
 
-    print(f"[done] Wrote: gs://{bucket_name}/{dest_blob}")
+        print(f"[done] Wrote: gs://{bucket_name}/{dest_blob}")
+
+    except DuplicateCampaignCodeError as e:
+        # Clear, structured logs about the duplicate + cleanup
+        print(json.dumps({
+            "event": "duplicate_campaign_code",
+            "message": str(e),
+            "bucket": bucket_name,
+            "object": object_name,
+            "owner_id": ownerId,
+            "campaign_id": params.get("campaign_id"),
+            "campaign_code": params.get("campaign_code"),
+            "cleanup_prefix": campaign_root_prefix
+        }, ensure_ascii=False))
+
+        # Delete the entire campaign folder (manifest, CSV/XLSX, templates, etc.)
+        if campaign_root_prefix:
+            print(json.dumps({
+                "event": "duplicate_cleanup_start",
+                "bucket": bucket_name,
+                "prefix": campaign_root_prefix
+            }, ensure_ascii=False))
+
+            blobs = list(bucket.list_blobs(prefix=campaign_root_prefix))
+            deleted = 0
+            for b in blobs:
+                try:
+                    b.delete()
+                    deleted += 1
+                except Exception as del_err:
+                    print(json.dumps({
+                        "event": "duplicate_cleanup_warning",
+                        "prefix": campaign_root_prefix,
+                        "blob": b.name,
+                        "error": str(del_err)
+                    }, ensure_ascii=False))
+
+            print(json.dumps({
+                "event": "duplicate_cleanup_done",
+                "bucket": bucket_name,
+                "prefix": campaign_root_prefix,
+                "deleted": deleted,
+                "listed": len(blobs)
+            }, ensure_ascii=False))
+        else:
+            print(json.dumps({
+                "event": "duplicate_cleanup_skipped_no_prefix",
+                "bucket": bucket_name,
+                "object": object_name
+            }, ensure_ascii=False))
+
+        # Re-raise so the invocation is marked failed and the error appears in logs
+        raise
