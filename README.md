@@ -50,6 +50,7 @@ python seed_links.py \
 
 NEW Example CLI command to deploy redirector:
  gcloud functions deploy redirector \
+  --project=$PROJECT_ID \
   --gen2 \
   --runtime=python311 \
   --region=europe-west3 \
@@ -71,7 +72,7 @@ gcloud functions deploy upload_processor \
   --source=functions/upload_processor \
   --entry-point=process_business_upload \
   --service-account=$SA \
-  --trigger-bucket=gb-qr-tracker-dev.firebasestorage.app \
+  --trigger-bucket=gb-qr-tracker.firebasestorage.app \
   --trigger-location=eu \
   --trigger-service-account=$SA \
   --set-secrets=MAPBOX_TOKEN=projects/$PROJECT_ID/secrets/MAPBOX_TOKEN:latest \

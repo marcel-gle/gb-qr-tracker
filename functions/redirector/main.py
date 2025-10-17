@@ -172,6 +172,8 @@ def redirector(request: Request):
         return ('Missing or invalid "id" query parameter.', 400)
 
     link_ref = _db.collection('links').document(link_id)
+    print("Fetching LINK:", link_id)
+    print("Link ref path:", link_ref.path)
     snap = link_ref.get()
     if not snap.exists:
         return ('Link not found.', 404)
@@ -197,6 +199,8 @@ def redirector(request: Request):
         batch = _db.batch()
 
         # link aggregates
+        print("Updating link hit count:", link_ref)
+        print("Link REF server timestamp:", SERVER_TIMESTAMP)
         batch.update(link_ref, {
             'hit_count': Increment(1),
             'last_hit_at': SERVER_TIMESTAMP,
@@ -213,7 +217,8 @@ def redirector(request: Request):
         if isinstance(campaign_ref, firestore.DocumentReference):
             batch.set(campaign_ref, {
                 'totals.hits': Increment(1),
-                'updated_at': SERVER_TIMESTAMP
+                'updated_at': SERVER_TIMESTAMP,
+                'last_hit_at': SERVER_TIMESTAMP,
             }, merge=True)
 
         batch.commit()
@@ -244,7 +249,7 @@ def redirector(request: Request):
         'device_type': dev,
         'ua_browser': browser[:128],
         'ua_os': os_str[:128],
-        "campagin_name": campaign_name
+        "campaign_name": campaign_name
     }
     if referer:
         hit['referer'] = referer[:512]

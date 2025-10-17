@@ -152,7 +152,7 @@ def snapshot_mailing_from_row(row: dict, fallback_business_name: Optional[str]) 
     return mailing
 
 def make_business_id(business_name: Optional[str], plz: Optional[str]) -> str:
-    print("make_business_id", business_name, plz)
+    #print("make_business_id", business_name, plz)
     base = sanitize_id(business_name or "")
     if plz:
         base = f"{base}-{sanitize_id(plz)}" if base else sanitize_id(plz)
@@ -260,6 +260,8 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     phone = " ".join(p for p in [prefix_tel, tel] if p)
     full_addr = compose_full_address(street, house_no, plz, city, "Germany")
 
+    #print("upsert_business_payload_from_row", business_name, street, house_no, plz, city, contact_name, phone, email, salutation, full_addr, coordinate)
+
     biz_id = make_business_id(business_name, plz)
     payload = {
         "business_name": business_name,
@@ -322,8 +324,8 @@ def assign_links_from_business_file(path: str, base_url: str,
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
 
-    print("assign_links_from_business_file ownerId:", ownerId)
-    print("Geocode:", geocode, "Mapbox token:", "yes" if mapbox_token else "no")
+    #print("assign_links_from_business_file ownerId:", ownerId)
+    #print("Geocode:", geocode, "Mapbox token:", "yes" if mapbox_token else "no")
 
     if is_excel:
         if pd is None:
@@ -357,8 +359,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                 r = { (k if isinstance(k, str) else str(k)): v for k, v in r.items() }
                 r.pop("_extra", None)
                 rows.append(r)
-        print(f"[csv] delimiter='{delimiter}' rows={len(rows)}")
-        print("2 ROWS", rows[:2])
+        #print(f"[csv] delimiter='{delimiter}' rows={len(rows)}")
+        #print("2 ROWS", rows[:2])
 
 
     total_rows = len(rows)
@@ -463,6 +465,7 @@ def assign_links_from_business_file(path: str, base_url: str,
                 if dest:
                     if skip_existing and doc_id in existing_ids:
                         # skip creating link, keep target status as linked
+                        print("[skip] link with id", doc_id, "already exists")
                         pass
                     else:
                         link_payload = {
@@ -484,6 +487,7 @@ def assign_links_from_business_file(path: str, base_url: str,
                         created_links += 1
                 else:
                     # excluded
+                    print("[info] No destination for row", row)
                     pass
 
                 row['tracking_link'] = build_tracking_link(base_url, doc_id) if dest else ''
@@ -579,6 +583,8 @@ def process_business_upload(cloud_event):
 
     #logging start
     print("⚡ trigger")
+    print("cloud_event", cloud_event)
+    print("data", data)
     print("bucket_name", bucket_name, "object_name", object_name, "content_type", content_type, "metadata", metadata)
     meta = {
         "id": getattr(cloud_event, "id", None),
@@ -596,7 +602,7 @@ def process_business_upload(cloud_event):
                       "metadata": data.get("metadata")}, ensure_ascii=False))
 
     name = (data.get("name") or "").lower()
-    if not name.startswith("uploads/dev/"):
+    if not name.startswith("uploads/"):
         print(f"[skip] outside watched prefix: {name}")
         return
     if not (name.endswith(".csv") or name.endswith(".xlsx")):
@@ -650,6 +656,8 @@ def process_business_upload(cloud_event):
         "geocode": bool(manifest.get("geocode", False) or (metadata.get("geocode") in ("1", "true", "True"))),
         "mapbox_token": manifest.get("mapbox_token") or metadata.get("mapbox_token") or DEFAULT_MAPBOX_TOKEN,
     }
+
+    #print("PARAMS", params)
 
     # Download uploaded file to /tmp
     local_in = os.path.join("/tmp", os.path.basename(object_name))

@@ -127,50 +127,6 @@ def ensure_customer_doc(
         )
         return False
 
-
-# ---------- CLI ----------
-def main_cli():
-    p = argparse.ArgumentParser(description="Create/ensure a customer by email")
-    p.add_argument("--email", required=True, help="Customer's login email")
-    p.add_argument("--name", help="Display name (defaults to email prefix)")
-    p.add_argument("--plan", default="free", choices=["free", "pro", "enterprise"])
-    p.add_argument("--active", type=int, default=1, help="1 or 0 (default 1)")
-    p.add_argument("--admin", type=int, default=None, help="set isAdmin claim (1/0); omit to leave unchanged")
-    p.add_argument("--locale", default="de-DE")
-    p.add_argument("--tz", default="Europe/Berlin")
-    p.add_argument("--project", help="GCP project ID (overrides env)")
-    p.add_argument("--database", default="(default)", help="Firestore database ID")
-    args = p.parse_args()
-
-    db = _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
-
-    user, created_user = ensure_user(args.email, args.name)
-    claims = ensure_claims(user.uid, (args.admin == 1) if args.admin is not None else None)
-    created_customer = ensure_customer_doc(
-        db,
-        uid=user.uid,
-        email=user.email,
-        display_name=user.display_name,
-        plan=args.plan,
-        is_active=bool(args.active),
-        timezone=args.tz,
-        locale=args.locale,
-    )
-
-    print(
-        json.dumps(
-            {
-                "uid": user.uid,
-                "user_created": created_user,
-                "customer_created": created_customer,
-                "claims": claims,
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-    )
-
-
 # ---------- HTTP Cloud Function ----------
 def _require_admin_from_bearer(request: Request) -> dict:
     """
@@ -236,12 +192,55 @@ def create_customer_http(request: Request):
         ), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+# ---------- CLI ----------
+def main_cli():
+    p = argparse.ArgumentParser(description="Create/ensure a customer by email")
+    p.add_argument("--email", required=True, help="Customer's login email")
+    p.add_argument("--name", help="Display name (defaults to email prefix)")
+    p.add_argument("--plan", default="free", choices=["free", "pro", "enterprise"])
+    p.add_argument("--active", type=int, default=1, help="1 or 0 (default 1)")
+    p.add_argument("--admin", type=int, default=None, help="set isAdmin claim (1/0); omit to leave unchanged") #Buggy
+    p.add_argument("--locale", default="de-DE")
+    p.add_argument("--tz", default="Europe/Berlin")
+    p.add_argument("--project", help="GCP project ID (overrides env)")
+    p.add_argument("--database", default="(default)", help="Firestore database ID")
+    args = p.parse_args()
+
+    db = _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
+
+    user, created_user = ensure_user(args.email, args.name)
+    claims = ensure_claims(user.uid, (args.admin == 1) if args.admin is not None else None)
+    created_customer = ensure_customer_doc(
+        db,
+        uid=user.uid,
+        email=user.email,
+        display_name=user.display_name,
+        plan=args.plan,
+        is_active=bool(args.active),
+        timezone=args.tz,
+        locale=args.locale,
+    )
+
+    print(
+        json.dumps(
+            {
+                "uid": user.uid,
+                "user_created": created_user,
+                "customer_created": created_customer,
+                "claims": claims,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
 
 # ---------- Entrypoint ----------
 if __name__ == "__main__":
     # CLI mode
-    PROJECT_ID = "gb-qr-tracker-dev"
+    PROJECT_ID = "gb-qr-tracker"
     DATABASE_ID = "(default)"
     _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
     main_cli()
