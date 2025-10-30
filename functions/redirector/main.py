@@ -22,6 +22,8 @@ from ipaddress import ip_address, ip_network
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from google.api_core.exceptions import AlreadyExists
+import os, hmac, hashlib, time
+from flask import Request
 
 import requests
 from google.cloud import firestore
@@ -46,6 +48,13 @@ GEOIP_API_URL = os.getenv('GEOIP_API_URL') or None
 STORE_IP_HASH = os.getenv('STORE_IP_HASH') == '1'
 IP_HASH_SALT = os.getenv('IP_HASH_SALT', '')
 LOG_HIT_ERRORS = os.getenv('LOG_HIT_ERRORS') == '1'
+
+
+Increment = firestore.Increment
+SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
+
+HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET", "")
+
 
 _geo_reader = None
 if GEOIP_DB_PATH and geoip2:
@@ -160,14 +169,91 @@ def _lookup_geo(ip: str) -> dict | None:
     return None
 
 
-Increment = firestore.Increment
-SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
+def _extract_link_id(request):
+    """
+    Resolves the link id from either:
+      - query param:  ?id=TRACKING-ID
+      - path:         /TRACKING-ID   or   /r/TRACKING-ID   or   /go/TRACKING-ID
+    """
+    # 1) Prefer query param (backwards compatible)
+    q = (request.args.get("id") or "").strip()
+    print("Extracted link ID from query param:", q)
+    if q:
+        return q
+
+    # 2) Fallback to path
+    path = (request.path or "/").strip("/")  # e.g., "TRACKING-ID" or "r/TRACKING-ID"
+    if not path:
+        return ""
+
+    parts = path.split("/")
+    # Support optional short prefixes to avoid route collisions
+    #if parts[0] in {"r", "go", "t"} and len(parts) >= 2:
+    #    return parts[1].strip()
+
+    # Otherwise treat the first segment as the id
+
+    link_id = parts[0].strip()
+    print("Extracted link ID from path:", link_id)
+    return link_id
+
+def _is_from_worker(request: Request, link_id: str) -> bool:
+    """Return True if signature is valid for this request (ts:id)."""
+    try:
+        ts = request.headers.get("x-ts")
+        sig = request.headers.get("x-sig")
+        if not (HMAC_SECRET and ts and sig and link_id):
+            return False
+
+        # Basic replay protection: 5-minute window
+        now = int(time.time())
+        if abs(now - int(ts)) > 300:
+            return False
+
+        msg = f"{ts}:{link_id}"
+        expected = hmac.new(
+            HMAC_SECRET.encode("utf-8"),
+            msg.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        # timing-safe compare
+
+        compared = hmac.compare_digest(expected, sig)
+        #print("Expected HMAC:", expected)
+        #print("Provided HMAC:", sig)
+        #print("HMAC comparison result:", compared)
+        msg = f"{ts}:{link_id}"
+        secret = os.environ.get("WORKER_HMAC_SECRET", "")
+
+        #print("DEBUG ts=", repr(ts))
+        #print("DEBUG id=", repr(link_id))
+        #print("DEBUG msg=", repr(msg))
+        #print("DEBUG secret_len=", len(secret))
+        #print("DEBUG secret_head_tail=", repr(secret[:2]), repr(secret[-2:]))  # look for quotes/newlines
+
+        # If you previously set the env var as ...WORKER_HMAC_SECRET='value' it may contain the quotes!
+        if secret and ((secret.startswith("'") and secret.endswith("'")) or (secret.startswith('"') and secret.endswith('"'))):
+            print("DEBUG WARNING: secret appears quoted; stripping quotes for now")
+            secret = secret[1:-1]
+
+        expected = hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+        #print("Expected HMAC:", expected)
+        #print("Provided HMAC:", sig)
+        #print("HMAC comparison result:", hmac.compare_digest(expected, (sig or "").lower()))
+        return compared
+    except Exception:
+        return False
+
+
 def redirector(request: Request):
     # Health
     if request.path.strip('/') == 'health':
         return ('ok', 200, {'Content-Type': 'text/plain', 'Cache-Control': 'no-store'})
 
-    link_id = (request.args.get('id') or '').strip()
+    link_id = _extract_link_id(request)
+    source = "cloudflare_worker" if _is_from_worker(request, link_id) else "direct"
+
     if not link_id or not ID_PATTERN.match(link_id):
         return ('Missing or invalid "id" query parameter.', 400)
 
@@ -249,7 +335,8 @@ def redirector(request: Request):
         'device_type': dev,
         'ua_browser': browser[:128],
         'ua_os': os_str[:128],
-        "campaign_name": campaign_name
+        "campaign_name": campaign_name,
+        "hit_origin": source, #shows if it is from link or qr code
     }
     if referer:
         hit['referer'] = referer[:512]

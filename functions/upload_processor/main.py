@@ -19,10 +19,17 @@ from google.cloud.firestore_v1 import ArrayUnion
 from google.api_core.exceptions import AlreadyExists
 import functions_framework  # <- add this import
 
+import tldextract
+
+
 
 # ---------------------------
 # Config (env vars with sensible defaults)
 # ---------------------------
+COMMON_EMAIL_PROVIDERS = {
+    "gmail", "gmx", "aol", "yahoo", "hotmail", "outlook",
+    "icloud", "t-online", "web", "live", "msn", "mail"
+}
 PROJECT_ID  = os.environ.get("PROJECT_ID") or os.environ.get("GCP_PROJECT") or "gb-qr-tracker-dev"
 DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
 DEFAULT_BASE_URL = os.environ.get("BASE_URL")                   # optional fallback
@@ -365,12 +372,25 @@ def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
         df.to_excel(writer, index=False)
     return out_path
 
+def _extract_registrable_domain(email: str) -> str | None:
+    try:
+        host = email.split("@", 1)[1]
+    except IndexError:
+        return None
+    ext = tldextract.extract(host)  # ext.domain is what you want
+    return ext.domain or None
+
+def _is_common_provider(email: str) -> bool:
+    domain = _extract_registrable_domain(email)
+    return domain in COMMON_EMAIL_PROVIDERS if domain else False
+
 # ---------------------------
 # Core flow (unchanged logic, minus argparse)
 # ---------------------------
 def assign_links_from_business_file(path: str, base_url: str,
                                     destination: Optional[str],
                                     campaign_code: Optional[str],
+                                    campaign_code_from_business: bool,
                                     campaign_name: Optional[str],
                                     campaign_id: Optional[str],
                                     ownerId: str,
@@ -423,6 +443,7 @@ def assign_links_from_business_file(path: str, base_url: str,
 
 
     total_rows = len(rows)
+    # How will I handle this if I use business ids from email?
     campaign_ref = get_or_create_campaign(ownerId, campaign_id, campaign_name, campaign_code)
 
     geo_cache: Dict[str, Dict] = {}
@@ -447,13 +468,27 @@ def assign_links_from_business_file(path: str, base_url: str,
             precomputed.append({"in_limit": False, "row": row})
             continue
 
-        doc_id_from_row = get_ci(row, 'id', 'link_id')
+        doc_id_from_row = get_ci(row, 'id', 'link_id') #probably dont want that
         dest = get_ci(row, 'destination', 'url') or destination
         business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
         template_key = get_ci_key(row, 'Template', 'template')
         template_raw = row.get(template_key) if template_key else None
 
-        doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
+
+        if campaign_code_from_business:
+            email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
+
+            if _is_common_provider(email):
+                #fallback
+                doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
+            else:
+                doc_id = _extract_registrable_domain(email) if email else None
+
+            print("Extracted doc_id from email", email, "->", doc_id)
+
+        else:
+            doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}" # Tracking ids are created here
+
         precomputed.append({
             "in_limit": True,
             "row": row,
@@ -465,11 +500,14 @@ def assign_links_from_business_file(path: str, base_url: str,
         })
 
     existing_ids: Set[str] = set()
+
     print("PRE CHECK skip_existing:", skip_existing)
     if skip_existing:
         print("Line 410 skip_existing", skip_existing, "precomputing existing link ids...")
+
         link_refs = [COL_LINKS.document(item["doc_id"]) for item in precomputed
                      if item.get("in_limit") and item.get("dest")]
+        
         existing_ids = bulk_get_existing(link_refs)
         print("Existing ids computed:", len(existing_ids))
         if existing_ids:
@@ -511,7 +549,7 @@ def assign_links_from_business_file(path: str, base_url: str,
                 status = "validated" if dest else "excluded"
                 snapshot = snapshot_mailing_from_row(row, business_name)
 
-                target_payload = {
+                target_payload = { #TODO/BUG: I dont want to create targets if links are skipped
                     "business_ref": biz_ref,
                     "status": "linked" if dest else status,
                     "reason_excluded": None if dest else "No destination",
@@ -740,13 +778,15 @@ def process_business_upload(cloud_event):
 
     params = {
         "destination": manifest.get("destination") or metadata.get("destination"),
-        "campaign_code": manifest.get("campaign_code") or metadata.get("campaign_code"),
+        "campaign_code": manifest.get("campaign_code") or metadata.get("campaign_code"), #= trackingPrefix in frontend
         "campaign_name": manifest.get("campaign_name") or metadata.get("campaign_name"),
+        "campaign_code_from_business": bool(manifest.get("campaign_code_from_business", False) or (metadata.get("campaign_code_from_business") in ("1", "true", "True"))),
         "campaign_id": manifest.get("campaignId") or metadata.get("campaign_id"),
         "limit": int(manifest.get("limit", 0) or metadata.get("limit", 0) or 0),
         "skip_existing": bool(manifest.get("skip_existing", True) or (metadata.get("skip_existing") in ("1", "true", "True"))),
         "geocode": bool(manifest.get("geocode", False) or (metadata.get("geocode") in ("1", "true", "True"))),
         "mapbox_token": manifest.get("mapbox_token") or metadata.get("mapbox_token") or DEFAULT_MAPBOX_TOKEN,
+        #use business domain as tracking id 
     }
 
     campaign_code = params["campaign_code"]
@@ -772,6 +812,7 @@ def process_business_upload(cloud_event):
             destination=params["destination"],
             campaign_code=params["campaign_code"],
             campaign_name=params["campaign_name"],
+            campaign_code_from_business=params["campaign_code_from_business"],
             campaign_id=params["campaign_id"],
             ownerId=ownerId,
             limit=params["limit"],

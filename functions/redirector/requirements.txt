@@ -1,9 +1,18 @@
+# Google Cloud + HTTP
 functions-framework==3.5.0
-google-cloud-firestore>=2.16.0
 Flask>=3.0.0
-qrcode[pil]>=7.4
+google-cloud-firestore>=2.16.0
+requests>=2.32.3
+
+# Data / utilities
 pandas>=2.2.0
 user-agents>=2.2.0
 geoip2>=4.8.0
-requests>=2.32.3
+qrcode[pil]>=7.4
 
+# Optional but useful for Cloud Functions
+python-dotenv>=1.0.1       # load .env locally for testing
+gunicorn>=21.2.0           # local HTTP server (optional)
+
+# Security / signing
+itsdangerous>=2.1.2        # (optional helper for token signing)
