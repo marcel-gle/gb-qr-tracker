@@ -18,6 +18,13 @@ from google.cloud import firestore
 from google.cloud.firestore_v1 import ArrayUnion
 from google.api_core.exceptions import AlreadyExists
 import functions_framework  # <- add this import
+from concurrent.futures import ThreadPoolExecutor, as_completed
+try:
+    # Preferred public path in recent releases
+    from google.cloud.firestore_v1.field_path import FieldPath
+except Exception:  # fallback for older/packaged versions
+    FieldPath = None
+
 
 import tldextract
 
@@ -74,6 +81,53 @@ def sanitize_id(value: str) -> str:
     v = re.sub(r"[^A-Za-z0-9]+", "-", v)
     v = re.sub(r"-{2,}", "-", v).strip("-")
     return v
+
+
+def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
+    """
+    Return all doc IDs that start with base_id: { base_id, base_id-1, base_id-2, ... }.
+    Uses a range query on document ID (aka __name__).
+    - Compares against DocumentReferences, not strings.
+    - Falls back to '__name__' if FieldPath isn't importable.
+    - Guards empty base to avoid scanning whole collection.
+    """
+    base_id = (base_id or "").strip()
+    if not base_id:
+        return set()
+
+    # Build DocumentReference bounds
+    start_ref = COL_LINKS.document(base_id)
+    end_ref = COL_LINKS.document(base_id + u"\uf8ff")
+
+    # Field path for document id
+    fp = FieldPath.document_id() if FieldPath else "__name__"
+
+    # Query only IDs (tiny payload)
+    q = (
+        COL_LINKS
+        .where(fp, ">=", start_ref)
+        .where(fp, "<=", end_ref)   # '<=' is fine here; can use '<' if you prefer
+        .select([])                 # no fields, just names
+    )
+
+    return {doc.id for doc in q.stream()}
+
+
+def next_id_from_cache(base_id: str, taken: set[str]) -> str:
+    """Pick base_id if free, else base_id-<n> with the smallest available n >= 1."""
+    if base_id not in taken:
+        taken.add(base_id)
+        return base_id
+    # Find the max numeric suffix already taken for this base
+    pat = re.compile(rf"^{re.escape(base_id)}-(\d+)$")
+    max_n = 0
+    for did in taken:
+        m = pat.match(did)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    candidate = f"{base_id}-{max_n + 1}"
+    taken.add(candidate)
+    return candidate
 
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
     if not template:
@@ -211,13 +265,50 @@ def chunked(iterable: Iterable, size: int) -> Iterable[List]:
     if buf:
         yield buf
 
-def bulk_get_existing(doc_refs: List[firestore.DocumentReference]) -> Set[str]:
+def bulk_get_existing_old(doc_refs: List[firestore.DocumentReference]) -> Set[str]:
     existing: Set[str] = set()
     for chunk in chunked(doc_refs, 300):
         for snap in db.get_all(chunk):
             if snap.exists:
                 existing.add(snap.id)
     return existing
+
+def bulk_get_existing(
+    doc_refs: List[firestore.DocumentReference],
+    chunk_size: int = 500,
+    max_workers: int = 4,
+) -> Set[str]:
+    """
+    Return the set of IDs that exist among the given doc_refs.
+    Uses get_all with an empty field mask so we fetch only metadata (IDs), not fields.
+    Chunked for safety; optionally parallelized for large batches.
+    """
+    if not doc_refs:
+        return set()
+
+    existing: Set[str] = set()
+
+    def fetch_chunk(chunk: List[firestore.DocumentReference]) -> List[str]:
+        # IMPORTANT: field_paths=[] -> request no document fields (tiny payload)
+        snaps = db.get_all(chunk, field_paths=[])
+        return [snap.id for snap in snaps if getattr(snap, "exists", False)]
+
+    # Small batches: run inline
+    if len(doc_refs) <= chunk_size or max_workers <= 1:
+        for chunk in chunked(doc_refs, chunk_size):
+            for doc_id in fetch_chunk(chunk):
+                existing.add(doc_id)
+        return existing
+
+    # Larger batches: parallelize across a few workers
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = [ex.submit(fetch_chunk, chunk) for chunk in chunked(doc_refs, chunk_size)]
+        for fut in as_completed(futures):
+            for doc_id in fut.result():
+                existing.add(doc_id)
+
+    return existing
+
 
 
 def normalize_campaign_code(code: Optional[str]) -> str:
@@ -384,6 +475,34 @@ def _is_common_provider(email: str) -> bool:
     domain = _extract_registrable_domain(email)
     return domain in COMMON_EMAIL_PROVIDERS if domain else False
 
+from collections import defaultdict
+
+def assign_final_ids(precomputed: List[Dict]) -> None:
+    """
+    For each unique base_id in precomputed, load existing Firestore variants once
+    and assign a collision-free final_id (base or base-<n>) to each item.
+    Mutates items in-place: item['final_id'] = ...
+    """
+    # Group rows by base
+    groups = defaultdict(list)
+    for item in precomputed:
+        if item.get("in_limit") and item.get("dest"):
+            base = item.get("base_id") or ""
+            groups[base].append(item)
+
+    # For each base, query existing variants once, then allocate final IDs
+    for base_id, items in groups.items():
+        if not base_id:
+            # still allow empty base; sanitize_id already tried to keep it readable
+            # if truly empty, they’ll become "", "-1", etc — unlikely given our fallbacks
+            pass
+        taken = existing_variants_for_base(COL_LINKS, base_id)
+        for item in items:
+            item["final_id"] = next_id_from_cache(base_id, taken)
+
+
+
+
 # ---------------------------
 # Core flow (unchanged logic, minus argparse)
 # ---------------------------
@@ -403,7 +522,7 @@ def assign_links_from_business_file(path: str, base_url: str,
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
 
-    #print("assign_links_from_business_file ownerId:", ownerId)
+    print("assign_links_from_business_file ownerId:", ownerId)
     #print("Geocode:", geocode, "Mapbox token:", "yes" if mapbox_token else "no")
 
     if is_excel:
@@ -445,8 +564,10 @@ def assign_links_from_business_file(path: str, base_url: str,
     total_rows = len(rows)
     # How will I handle this if I use business ids from email?
     campaign_ref = get_or_create_campaign(ownerId, campaign_id, campaign_name, campaign_code)
+    print("Using campaign ref id:", campaign_ref.id)
 
     geo_cache: Dict[str, Dict] = {}
+
     def maybe_geocode(row: dict) -> Optional[Dict]:
         if not geocode or not mapbox_token:
             return None
@@ -461,6 +582,8 @@ def assign_links_from_business_file(path: str, base_url: str,
             geo_cache[addr] = geocode_mapbox(addr, mapbox_token) or None
         return geo_cache[addr]
 
+
+    print("Total rows in input file:", total_rows)
     precomputed: List[Dict] = []
     for i, row in enumerate(rows):
         in_limit = (limit <= 0) or (i < limit)
@@ -468,50 +591,37 @@ def assign_links_from_business_file(path: str, base_url: str,
             precomputed.append({"in_limit": False, "row": row})
             continue
 
-        doc_id_from_row = get_ci(row, 'id', 'link_id') #probably dont want that
+        doc_id_from_row = get_ci(row, 'id', 'link_id')  # may be None
         dest = get_ci(row, 'destination', 'url') or destination
         business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
         template_key = get_ci_key(row, 'Template', 'template')
         template_raw = row.get(template_key) if template_key else None
 
-
         if campaign_code_from_business:
             email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
-
             if _is_common_provider(email):
-                #fallback
-                doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
+                base_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
             else:
-                doc_id = _extract_registrable_domain(email) if email else None
-
-            print("Extracted doc_id from email", email, "->", doc_id)
-
+                base_id = _extract_registrable_domain(email) if email else None
         else:
-            doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}" # Tracking ids are created here
+            base_id = doc_id_from_row or business_name or f"{(campaign_code or 'L').upper()}-{i+1}"
+
+        base_id = sanitize_id(base_id or "")
 
         precomputed.append({
             "in_limit": True,
             "row": row,
             "dest": dest,
-            "doc_id": doc_id,
+            "base_id": base_id,          # <— store base
             "business_name": business_name,
             "template_raw": template_raw,
             "template_key": template_key
         })
 
-    existing_ids: Set[str] = set()
+    assign_final_ids(precomputed)
 
-    print("PRE CHECK skip_existing:", skip_existing)
-    if skip_existing:
-        print("Line 410 skip_existing", skip_existing, "precomputing existing link ids...")
-
-        link_refs = [COL_LINKS.document(item["doc_id"]) for item in precomputed
-                     if item.get("in_limit") and item.get("dest")]
-        
-        existing_ids = bulk_get_existing(link_refs)
-        print("Existing ids computed:", len(existing_ids))
-        if existing_ids:
-            print(f"[pre-scan] Found {len(existing_ids)} existing link ids (will skip creating those).")
+    print("Precomputed", precomputed[:3])
+    print("Len precomputed:", len(precomputed))
 
     batch = db.batch()
     ops = 0
@@ -531,25 +641,31 @@ def assign_links_from_business_file(path: str, base_url: str,
                 continue
 
             dest = item.get("dest")
-            doc_id = item.get("doc_id")
+            final_id = item.get("final_id")    # <- use the ID allocated earlier
             business_name = item.get("business_name")
             template_raw = item.get("template_raw")
             template_key = item.get("template_key")
+
+            print("DEBUG final_id:", final_id)
 
             try:
                 coordinate = maybe_geocode(row)
                 biz_id, biz_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
                 biz_ref = COL_BUSINESSES.document(biz_id)
 
+                # upsert business
                 batch.set(biz_ref, {**biz_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
                 batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
 
+                # target
                 target_ref = campaign_ref.collection('targets').document()
-                link_ref = COL_LINKS.document(doc_id)
                 status = "validated" if dest else "excluded"
                 snapshot = snapshot_mailing_from_row(row, business_name)
 
-                target_payload = { #TODO/BUG: I dont want to create targets if links are skipped
+                # reference to link doc (by final_id)
+                link_ref = COL_LINKS.document(final_id) if dest else None
+
+                target_payload = {
                     "business_ref": biz_ref,
                     "status": "linked" if dest else status,
                     "reason_excluded": None if dest else "No destination",
@@ -562,39 +678,59 @@ def assign_links_from_business_file(path: str, base_url: str,
                 batch.set(target_ref, target_payload); ops += 1
                 created_targets += 1
 
-                if dest:
-                    if skip_existing and doc_id in existing_ids:
-                        print("[skip] link with id", doc_id, "already exists")
-                    else:
-                        try:
-                            # never overwrite: create will error if the doc exists
-                            batch.create(link_ref, {
-                                "campaign_ref": campaign_ref,
-                                "business_ref": biz_ref,
-                                "target_ref": target_ref,
-                                "destination": dest,
-                                "template_id": template_with_qr_suffix(template_raw),
-                                "short_code": doc_id,
-                                "active": True,
-                                "hit_count": 0,
-                                "created_at": firestore.SERVER_TIMESTAMP,
-                                "last_hit_at": None,
-                                "owner_id": ownerId,
-                                "snapshot_mailing": snapshot,
-                                "campaign_name": campaign_name,
-                            })
-                            ops += 1
-                            created_links += 1
-                        except AlreadyExists:
-                            if skip_existing:
-                                print("[skip] link with id", doc_id, "already exists")
-                            else:
-                                raise RuntimeError(
-                                    f"Link ID '{doc_id}' already exists. "
-                                    "Refusing to overwrite. Enable skip_existing to bypass."
-                                )
+                print("DEBUG target_payload:", target_payload)
+                print("DEBUG dest:", dest)
 
-                row['tracking_link'] = build_tracking_link(base_url, doc_id) if dest else ''
+                if dest:
+                    # Try to create link with final_id. If a rare race hits, retry once with the next suffix.
+                    try:
+                        print(f"Creating link with ID: {final_id}")
+                        batch.create(COL_LINKS.document(final_id), {
+                            "campaign_ref": campaign_ref,
+                            "business_ref": biz_ref,
+                            "target_ref": target_ref,
+                            "destination": dest,
+                            "template_id": template_with_qr_suffix(template_raw),
+                            "short_code": final_id,   # mirror the human-readable ID
+                            "active": True,
+                            "hit_count": 0,
+                            "created_at": firestore.SERVER_TIMESTAMP,
+                            "last_hit_at": None,
+                            "owner_id": ownerId,
+                            "snapshot_mailing": snapshot,
+                            "campaign_name": campaign_name,
+                        })
+                        ops += 1
+                        created_links += 1
+                    except AlreadyExists:
+                        # Recompute suffix (another worker probably grabbed our final_id)
+                        print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
+                        base = item.get("base_id") or final_id
+                        taken = existing_variants_for_base(COL_LINKS, base)
+                        retry_id = next_id_from_cache(base, taken)
+
+                        batch.create(COL_LINKS.document(retry_id), {
+                            "campaign_ref": campaign_ref,
+                            "business_ref": biz_ref,
+                            "target_ref": target_ref,
+                            "destination": dest,
+                            "template_id": template_with_qr_suffix(template_raw),
+                            "short_code": retry_id,
+                            "active": True,
+                            "hit_count": 0,
+                            "created_at": firestore.SERVER_TIMESTAMP,
+                            "last_hit_at": None,
+                            "owner_id": ownerId,
+                            "snapshot_mailing": snapshot,
+                            "campaign_name": campaign_name,
+                        })
+                        ops += 1
+                        created_links += 1
+                        final_id = retry_id             # make sure output uses the actual created ID
+
+                # write back tracking link + template into the row
+                row['tracking_link'] = build_tracking_link(base_url, final_id) if dest else ''
+                print("DEBUG tracking_link:", row['tracking_link'])
                 adjusted_template = template_with_qr_suffix(template_raw)
                 if adjusted_template:
                     if template_key:
@@ -616,6 +752,7 @@ def assign_links_from_business_file(path: str, base_url: str,
             pbar.close()
         except Exception:
             pass
+
 
     COL_CAMPAIGNS.document(campaign_ref.id).set(
         {"totals.targets": firestore.Increment(created_targets),
