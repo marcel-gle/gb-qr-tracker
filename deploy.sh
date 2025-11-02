@@ -12,6 +12,10 @@ fi
 # 2) Load function config
 source "functions/${FUNC_DIR}/config.${ENVIRONMENT}.sh"
 
+# Ensure optional arrays/vars exist (avoids unset errors with `set -u`)
+declare -a ENV_VARS SECRETS TRIGGER_ARGS
+: "${TRIGGER_KIND:=http}"
+
 # 3) Common bits
 : "${REGION:?missing REGION}"
 : "${PROJECT_ID:?missing PROJECT_ID}"
@@ -22,7 +26,7 @@ source "functions/${FUNC_DIR}/config.${ENVIRONMENT}.sh"
 : "${MEMORY:=256Mi}"
 : "${TIMEOUT:=60s}"
 
-CMD=( gcloud functions deploy "${FUNCTION_NAME}" 
+CMD=( gcloud functions deploy "${FUNCTION_NAME}"
   --project="${PROJECT_ID}"
   --gen2
   --region="${REGION}"
@@ -35,11 +39,11 @@ CMD=( gcloud functions deploy "${FUNCTION_NAME}"
 )
 
 # 4) Trigger
-case "${TRIGGER_KIND:-http}" in
+case "${TRIGGER_KIND}" in
   http)
     CMD+=( --trigger-http )
-    # allow unauth etc.
-    if [[ -n "${TRIGGER_ARGS[*]:-}" ]]; then
+    # extra flags (e.g. --allow-unauthenticated)
+    if ((${#TRIGGER_ARGS[@]})); then
       CMD+=( "${TRIGGER_ARGS[@]}" )
     fi
     ;;
@@ -49,14 +53,14 @@ case "${TRIGGER_KIND:-http}" in
     if [[ -n "${TRIGGER_LOCATION:-}" ]]; then
       CMD+=( --trigger-location="${TRIGGER_LOCATION}" )
     fi
-    if [[ -n "${TRIGGER_ARGS[*]:-}" ]]; then
+    if ((${#TRIGGER_ARGS[@]})); then
       CMD+=( "${TRIGGER_ARGS[@]}" )
     fi
     ;;
   pubsub)
     : "${TOPIC_NAME:?missing TOPIC_NAME for pubsub trigger}"
     CMD+=( --trigger-topic="${TOPIC_NAME}" )
-    if [[ -n "${TRIGGER_ARGS[*]:-}" ]]; then
+    if ((${#TRIGGER_ARGS[@]})); then
       CMD+=( "${TRIGGER_ARGS[@]}" )
     fi
     ;;
@@ -65,13 +69,15 @@ case "${TRIGGER_KIND:-http}" in
 esac
 
 # 5) Env vars
-if [[ "${#ENV_VARS[@]:-0}" -gt 0 ]]; then
-  IFS=, eval 'CMD+=( --set-env-vars="${ENV_VARS[*]}" )'
+if ((${#ENV_VARS[@]})); then
+  env_join=$(IFS=,; printf "%s" "${ENV_VARS[*]}")
+  CMD+=( --set-env-vars="${env_join}" )
 fi
 
 # 6) Secrets
-if [[ "${#SECRETS[@]:-0}" -gt 0 ]]; then
-  IFS=, eval 'CMD+=( --set-secrets="${SECRETS[*]}" )'
+if ((${#SECRETS[@]})); then
+  secrets_join=$(IFS=,; printf "%s" "${SECRETS[*]}")
+  CMD+=( --set-secrets="${secrets_join}" )
 fi
 
 # 7) Optional: ingress/VPC/etc. (add here if you need)
