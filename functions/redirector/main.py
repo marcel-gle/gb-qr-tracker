@@ -14,6 +14,7 @@
 #   LOG_HIT_ERRORS=1              # log exceptions for per-hit writes (helpful for debugging)
 #
 # Note: Do not store raw IPs. This code derives geo only and (optionally) stores a salted hash.
+#test
 
 import os
 import re
