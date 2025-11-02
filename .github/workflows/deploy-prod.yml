@@ -70,5 +70,14 @@ jobs:
         with:
           project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
 
+      - name: Prepare .env.prod for deploy.sh
+        run: |
+            cat > .env.prod <<'EOF'
+            PROJECT_ID=${{ secrets.PROD_GCP_PROJECT_ID }}
+            REGION=europe-west3
+            SA_NAME=cf-campaign-importer
+            SA=cf-campaign-importer@${{ secrets.PROD_GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            EOF
+
       - name: Deploy via script
         run: ./deploy.sh prod ${{ matrix.function }}

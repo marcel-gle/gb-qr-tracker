@@ -5,7 +5,9 @@ ENVIRONMENT="${1:?Usage: ./deploy.sh <dev|prod> <function_dir>}"
 FUNC_DIR="${2:?Usage: ./deploy.sh <dev|prod> <function_dir>}"
 
 # 1) Load env (PROJECT_ID, REGION, SA, etc.)
-source ".env.${ENVIRONMENT}"
+if [[ -f ".env.${ENVIRONMENT}" ]]; then
+  source ".env.${ENVIRONMENT}"
+fi
 
 # 2) Load function config
 source "functions/${FUNC_DIR}/config.${ENVIRONMENT}.sh"
