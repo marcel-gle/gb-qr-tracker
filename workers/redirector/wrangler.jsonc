@@ -1,0 +1,39 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "redirector-dev",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-11-09",
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"BACKEND_FUNCTION_URL": "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector"
+	},
+	"routes": [
+		{
+			"pattern": "dev.rocket-letter.de/*",
+			"zone_name": "rocket-letter.de"
+		}
+	],
+	"env": {
+		"production": {
+			"name": "redirector",
+			"observability": {
+				"enabled": true
+			},
+			"vars": {
+				"BACKEND_FUNCTION_URL": "https://europe-west3-gb-qr-tracker.cloudfunctions.net/redirector"
+			},
+			"routes": [
+				{
+					"pattern": "go.rocket-letter.de/*",
+					"zone_name": "rocket-letter.de"
+				}
+			]
+		}
+	}
+}

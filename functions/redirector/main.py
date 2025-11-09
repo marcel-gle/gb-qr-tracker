@@ -254,6 +254,7 @@ def redirector(request: Request):
 
     link_id = _extract_link_id(request)
     source = "cloudflare_worker" if _is_from_worker(request, link_id) else "direct"
+    print("DEGUB Source:", source)
 
     if not link_id or not ID_PATTERN.match(link_id):
         return ('Missing or invalid "id" query parameter.', 400)
