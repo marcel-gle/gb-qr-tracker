@@ -240,6 +240,7 @@ def main_cli():
 # ---------- Entrypoint ----------
 if __name__ == "__main__":
     # CLI mode
+    #test deploy
     PROJECT_ID = "gb-qr-tracker-dev"
     DATABASE_ID = "(default)"
     _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
