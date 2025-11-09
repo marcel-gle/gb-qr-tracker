@@ -249,7 +249,7 @@ def _is_from_worker(request: Request, link_id: str) -> bool:
 
 def redirector(request: Request):
     # Health
-    #test deploy
+    #test deploy2
     if request.path.strip('/') == 'health':
         return ('ok', 200, {'Content-Type': 'text/plain', 'Cache-Control': 'no-store'})
 
