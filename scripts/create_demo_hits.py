@@ -15,12 +15,12 @@ from firebase_admin import credentials, firestore
 
 # --- 🔧 CONFIGURATION ---
 FIREBASE_CREDENTIALS_PATH = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #should always be dev
-NUM_DOCS = 300  # number of demo docs to create
-OWNER_ID = "2bwkVVRWekNULFKevJf9GuHWyJC3"
+NUM_DOCS = 26  # number of demo docs to create
+OWNER_ID = "4qXpgdIK0vTg7wThQ89OHWMUlf13"
 
-BUSINESS_REF_PATH = "businesses/1000eyes-GmbH-10719"
-CAMPAIGN_REF_PATH = "campaigns/a8f52a20-ebeb-4d5a-8e89-dc255a80ac14"
-TARGET_REF_PATH   = "campaigns/a8f52a20-ebeb-4d5a-8e89-dc255a80ac14/targets/LkcaNj5kg9DnXX7HdmBV"
+BUSINESS_REF_PATH = "businesses/4-advice-GmbH-53177"
+CAMPAIGN_REF_PATH = "campaigns/eebb74b8-6c5b-44b9-96ab-f4b6e3505206"
+TARGET_REF_PATH   = "campaigns/eebb74b8-6c5b-44b9-96ab-f4b6e3505206/targets/1Ooy6wos1S7UzloMPP5K"
 
 DEVICE_TYPES = ["desktop", "mobile", "tablet"]
 CITIES = [
@@ -49,7 +49,7 @@ db = firestore.client()
 # --- HELPERS ---
 def random_timestamp_within_last_14_days() -> datetime:
     now = datetime.now(timezone.utc)
-    days_back = random.randint(0, 35)
+    days_back = random.randint(0, 14)
     seconds_in_day = random.randint(0, 24 * 3600 - 1)
     ts = (now - timedelta(days=days_back)).replace(hour=0, minute=0, second=0, microsecond=0)
     ts += timedelta(seconds=seconds_in_day)

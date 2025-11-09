@@ -18,18 +18,18 @@
 
 import os
 import re
+import hmac
 import hashlib
+import time
 from ipaddress import ip_address, ip_network
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from google.api_core.exceptions import AlreadyExists
-import os, hmac, hashlib, time
-from flask import Request
-
+from flask import Request, redirect
 import requests
 from google.cloud import firestore
-from flask import Request, redirect
 from user_agents import parse as parse_ua
+
 
 try:
     import geoip2.database  # type: ignore

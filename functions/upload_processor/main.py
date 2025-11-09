@@ -599,14 +599,22 @@ def assign_links_from_business_file(path: str, base_url: str,
 
         if campaign_code_from_business:
             email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
-            if _is_common_provider(email):
+            if not email:
+                # No email provided - use clean business name from "Namenszeile"
+                print("DEBUG business_name:", business_name)
+                base_id = _extract_clean_business_name(business_name)
+            elif _is_common_provider(email):
                 base_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
             else:
-                base_id = _extract_registrable_domain(email) if email else None
+                # Business email - use domain
+                print("DEBUG email:", email)
+                base_id = _extract_registrable_domain(email)
         else:
             base_id = doc_id_from_row or business_name or f"{(campaign_code or 'L').upper()}-{i+1}"
 
         base_id = sanitize_id(base_id or "")
+
+        print("DEBUG base_id:", base_id)
 
         precomputed.append({
             "in_limit": True,
@@ -823,6 +831,101 @@ def _delete_prefix(bucket: storage.Bucket, prefix: str) -> int:
     return deleted
 
 
+
+
+def _extract_clean_business_name(business_name: Optional[str]) -> Optional[str]:
+    """
+    Extract a clean, short business name from a full business name.
+    Removes common business suffixes, handles special characters, and keeps it concise.
+    """
+    if not business_name:
+        return None
+
+    name = str(business_name).strip()
+
+    # --- 1️⃣ Convert umlauts early ---
+    umlaut_map = {
+        'ä': 'ae', 'ö': 'oe', 'ü': 'ue',
+        'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue',
+        'ß': 'ss'
+    }
+    for umlaut, replacement in umlaut_map.items():
+        name = name.replace(umlaut, replacement)
+
+    # --- 2️⃣ Handle "&" and "@" correctly ---
+    # Join words directly so "A & B" → "AundB", "a@m" → "aatm"
+    name = re.sub(r'\s*&\s*', 'und', name)
+    name = re.sub(r'&', 'und', name)
+    name = re.sub(r'\s*@\s*', 'at', name)
+    name = name.replace('@', 'at')
+
+    # --- 3️⃣ Remove leading special characters and normalize hyphens ---
+    name = re.sub(r'^[/\s\-_]+', '', name)
+    name = re.sub(r'\s*-\s*', '-', name)
+
+    # --- 4️⃣ Remove legal suffixes anywhere (not just at the end) ---
+    suffix_token = (
+        r'(?:gmbh(?:\s*und\s*co\.?\s*kg)?|'  # GmbH + GmbH und Co. KG
+        r'co\.?\s*kg|'
+        r'kg|ag|mbh|e\.?v\.?|ug|ohg|gbr|inc\.?|ltd\.?|llc|corp\.?)'
+    )
+    name = re.sub(rf'(?i)(^|[\s\-_]){suffix_token}($|[\s\-_])', ' ', name)
+    name = re.sub(r'(?i)gmbhundco', ' ', name)  # handle glued-together variant
+
+    # --- 5️⃣ Normalize whitespace and separators ---
+    name = re.sub(r'[_/]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+
+    if not name:
+        return None
+
+    # --- 6️⃣ Split and remove trailing numbers (ZIP codes etc.) ---
+    parts = name.split()
+    while parts and re.fullmatch(r'\d+', parts[-1]):
+        parts.pop()
+    if not parts:
+        return None
+
+    # --- 7️⃣ Clean each part ---
+    clean_parts = []
+    for p in parts:
+        p = p.lower()
+        p = re.sub(r'[^a-z0-9\-]+', '-', p)
+        p = re.sub(r'-{2,}', '-', p).strip('-')
+        if p:
+            clean_parts.append(p)
+    if not clean_parts:
+        return None
+
+    # --- 8️⃣ Decide how many words to include ---
+    first = clean_parts[0]
+    rest = clean_parts[1:]
+    stopwords = {'und', 'and', 'the', 'der', 'die', 'das', 'für', 'fuer', 'co', 'kg', 'mbh'}
+
+    result_parts = [first]
+    if rest:
+        second = rest[0]
+        first_len = len(first.replace('-', ''))
+        combined_len = len(first) + 1 + len(second)
+        first_is_numeric = first.isdigit()
+
+        include_second = False
+        if first_len <= 2 or first_is_numeric:
+            include_second = True
+        elif combined_len <= 20 and first_len <= 8 and ('-' not in first or first_len <= 4):
+            include_second = True
+
+        if include_second and second not in stopwords:
+            result_parts.append(second)
+
+    # --- 9️⃣ Final normalization ---
+    result = '-'.join(result_parts)
+    result = re.sub(r'-{2,}', '-', result).strip('-')
+
+    return result if result else None
+
+
+
 # ---------------------------
 # CloudEvent entry point (Gen 2)
 # ---------------------------
@@ -949,7 +1052,7 @@ def process_business_upload(cloud_event):
             destination=params["destination"],
             campaign_code=params["campaign_code"],
             campaign_name=params["campaign_name"],
-            campaign_code_from_business=params["campaign_code_from_business"],
+            campaign_code_from_business=True, #params["campaign_code_from_business"]
             campaign_id=params["campaign_id"],
             ownerId=ownerId,
             limit=params["limit"],

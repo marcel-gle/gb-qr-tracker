@@ -54,9 +54,9 @@ if __name__ == "__main__":
     # Example usage:
     credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #Dev account
     #credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service//gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json"  # Use Application Default Credentials (ADC)
-    uid = "2bwkVVRWekNULFKevJf9GuHWyJC3"
+    uid = "4qXpgdIK0vTg7wThQ89OHWMUlf13"
 
-    claims = set_user_claims(uid, is_admin=True, credential_path=credentials_local_path)  # uses ADC
+    claims = set_user_claims(uid, is_admin=False, credential_path=credentials_local_path)  # uses ADC
     # claims = set_user_claims("some-uid-123", is_admin=False, credential_path="service-account.json")
     print("Updated claims:", claims)
     user = auth.get_user(uid)
