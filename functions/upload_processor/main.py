@@ -12,6 +12,7 @@ import json
 import csv
 import re
 from typing import Optional, Tuple, List, Set, Dict, Iterable
+from datetime import datetime, timezone
 
 from google.cloud import storage
 from google.cloud import firestore
@@ -310,6 +311,44 @@ def bulk_get_existing(
     return existing
 
 
+def load_blacklist(owner_id: str) -> Set[str]:
+    """
+    Load all blacklisted business_ids for a given owner.
+    Returns a set of business_id strings.
+    """
+    if not owner_id:
+        return set()
+    
+    try:
+        blacklist_ref = db.collection('customers').document(owner_id).collection('blacklist')
+        blacklisted_ids = set()
+        
+        for doc in blacklist_ref.stream():
+            data = doc.to_dict() or {}
+            # Check business_id field
+            business_id = data.get('business_id')
+            if business_id:
+                blacklisted_ids.add(str(business_id))
+            
+            # Also check the business reference if present
+            business_ref = data.get('business')
+            if business_ref:
+                # business_ref is a DocumentReference, get its ID
+                if hasattr(business_ref, 'id'):
+                    blacklisted_ids.add(business_ref.id)
+                elif isinstance(business_ref, str):
+                    # Handle case where it's stored as a path string like "/businesses/2DC-GmbH-33602"
+                    if '/businesses/' in business_ref:
+                        parts = business_ref.split('/businesses/')
+                        if len(parts) == 2:
+                            blacklisted_ids.add(parts[1])
+        
+        print(f"[blacklist] Loaded {len(blacklisted_ids)} blacklisted business_ids for owner {owner_id}")
+        return blacklisted_ids
+    except Exception as e:
+        print(f"[warn] Failed to load blacklist for owner {owner_id}: {e}")
+        return set()
+
 
 def normalize_campaign_code(code: Optional[str]) -> str:
     if not code:
@@ -519,10 +558,22 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     geocode: bool = True):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
+    blacklisted_count = 0
+    blacklisted_details = []
+    error_details = []
+    excluded_no_destination = 0
+    geocoding_successful = 0
+    geocoding_failed = 0
+    processing_start = datetime.now(timezone.utc)
+    
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
 
     print("assign_links_from_business_file ownerId:", ownerId)
+    
+    # Load blacklist at the start
+    blacklisted_business_ids = load_blacklist(ownerId)
+    
     #print("Geocode:", geocode, "Mapbox token:", "yes" if mapbox_token else "no")
 
     if is_excel:
@@ -587,13 +638,35 @@ def assign_links_from_business_file(path: str, base_url: str,
     precomputed: List[Dict] = []
     for i, row in enumerate(rows):
         in_limit = (limit <= 0) or (i < limit)
+        
+        # Check if business is blacklisted BEFORE other processing
+        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
+        plz = get_ci(row, 'PLZ', 'Postleitzahl')
+        biz_id = make_business_id(business_name, plz)
+        
+        is_blacklisted = biz_id in blacklisted_business_ids
+        if is_blacklisted:
+            print(f"[blacklist] Skipping blacklisted business: {biz_id} (row {i+1})")
+            blacklisted_count += 1
+            # Track blacklisted business details
+            blacklisted_details.append({
+                "business_id": biz_id,
+                "business_name": business_name,
+                "row_number": i + 1,
+                "plz": plz,
+                "city": get_ci(row, 'Ort', 'Stadt', 'City')
+            })
+            # Mark row to be excluded from final output
+            row['_blacklisted'] = True
+            precomputed.append({"in_limit": False, "row": row, "blacklisted": True})
+            continue
+        
         if not in_limit:
-            precomputed.append({"in_limit": False, "row": row})
+            precomputed.append({"in_limit": False, "row": row, "blacklisted": False})
             continue
 
         doc_id_from_row = get_ci(row, 'id', 'link_id')  # may be None
         dest = get_ci(row, 'destination', 'url') or destination
-        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
         template_key = get_ci_key(row, 'Template', 'template')
         template_raw = row.get(template_key) if template_key else None
 
@@ -623,7 +696,8 @@ def assign_links_from_business_file(path: str, base_url: str,
             "base_id": base_id,          # <— store base
             "business_name": business_name,
             "template_raw": template_raw,
-            "template_key": template_key
+            "template_key": template_key,
+            "blacklisted": False
         })
 
     assign_final_ids(precomputed)
@@ -658,8 +732,16 @@ def assign_links_from_business_file(path: str, base_url: str,
 
             try:
                 coordinate = maybe_geocode(row)
+                # Track geocoding stats
+                if geocode:
+                    if coordinate:
+                        geocoding_successful += 1
+                    else:
+                        geocoding_failed += 1
+                
                 biz_id, biz_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
                 biz_ref = COL_BUSINESSES.document(biz_id)
+                current_biz_id = biz_id  # Store for error tracking
 
                 # upsert business
                 batch.set(biz_ref, {**biz_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
@@ -685,6 +767,10 @@ def assign_links_from_business_file(path: str, base_url: str,
                 }
                 batch.set(target_ref, target_payload); ops += 1
                 created_targets += 1
+                
+                # Track excluded rows (no destination)
+                if not dest:
+                    excluded_no_destination += 1
 
                 print("DEBUG target_payload:", target_payload)
                 print("DEBUG dest:", dest)
@@ -752,6 +838,19 @@ def assign_links_from_business_file(path: str, base_url: str,
             except Exception as e:
                 print(f"[error] row: {e}")
                 errors += 1
+                # Track error details
+                error_biz_id = None
+                try:
+                    error_biz_id = current_biz_id if 'current_biz_id' in locals() else None
+                except:
+                    pass
+                error_details.append({
+                    "row_number": i + 1,
+                    "business_name": business_name or "Unknown",
+                    "business_id": error_biz_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                })
                 row['tracking_link'] = ''
 
     finally:
@@ -769,16 +868,46 @@ def assign_links_from_business_file(path: str, base_url: str,
         merge=True
     )
 
+    # Filter out blacklisted rows before writing output
+    filtered_rows = [r for r in rows if not r.get('_blacklisted', False)]
+    
     if is_excel:
         if pd is None:
             raise RuntimeError("Excel output requires pandas/openpyxl")
-        out_df = pd.DataFrame(rows)
+        out_df = pd.DataFrame(filtered_rows)
         out_path = write_back_excel(path, out_df)
     else:
-        out_path = write_back_csv(path, rows)
+        out_path = write_back_csv(path, filtered_rows)
 
-    print(f"Done. created_links={created_links} created_targets={created_targets} skipped={skipped} errors={errors}")
-    return out_path
+    processing_end = datetime.now(timezone.utc)
+    
+    # Prepare statistics
+    statistics = {
+        "created_links": created_links,
+        "created_targets": created_targets,
+        "skipped": skipped,
+        "errors": errors,
+        "blacklisted_count": blacklisted_count,
+        "blacklisted_details": blacklisted_details,
+        "error_details": error_details,
+        "excluded_no_destination": excluded_no_destination,
+        "geocoding_stats": {
+            "enabled": geocode,
+            "successful": geocoding_successful,
+            "failed": geocoding_failed
+        },
+        "total_rows": total_rows,
+        "processed_rows": len(filtered_rows)
+    }
+
+    print(f"Done. created_links={created_links} created_targets={created_targets} skipped={skipped} errors={errors} blacklisted={blacklisted_count}")
+    
+    return {
+        "output_path": out_path,
+        "statistics": statistics,
+        "processing_start": processing_start,
+        "processing_end": processing_end
+    }
 
 # ---------------------------
 # GCS helpers
@@ -811,6 +940,72 @@ def _content_type_for(path: str) -> str:
     if ext in (".xlsx", ".xls"):
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return "application/octet-stream"
+
+def generate_upload_report(
+    statistics: Dict,
+    campaign_info: Dict,
+    input_file_info: Dict,
+    output_file_path: str,
+    processing_start: datetime,
+    processing_end: datetime,
+    owner_id: str
+) -> Dict:
+    """
+    Generate a comprehensive upload report.
+    
+    Returns a dictionary that can be serialized to JSON.
+    """
+    duration = (processing_end - processing_start).total_seconds()
+    
+    report = {
+        "upload_id": f"{campaign_info.get('campaign_id', 'unknown')}-{int(processing_start.timestamp())}",
+        "timestamp": processing_end.isoformat(),
+        "campaign": {
+            "campaign_id": campaign_info.get("campaign_id"),
+            "campaign_name": campaign_info.get("campaign_name"),
+            "campaign_code": campaign_info.get("campaign_code"),
+        },
+        "input_file": input_file_info,
+        "processing": {
+            "started_at": processing_start.isoformat(),
+            "completed_at": processing_end.isoformat(),
+            "duration_seconds": round(duration, 2)
+        },
+        "statistics": {
+            "total_rows": statistics.get("total_rows", 0),
+            "processed_rows": statistics.get("processed_rows", 0),
+            "successful_links": statistics.get("created_links", 0),
+            "targets_created": statistics.get("created_targets", 0),
+            "blacklisted": {
+                "count": statistics.get("blacklisted_count", 0),
+                "businesses": statistics.get("blacklisted_details", [])
+            },
+            "skipped": {
+                "count": statistics.get("skipped", 0),
+                "reason": "limit_exceeded"
+            },
+            "errors": {
+                "count": statistics.get("errors", 0),
+                "details": statistics.get("error_details", [])
+            },
+            "excluded": {
+                "count": statistics.get("excluded_no_destination", 0),
+                "reason": "no_destination"
+            },
+            "geocoding": statistics.get("geocoding_stats", {
+                "enabled": False,
+                "successful": 0,
+                "failed": 0
+            })
+        },
+        "output_files": {
+            "with_links": output_file_path
+        },
+        "status": "completed",
+        "owner_id": owner_id
+    }
+    
+    return report
 
 def _delete_prefix(bucket: storage.Bucket, prefix: str) -> int:
     """
@@ -1044,9 +1239,10 @@ def process_business_upload(cloud_event):
     # ---------------------------
     # Process (with minimal changes): on DuplicateCampaignCodeError, delete folder & log
     # ---------------------------
+    processing_start = datetime.now(timezone.utc)
     try:
         # Process
-        out_path = assign_links_from_business_file(
+        result = assign_links_from_business_file(
             path=local_in,
             base_url=base_url,
             destination=params["destination"],
@@ -1061,12 +1257,61 @@ def process_business_upload(cloud_event):
             geocode=params["geocode"],
         )
 
+        out_path = result["output_path"]
+        statistics = result["statistics"]
+        processing_end = result.get("processing_end", datetime.now(timezone.utc))
+
         # Upload output next to input (same folder), with suffix
         out_name = os.path.basename(out_path)
         dest_blob = f"{prefix_dir}/{out_name}" if prefix_dir else out_name
         _upload_blob(bucket, out_path, dest_blob, _content_type_for(out_path))
 
         print(f"[done] Wrote: gs://{bucket_name}/{dest_blob}")
+
+        # Generate and upload report
+        report = generate_upload_report(
+            statistics=statistics,
+            campaign_info={
+                "campaign_id": params["campaign_id"],
+                "campaign_name": params["campaign_name"],
+                "campaign_code": params["campaign_code"]
+            },
+            input_file_info={
+                "name": os.path.basename(object_name),
+                "path": object_name,
+                "total_rows": statistics.get("total_rows", 0)
+            },
+            output_file_path=f"gs://{bucket_name}/{dest_blob}",
+            processing_start=result.get("processing_start", processing_start),
+            processing_end=processing_end,
+            owner_id=ownerId
+        )
+
+        # Save report to local file
+        report_path = os.path.join("/tmp", "upload_report.json")
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+
+        # Upload report to GCS
+        report_blob_name = f"{prefix_dir}/upload_report.json"
+        _upload_blob(bucket, report_path, report_blob_name, "application/json")
+
+        print(f"[report] Uploaded report: gs://{bucket_name}/{report_blob_name}")
+
+        # Log summary
+        print(json.dumps({
+            "event": "upload_completed",
+            "campaign_id": params["campaign_id"],
+            "statistics": {
+                "total_rows": statistics.get("total_rows", 0),
+                "links_created": statistics.get("created_links", 0),
+                "targets_created": statistics.get("created_targets", 0),
+                "blacklisted": statistics.get("blacklisted_count", 0),
+                "errors": statistics.get("errors", 0),
+                "excluded_no_destination": statistics.get("excluded_no_destination", 0)
+            },
+            "report_path": f"gs://{bucket_name}/{report_blob_name}"
+        }, ensure_ascii=False))
 
     except DuplicateCampaignCodeError as e:
         # Clear, structured logs about the duplicate + cleanup
@@ -1118,4 +1363,43 @@ def process_business_upload(cloud_event):
             }, ensure_ascii=False))
 
         # Re-raise so the invocation is marked failed and the error appears in logs
+        raise
+    
+    except Exception as e:
+        # Generate error report for other exceptions
+        processing_end = datetime.now(timezone.utc)
+        try:
+            error_report = {
+                "status": "failed",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "timestamp": processing_end.isoformat(),
+                "input_file": {
+                    "name": os.path.basename(object_name),
+                    "path": object_name
+                },
+                "campaign": {
+                    "campaign_id": params.get("campaign_id"),
+                    "campaign_name": params.get("campaign_name"),
+                    "campaign_code": params.get("campaign_code")
+                },
+                "processing": {
+                    "started_at": processing_start.isoformat(),
+                    "failed_at": processing_end.isoformat(),
+                    "duration_seconds": round((processing_end - processing_start).total_seconds(), 2)
+                },
+                "owner_id": ownerId
+            }
+            
+            report_path = os.path.join("/tmp", "upload_report_error.json")
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(error_report, f, indent=2, ensure_ascii=False)
+            
+            report_blob_name = f"{prefix_dir}/upload_report_error.json"
+            _upload_blob(bucket, report_path, report_blob_name, "application/json")
+            print(f"[report] Uploaded error report: gs://{bucket_name}/{report_blob_name}")
+        except Exception as report_error:
+            print(f"[warn] Failed to generate error report: {report_error}")
+        
+        # Re-raise the original exception
         raise
