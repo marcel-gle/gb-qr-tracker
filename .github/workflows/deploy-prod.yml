@@ -28,6 +28,8 @@ jobs:
               - 'functions/upload_processor/**'
             delete_campaign:
               - 'functions/delete_campaign/**'
+            health_monitor:
+              - 'functions/health_monitor/**'
             shared:
               - 'deploy.sh'
               - '.env.prod'
@@ -36,12 +38,13 @@ jobs:
       - id: set-matrix
         run: |
           if [[ "${{ steps.filters.outputs.shared }}" == 'true' ]]; then
-            echo "matrix={\"function\":[\"redirector\",\"upload_processor\",\"delete_campaign\"]}" >> $GITHUB_OUTPUT
+            echo "matrix={\"function\":[\"redirector\",\"upload_processor\",\"delete_campaign\",\"health_monitor\"]}" >> $GITHUB_OUTPUT
           else
             list=()
             [[ "${{ steps.filters.outputs.redirector }}" == 'true' ]] && list+=('"redirector"')
             [[ "${{ steps.filters.outputs.upload_processor }}" == 'true' ]] && list+=('"upload_processor"')
             [[ "${{ steps.filters.outputs.delete_campaign }}" == 'true' ]] && list+=('"delete_campaign"')
+            [[ "${{ steps.filters.outputs.health_monitor }}" == 'true' ]] && list+=('"health_monitor"')
             if [[ ${#list[@]} -eq 0 ]]; then
               echo 'matrix={"function":[]}' >> $GITHUB_OUTPUT
             else

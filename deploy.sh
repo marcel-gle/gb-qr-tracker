@@ -70,8 +70,42 @@ esac
 
 # 5) Env vars
 if ((${#ENV_VARS[@]})); then
-  env_join=$(IFS=,; printf "%s" "${ENV_VARS[*]}")
-  CMD+=( --set-env-vars="${env_join}" )
+  # Check if any env var value contains a comma (which breaks gcloud parsing)
+  needs_file=false
+  for var in "${ENV_VARS[@]}"; do
+    # Extract value part (after =)
+    if [[ "$var" =~ = ]] && [[ "$var" =~ , ]]; then
+      needs_file=true
+      break
+    fi
+  done
+  
+  if [[ "$needs_file" == "true" ]]; then
+    # Use env-vars-file for values with commas (YAML format)
+    env_file=$(mktemp)
+    for var in "${ENV_VARS[@]}"; do
+      # Split key and value
+      if [[ "$var" =~ ^([^=]+)=(.*)$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+        # Remove quotes from value if present
+        value="${value#\"}"
+        value="${value%\"}"
+        value="${value#\'}"
+        value="${value%\'}"
+        # Write in YAML format (key: value)
+        # Escape colons in value if present
+        echo "${key}: ${value}" >> "$env_file"
+      fi
+    done
+    CMD+=( --env-vars-file="${env_file}" )
+    # Clean up temp file after deployment (using trap)
+    trap "rm -f ${env_file}" EXIT
+  else
+    # Use direct flag for simple values
+    env_join=$(IFS=,; printf "%s" "${ENV_VARS[*]}")
+    CMD+=( --set-env-vars="${env_join}" )
+  fi
 fi
 
 # 6) Secrets
