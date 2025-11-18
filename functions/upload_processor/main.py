@@ -81,6 +81,8 @@ def sanitize_id(value: str) -> str:
     v = str(value).strip()
     v = re.sub(r"[^A-Za-z0-9]+", "-", v)
     v = re.sub(r"-{2,}", "-", v).strip("-")
+    # Normalize to lowercase for consistency
+    v = v.lower()
     return v
 
 
@@ -439,7 +441,11 @@ def get_or_create_campaign_old(owner_id: str,
 
 
 def upsert_business_payload_from_row(row: dict, ownerId: str,
-                                     coordinate: Optional[Dict[str, float]]) -> Tuple[str, Dict]:
+                                     coordinate: Optional[Dict[str, float]]) -> Tuple[str, Dict, Dict]:
+    """
+    Split business data into canonical and customer-specific payloads.
+    Returns: (biz_id, canonical_payload, customer_payload)
+    """
     business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
     street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
     house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
@@ -456,27 +462,33 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     phone = " ".join(p for p in [prefix_tel, tel] if p)
     full_addr = compose_full_address(street, house_no, plz, city, "Germany")
 
-    #print("upsert_business_payload_from_row", business_name, street, house_no, plz, city, contact_name, phone, email, salutation, full_addr, coordinate)
-
     biz_id = make_business_id(business_name, plz)
-    payload = {
+    
+    # Canonical payload (shared across customers)
+    canonical_payload = {
         "business_name": business_name,
         "street": street,
         "house_number": house_no,
         "postcode": plz,
         "city": city,
-        "name": contact_name or None,
-        "phone": phone or None,
-        "email": email or None,
         "address": full_addr or None,
-        "salutation": salutation or None,
-        "updated_at": firestore.SERVER_TIMESTAMP,
-        "hit_count": 0,
-        "business_id": biz_id,
+        "business_id": biz_id,  # Store normalized business_id in document
     }
     if coordinate:
-        payload["coordinate"] = coordinate
-    return biz_id, payload
+        canonical_payload["coordinate"] = coordinate
+    
+    # Customer-specific payload (per-customer overlay)
+    customer_payload = {
+        "phone": phone or None,
+        "email": email or None,
+        "name": contact_name or None,
+        "salutation": salutation or None,
+        "hit_count": 0,
+        "last_hit_at": None,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    
+    return biz_id, canonical_payload, customer_payload
 
 def write_back_csv(input_path: str, rows: list, suffix="_with_links") -> str:
     base, _ = os.path.splitext(input_path)
@@ -739,13 +751,20 @@ def assign_links_from_business_file(path: str, base_url: str,
                     else:
                         geocoding_failed += 1
                 
-                biz_id, biz_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
+                biz_id, canonical_payload, customer_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
                 biz_ref = COL_BUSINESSES.document(biz_id)
                 current_biz_id = biz_id  # Store for error tracking
 
-                # upsert business
-                batch.set(biz_ref, {**biz_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
+                # Upsert canonical business document
+                batch.set(biz_ref, {**canonical_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
                 batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
+
+                # Upsert customer-specific overlay
+                customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
+                batch.set(customer_business_ref, {
+                    "business_ref": biz_ref,
+                    **customer_payload
+                }, merge=True); ops += 1
 
                 # target
                 target_ref = campaign_ref.collection('targets').document()

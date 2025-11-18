@@ -295,11 +295,15 @@ def redirector(request: Request):
             'last_hit_at': SERVER_TIMESTAMP,
         })
 
-        # business aggregates (optional)
-        if isinstance(business_ref, firestore.DocumentReference):
-            batch.set(business_ref, {
+        # business aggregates (per-customer overlay)
+        if isinstance(business_ref, firestore.DocumentReference) and owner_id:
+            # Update customer-specific business overlay instead of canonical business
+            business_id = business_ref.id
+            customer_business_ref = _db.collection('customers').document(owner_id).collection('businesses').document(business_id)
+            batch.set(customer_business_ref, {
                 'hit_count': Increment(1),
                 'last_hit_at': SERVER_TIMESTAMP,
+                'updated_at': SERVER_TIMESTAMP,
             }, merge=True)
 
         # campaign aggregates (totals.hits)
