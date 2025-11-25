@@ -17,6 +17,14 @@ import functions_framework
 import requests
 from google.cloud import firestore
 
+# Optional: verify Firebase ID token
+try:
+    import firebase_admin
+    from firebase_admin import auth as fb_auth
+    firebase_admin.initialize_app()  # uses default credentials
+except Exception:
+    fb_auth = None  # if you prefer IAM-only auth, handle below
+
 # Initialize clients
 _db = firestore.Client()
 
@@ -179,10 +187,10 @@ def _perform_test_scan_direct(gcp_url: str, link_id: str, env: str) -> Tuple[boo
         return False, f"Request failed: {str(e)}", None
 
 
-def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datetime) -> Tuple[bool, Optional[str], Optional[Dict]]:
+def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datetime) -> Tuple[bool, Optional[str], Optional[Dict], Optional[firestore.DocumentReference]]:
     """
     Verify that a hit was written to Firestore.
-    Returns (success, error_message, hit_data).
+    Returns (success, error_message, hit_data, hit_doc_ref).
     """
     try:
         # Calculate time window for search
@@ -197,6 +205,7 @@ def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datet
         
         # Find a hit within the time window with matching origin
         found_hit = None
+        found_hit_ref = None
         for hit in hits:
             hit_data = hit.to_dict()
             hit_ts = hit_data.get('ts')
@@ -219,20 +228,21 @@ def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datet
                         if hit_data.get('hit_origin') == expected_origin:
                             found_hit = hit_data
                             found_hit['hit_id'] = hit.id
+                            found_hit_ref = hit.reference
                             break
                 except Exception:
                     # Skip this hit if timestamp conversion fails
                     continue
         
         if not found_hit:
-            return False, f"No matching hit found in database (link_id={link_id}, origin={expected_origin}, window={DB_VERIFICATION_WINDOW}s)", None
+            return False, f"No matching hit found in database (link_id={link_id}, origin={expected_origin}, window={DB_VERIFICATION_WINDOW}s)", None, None
         
         # Verify link document was updated
         link_ref = _db.collection('links').document(link_id)
         link_doc = link_ref.get()
         
         if not link_doc.exists:
-            return False, f"Link document {link_id} not found", found_hit
+            return False, f"Link document {link_id} not found", found_hit, found_hit_ref
         
         link_data = link_doc.to_dict()
         hit_count = link_data.get('hit_count', 0)
@@ -240,10 +250,10 @@ def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datet
         
         # Basic verification - hit_count should be > 0, last_hit_at should exist
         if hit_count == 0:
-            return False, f"Link hit_count is 0, expected > 0", found_hit
+            return False, f"Link hit_count is 0, expected > 0", found_hit, found_hit_ref
         
         if not last_hit_at:
-            return False, f"Link last_hit_at is missing", found_hit
+            return False, f"Link last_hit_at is missing", found_hit, found_hit_ref
         
         return True, None, {
             "hit": found_hit,
@@ -251,10 +261,39 @@ def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datet
                 "hit_count": hit_count,
                 "last_hit_at": str(last_hit_at) if last_hit_at else None
             }
-        }
+        }, found_hit_ref
         
     except Exception as e:
-        return False, f"Database verification failed: {str(e)}", None
+        return False, f"Database verification failed: {str(e)}", None, None
+
+
+def _delete_hit(hit_ref: Optional[firestore.DocumentReference]) -> bool:
+    """
+    Delete a hit document from Firestore.
+    Returns True if successful, False otherwise.
+    """
+    if not hit_ref:
+        return False
+    
+    try:
+        hit_ref.delete()
+        logger.info(f"Deleted health check hit: {hit_ref.id}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to delete health check hit {hit_ref.id}: {str(e)}")
+        return False
+
+
+def _verify_firebase_token(request: Request) -> str:
+    """Verify Firebase ID token and return user ID."""
+    if fb_auth is None:
+        raise PermissionError("Auth not configured on server (firebase_admin missing).")
+    authz = request.headers.get("Authorization", "")
+    if not authz.startswith("Bearer "):
+        raise PermissionError("Missing bearer token")
+    id_token = authz.split(" ", 1)[1].strip()
+    decoded = fb_auth.verify_id_token(id_token, check_revoked=True)
+    return decoded["uid"]
 
 
 def _log_error(component: str, check_type: str, error: str, details: Optional[Dict] = None):
@@ -362,13 +401,16 @@ def _perform_test_scans() -> Dict:
     
     if success:
         # Verify in database
-        db_success, db_error, db_data = _verify_hit_in_database(
+        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
             TEST_LINK_ID,
             "cloudflare_worker",
             scan_time
         )
         results["worker_dev"]["db_verified"] = db_success
-        if not db_success:
+        if db_success:
+            # Delete the hit after successful verification
+            _delete_hit(hit_ref)
+        else:
             results["worker_dev"]["db_error"] = db_error
             _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
                 "environment": "dev",
@@ -392,13 +434,16 @@ def _perform_test_scans() -> Dict:
     
     if success:
         # Verify in database
-        db_success, db_error, db_data = _verify_hit_in_database(
+        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
             TEST_LINK_ID,
             "cloudflare_worker",
             scan_time
         )
         results["worker_prod"]["db_verified"] = db_success
-        if not db_success:
+        if db_success:
+            # Delete the hit after successful verification
+            _delete_hit(hit_ref)
+        else:
             results["worker_prod"]["db_error"] = db_error
             _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
                 "environment": "prod",
@@ -426,13 +471,16 @@ def _perform_test_scans() -> Dict:
         
         if success:
             # Verify in database
-            db_success, db_error, db_data = _verify_hit_in_database(
+            db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
                 TEST_LINK_ID,
                 "cloudflare_worker",
                 scan_time
             )
             results[f"worker_{domain_key}"]["db_verified"] = db_success
-            if not db_success:
+            if db_success:
+                # Delete the hit after successful verification
+                _delete_hit(hit_ref)
+            else:
                 results[f"worker_{domain_key}"]["db_error"] = db_error
                 _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
                     "domain": domain,
@@ -456,13 +504,16 @@ def _perform_test_scans() -> Dict:
     
     if success:
         # Verify in database
-        db_success, db_error, db_data = _verify_hit_in_database(
+        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
             TEST_LINK_ID,
             "direct",
             scan_time
         )
         results["direct_dev"]["db_verified"] = db_success
-        if not db_success:
+        if db_success:
+            # Delete the hit after successful verification
+            _delete_hit(hit_ref)
+        else:
             results["direct_dev"]["db_error"] = db_error
             _log_error("gcp_function", "db_verification", db_error or "Unknown error", {
                 "environment": "dev",
@@ -488,13 +539,16 @@ def _perform_test_scans() -> Dict:
     
     if success:
         # Verify in database
-        db_success, db_error, db_data = _verify_hit_in_database(
+        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
             TEST_LINK_ID,
             "direct",
             scan_time
         )
         results["direct_prod"]["db_verified"] = db_success
-        if not db_success:
+        if db_success:
+            # Delete the hit after successful verification
+            _delete_hit(hit_ref)
+        else:
             results["direct_prod"]["db_error"] = db_error
             _log_error("gcp_function", "db_verification", db_error or "Unknown error", {
                 "environment": "prod",
@@ -516,8 +570,19 @@ def health_monitor(request: Request):
     """
     Main entry point for health monitoring.
     Checks health endpoints, performs test scans, and verifies database.
+    
+    Auth:
+      - Expects Firebase ID token in Authorization: Bearer <token>
     """
     try:
+        # Verify Firebase ID token
+        try:
+            uid = _verify_firebase_token(request)
+            logger.info(f"Health monitor check authenticated for user: {uid}")
+        except Exception as e:
+            logger.warning(f"Authentication failed: {str(e)}")
+            return jsonify({"error": f"Unauthorized: {str(e)}"}), 401
+        
         logger.info("Starting health monitor check")
         
         # Perform health checks
@@ -545,7 +610,7 @@ def health_monitor(request: Request):
             }
         }
 
-        #_log_error("health_monitor_test", "TEST", "Health monitor check passed")
+        #git_log_error("health_monitor_test", "TEST", "Health monitor check passed")
         
         if overall_success:
             logger.info("Health monitor check passed")

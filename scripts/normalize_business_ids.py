@@ -429,6 +429,81 @@ def normalize_business_id_fields(
     return stats
 
 
+def normalize_overlay_business_refs(
+    db: firestore.Client,
+    dry_run: bool = False
+) -> Dict:
+    """
+    Normalize business_ref fields in customer overlay documents.
+    
+    This function fixes cases where overlay documents have business_ref pointing
+    to non-normalized business IDs, even if the overlay document ID itself is normalized.
+    
+    Returns statistics.
+    """
+    print(f"Normalizing business_ref fields in customer overlays (dry_run={dry_run})...")
+    
+    stats = {
+        "overlays_checked": 0,
+        "overlays_updated": 0,
+        "errors": []
+    }
+    
+    batch = db.batch()
+    ops = 0
+    
+    # Scan all customer overlays
+    customers = list(db.collection("customers").stream())
+    for customer_doc in tqdm(customers, desc="Processing customers"):
+        customer_id = customer_doc.id
+        businesses_ref = customer_doc.reference.collection("businesses")
+        
+        for overlay_doc in businesses_ref.stream():
+            stats["overlays_checked"] += 1
+            overlay_data = overlay_doc.to_dict() or {}
+            business_ref = overlay_data.get("business_ref")
+            
+            if not business_ref:
+                continue
+            
+            # Check if business_ref is a DocumentReference
+            if not hasattr(business_ref, "id"):
+                continue
+            
+            old_business_id = business_ref.id
+            normalized_id = normalize_business_id(old_business_id)
+            
+            # If the business_ref points to a non-normalized ID, update it
+            if old_business_id != normalized_id:
+                # Check if normalized business exists
+                normalized_business_ref = db.collection("businesses").document(normalized_id)
+                normalized_business = normalized_business_ref.get()
+                
+                if not normalized_business.exists:
+                    stats["errors"].append(
+                        f"Customer {customer_id}, overlay {overlay_doc.id}: "
+                        f"Normalized business {normalized_id} does not exist "
+                        f"(old: {old_business_id})"
+                    )
+                    continue
+                
+                if not dry_run:
+                    batch.update(overlay_doc.reference, {"business_ref": normalized_business_ref})
+                    ops += 1
+                    if ops >= BATCH_SIZE:
+                        batch.commit()
+                        batch = db.batch()
+                        ops = 0
+                
+                stats["overlays_updated"] += 1
+    
+    # Commit remaining batch operations
+    if not dry_run and ops > 0:
+        batch.commit()
+    
+    return stats
+
+
 def migrate_all_business_ids(
     db: firestore.Client,
     dry_run: bool = False,
@@ -453,6 +528,10 @@ def migrate_all_business_ids(
         # Still normalize business_id fields in documents
         references = preload_all_references(db)
         field_stats = normalize_business_id_fields(db, references, dry_run)
+        
+        # Normalize business_ref fields in overlays
+        overlay_ref_stats = normalize_overlay_business_refs(db, dry_run)
+        
         return {
             "total": 0,
             "migrated": 0,
@@ -464,7 +543,9 @@ def migrate_all_business_ids(
             "links_business_id_updated": field_stats["links_updated"],
             "hits_business_id_updated": field_stats["hits_updated"],
             "targets_business_id_updated": field_stats["targets_updated"],
-            "errors": [],
+            "overlays_business_ref_updated": overlay_ref_stats["overlays_updated"],
+            "overlays_business_ref_checked": overlay_ref_stats["overlays_checked"],
+            "errors": overlay_ref_stats["errors"],
             "businesses_with_errors": 0
         }
     
@@ -483,6 +564,8 @@ def migrate_all_business_ids(
         "links_business_id_updated": 0,
         "hits_business_id_updated": 0,
         "targets_business_id_updated": 0,
+        "overlays_business_ref_updated": 0,
+        "overlays_business_ref_checked": 0,
         "errors": [],
         "businesses_with_errors": 0,
     }
@@ -515,6 +598,14 @@ def migrate_all_business_ids(
     aggregate_stats["hits_business_id_updated"] = field_stats["hits_updated"]
     aggregate_stats["targets_business_id_updated"] = field_stats["targets_updated"]
     
+    # Normalize business_ref fields in overlays
+    print("\nNormalizing business_ref fields in overlays...")
+    overlay_ref_stats = normalize_overlay_business_refs(db, dry_run)
+    aggregate_stats["overlays_business_ref_updated"] = overlay_ref_stats["overlays_updated"]
+    aggregate_stats["overlays_business_ref_checked"] = overlay_ref_stats["overlays_checked"]
+    if overlay_ref_stats["errors"]:
+        aggregate_stats["errors"].extend(overlay_ref_stats["errors"])
+    
     return aggregate_stats
 
 
@@ -545,6 +636,11 @@ def main():
         default=None,
         help="Limit number of businesses to migrate (for testing)"
     )
+    parser.add_argument(
+        "--fix-overlay-refs-only",
+        action="store_true",
+        help="Only fix business_ref fields in customer overlays (skip main migration)"
+    )
 
     args = parser.parse_args()
 
@@ -556,6 +652,31 @@ def main():
 
     # Initialize Firestore client
     db = firestore.Client(project=args.project, database=args.database)
+
+    # If --fix-overlay-refs-only flag is set, only run the overlay fix
+    if args.fix_overlay_refs_only:
+        stats = normalize_overlay_business_refs(db, dry_run=args.dry_run)
+        
+        # Print summary
+        print("\n" + "=" * 60)
+        print("Overlay business_ref Normalization Summary")
+        print("=" * 60)
+        print(f"Overlays checked: {stats['overlays_checked']}")
+        print(f"Overlays updated: {stats['overlays_updated']}")
+        
+        if stats["errors"]:
+            print(f"\nErrors ({len(stats['errors'])}):")
+            for error in stats["errors"][:20]:  # Show first 20 errors
+                print(f"  - {error}")
+            if len(stats["errors"]) > 20:
+                print(f"  ... and {len(stats['errors']) - 20} more errors")
+        
+        if args.dry_run:
+            print("\n[DRY RUN] No changes were written to the database")
+        else:
+            print("\nFix completed!")
+        
+        return 0 if len(stats["errors"]) == 0 else 1
 
     # Run migration
     stats = migrate_all_business_ids(db, dry_run=args.dry_run, limit=args.limit)
@@ -574,6 +695,9 @@ def main():
     print(f"Links business_id fields normalized: {stats['links_business_id_updated']}")
     print(f"Hits business_id fields normalized: {stats['hits_business_id_updated']}")
     print(f"Targets business_id fields normalized: {stats['targets_business_id_updated']}")
+    if 'overlays_business_ref_checked' in stats:
+        print(f"Overlay business_ref fields checked: {stats['overlays_business_ref_checked']}")
+        print(f"Overlay business_ref fields updated: {stats.get('overlays_business_ref_updated', 0)}")
     print(f"Businesses with errors: {stats['businesses_with_errors']}")
     
     if stats["errors"]:
