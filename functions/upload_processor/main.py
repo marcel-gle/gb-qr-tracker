@@ -75,15 +75,56 @@ class DuplicateCampaignCodeError(RuntimeError):
 def build_tracking_link(base_url: str, doc_id: str) -> str:
     return f"{base_url.rstrip('/')}/?id={doc_id}"
 
+def build_tracking_url(tracking_url_prefix: Optional[str], final_id: str) -> str:
+    """
+    Build the printable tracking URL shown in the export.
+
+    - If `tracking_url_prefix` is provided (e.g. "https://example.com/track"),
+      we generate "<prefix>/<final_id>".
+    - If not provided, we default to "ihr-brief.de/<final_id>".
+    """
+    if tracking_url_prefix:
+        return f"{tracking_url_prefix.rstrip('/')}/{final_id}"
+    return f"ihr-brief.de/{final_id}"
+
 def sanitize_id(value: str) -> str:
     if value is None:
         return ""
     v = str(value).strip()
-    v = re.sub(r"[^A-Za-z0-9]+", "-", v)
+    # Allow A-Z, a-z, 0-9, and German umlauts (ä, ö, ü, ß)
+    # Replace everything else with hyphens
+    v = re.sub(r"[^A-Za-z0-9äöüÄÖÜß]+", "-", v)
     v = re.sub(r"-{2,}", "-", v).strip("-")
     # Normalize to lowercase for consistency
     v = v.lower()
     return v
+
+def remove_tld_suffix(domain_id: str) -> str:
+    """
+    Remove common TLD suffixes from the end of a domain-based ID.
+    Examples: 'example-com' -> 'example', 'test-de' -> 'test'
+    """
+    if not domain_id:
+        return domain_id
+    
+    # Common TLD suffixes to remove (case-insensitive)
+    # Includes country codes and generic TLDs
+    tld_suffixes = [
+        '-de', '-com', '-net', '-org', '-io', '-co', '-uk', '-fr', '-it', '-es',
+        '-nl', '-be', '-at', '-ch', '-pl', '-cz', '-dk', '-se', '-no', '-fi',
+        '-au', '-ca', '-jp', '-cn', '-in', '-br', '-mx', '-ru', '-kr', '-tw',
+        '-info', '-biz', '-name', '-pro', '-mobi', '-tel', '-asia', '-jobs',
+        '-edu', '-gov', '-mil', '-int', '-aero', '-museum', '-travel'
+    ]
+    
+    domain_id_lower = domain_id.lower()
+    for suffix in tld_suffixes:
+        if domain_id_lower.endswith(suffix):
+            # Remove the suffix and any trailing dashes
+            result = domain_id[:-len(suffix)].rstrip('-')
+            return result if result else domain_id  # Don't return empty string
+    
+    return domain_id
 
 
 def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
@@ -118,6 +159,11 @@ def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
 
 def next_id_from_cache(base_id: str, taken: set[str]) -> str:
     """Pick base_id if free, else base_id-<n> with the smallest available n >= 1."""
+    # Guard against empty base_id - never return empty string
+    if not base_id or not base_id.strip():
+        base_id = "link"
+        print(f"[warn] Empty base_id detected in next_id_from_cache, using fallback: 'link'")
+    
     if base_id not in taken:
         taken.add(base_id)
         return base_id
@@ -131,6 +177,7 @@ def next_id_from_cache(base_id: str, taken: set[str]) -> str:
     candidate = f"{base_id}-{max_n + 1}"
     taken.add(candidate)
     return candidate
+
 
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
     if not template:
@@ -164,20 +211,24 @@ def get_ci_key(row: dict, *names: str) -> Optional[str]:
 
 
 def csv_fieldnames_union(rows: List[dict]) -> List[str]:
+    """
+    Compute CSV headers from a list of dict rows, ensuring our tracking columns
+    appear at the end in a stable order.
+    """
+    tracking_cols = ["tracking_link", "tracking_url", "tracking_id"]
     if not rows:
-        return ['tracking_link']
+        return tracking_cols
     seen: Set[str] = set()
     ordered: List[str] = []
     for k in rows[0].keys():
-        if k not in seen:
+        if k not in seen and k not in tracking_cols:
             ordered.append(k); seen.add(k)
     for r in rows[1:]:
         for k in r.keys():
-            if k not in seen and k != 'tracking_link':
+            if k not in seen and k not in tracking_cols:
                 ordered.append(k); seen.add(k)
-    if 'tracking_link' in seen:
-        ordered = [k for k in ordered if k != 'tracking_link']
-    ordered.append('tracking_link')
+    # Append tracking columns at the end (whether or not they appeared in rows)
+    ordered.extend(tracking_cols)
     return ordered
 
 def compose_full_address(street: Optional[str], house_no: Optional[str],
@@ -505,9 +556,13 @@ def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
     base, _ = os.path.splitext(input_path)
     out_path = f"{base}{suffix}.xlsx"
     cols = list(df.columns)
-    if 'tracking_link' in cols:
-        cols = [c for c in cols if c != 'tracking_link'] + ['tracking_link']
-        df = df[cols]
+    # Ensure tracking columns exist and are placed at the end
+    tracking_cols = ["tracking_link", "tracking_url", "tracking_id"]
+    for col in tracking_cols:
+        if col not in df.columns:
+            df[col] = ""
+    cols = [c for c in df.columns if c not in tracking_cols] + tracking_cols
+    df = df[cols]
     if pd is None:
         raise RuntimeError("Excel output requires pandas/openpyxl.")
     with pd.ExcelWriter(out_path, engine='openpyxl') as writer:
@@ -544,12 +599,18 @@ def assign_final_ids(precomputed: List[Dict]) -> None:
     # For each base, query existing variants once, then allocate final IDs
     for base_id, items in groups.items():
         if not base_id:
-            # still allow empty base; sanitize_id already tried to keep it readable
-            # if truly empty, they’ll become "", "-1", etc — unlikely given our fallbacks
-            pass
+            # Ensure empty base_id gets a fallback
+            base_id = "link"
+            print(f"[warn] Empty base_id in assign_final_ids, using fallback: 'link'")
         taken = existing_variants_for_base(COL_LINKS, base_id)
         for item in items:
             item["final_id"] = next_id_from_cache(base_id, taken)
+            # Double-check: ensure final_id is never empty
+            if not item["final_id"] or not item["final_id"].strip():
+                fallback_id = f"link-{len(taken) + 1}"
+                print(f"[warn] final_id was empty for base_id '{base_id}', using fallback: '{fallback_id}'")
+                item["final_id"] = fallback_id
+                taken.add(fallback_id)
 
 
 
@@ -567,7 +628,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     limit: int,
                                     mapbox_token: Optional[str],
                                     skip_existing: bool,
-                                    geocode: bool = True):
+                                    geocode: bool = True,
+                                    tracking_url_prefix: Optional[str] = None):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
     blacklisted_count = 0
@@ -655,6 +717,7 @@ def assign_links_from_business_file(path: str, base_url: str,
         business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
         plz = get_ci(row, 'PLZ', 'Postleitzahl')
         biz_id = make_business_id(business_name, plz)
+        print("DEBUG biz_id:", biz_id)
         
         is_blacklisted = biz_id in blacklisted_business_ids
         if is_blacklisted:
@@ -682,8 +745,28 @@ def assign_links_from_business_file(path: str, base_url: str,
         template_key = get_ci_key(row, 'Template', 'template')
         template_raw = row.get(template_key) if template_key else None
 
-        if campaign_code_from_business:
+        print("DEBUG campaign_code_from_business:", campaign_code_from_business)
+        print("DEBUG doc_id_from_row:", doc_id_from_row)
+        print("DEBUG business_name:", business_name)
+        print("DEBUG campaign_code:", campaign_code)
+        print("DEBUG i:", i)
+        print("DEBUG destination:", destination)
+        print("DEBUG template_key:", template_key)
+        print("DEBUG template_raw:", template_raw)
+
+        # Check for "Domain" column first - this takes priority
+        domain_from_row = get_ci(row, 'Domain', 'domain')
+        print("DEBUG domain_from_row:", domain_from_row)
+        
+        using_domain_column = False
+        if domain_from_row and domain_from_row.strip():
+            # Use Domain column as base_id if present
+            base_id = domain_from_row
+            using_domain_column = True
+            print("DEBUG using Domain column as base_id:", base_id)
+        elif campaign_code_from_business:
             email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
+            print("DEBUG email:", email)
             if not email:
                 # No email provided - use clean business name from "Namenszeile"
                 print("DEBUG business_name:", business_name)
@@ -694,12 +777,30 @@ def assign_links_from_business_file(path: str, base_url: str,
                 # Business email - use domain
                 print("DEBUG email:", email)
                 base_id = _extract_registrable_domain(email)
+                using_domain_column = True  # Also remove TLD from email-extracted domains
         else:
             base_id = doc_id_from_row or business_name or f"{(campaign_code or 'L').upper()}-{i+1}"
 
         base_id = sanitize_id(base_id or "")
+        
+        # Remove TLD suffixes from domain-based IDs
+        if using_domain_column and base_id:
+            base_id_before = base_id
+            base_id = remove_tld_suffix(base_id)
+            if base_id_before != base_id:
+                print(f"DEBUG removed TLD suffix: '{base_id_before}' -> '{base_id}'")
 
         print("DEBUG base_id:", base_id)
+
+        if not base_id:
+            print("⚠️ [DEBUG EMPTY BASE_ID] row:", i+1)
+            print("    business_name:", repr(business_name))
+            print("    email:", repr(email))
+            print("    doc_id_from_row:", repr(doc_id_from_row))
+            print("    original base:", repr(orig_base if 'orig_base' in locals() else None))
+            print("    after sanitize:", repr(base_id))
+            print("    Using campaign_code:", campaign_code)
+            print("    FULL ROW:", row)
 
         precomputed.append({
             "in_limit": True,
@@ -722,13 +823,20 @@ def assign_links_from_business_file(path: str, base_url: str,
     def flush():
         nonlocal batch, ops
         if ops:
-            batch.commit()
-            batch = db.batch()
-            ops = 0
+            try:
+                batch.commit()
+                print(f"[batch] Committed {ops} operations successfully")
+            except Exception as e:
+                print(f"[ERROR] Batch commit failed: {e}")
+                print(f"[ERROR] This batch had {ops} operations")
+                raise  # Re-raise to be caught by outer handler
+            finally:
+                batch = db.batch()
+                ops = 0
 
     pbar = tqdm(precomputed, desc="Processing rows", unit="row")
     try:
-        for item in pbar:
+        for item_idx, item in enumerate(pbar):
             row = item["row"]
             if not item["in_limit"]:
                 row['tracking_link'] = ''
@@ -739,6 +847,25 @@ def assign_links_from_business_file(path: str, base_url: str,
             business_name = item.get("business_name")
             template_raw = item.get("template_raw")
             template_key = item.get("template_key")
+
+            # Validate final_id before proceeding - prevent empty final_id errors
+            if dest and (not final_id or not final_id.strip()):
+                print(f"[ERROR] Empty final_id detected! Row data:")
+                print(f"  - dest: {dest}")
+                print(f"  - final_id: '{final_id}' (type: {type(final_id)}, len: {len(final_id) if final_id else 0})")
+                print(f"  - base_id: {item.get('base_id')}")
+                print(f"  - business_name: {business_name}")
+                print(f"  - row_index: {item_idx + 1}")
+                # Set dest to None to skip link creation for this row
+                dest = None
+                item["dest"] = None
+                errors += 1
+                error_details.append({
+                    "row_number": item_idx + 1,
+                    "business_name": business_name or "Unknown",
+                    "error": "Empty final_id detected - link creation skipped",
+                    "error_type": "ValidationError"
+                })
 
             print("DEBUG final_id:", final_id)
 
@@ -772,7 +899,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                 snapshot = snapshot_mailing_from_row(row, business_name)
 
                 # reference to link doc (by final_id)
-                link_ref = COL_LINKS.document(final_id) if dest else None
+                # FIX: Only create link_ref if dest exists AND final_id is valid (not empty)
+                link_ref = COL_LINKS.document(final_id) if (dest and final_id and final_id.strip()) else None
 
                 target_payload = {
                     "business_ref": biz_ref,
@@ -818,9 +946,17 @@ def assign_links_from_business_file(path: str, base_url: str,
                     except AlreadyExists:
                         # Recompute suffix (another worker probably grabbed our final_id)
                         print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
-                        base = item.get("base_id") or final_id
+                        base = item.get("base_id") or final_id or "link"
+                        if not base or not base.strip():
+                            base = "link"
+                            print(f"[warn] Empty base in retry logic, using fallback: 'link'")
                         taken = existing_variants_for_base(COL_LINKS, base)
                         retry_id = next_id_from_cache(base, taken)
+                        
+                        # Double-check retry_id is not empty
+                        if not retry_id or not retry_id.strip():
+                            retry_id = f"link-{len(taken) + 1}"
+                            print(f"[warn] retry_id was empty, using fallback: '{retry_id}'")
 
                         batch.create(COL_LINKS.document(retry_id), {
                             "campaign_ref": campaign_ref,
@@ -841,8 +977,15 @@ def assign_links_from_business_file(path: str, base_url: str,
                         created_links += 1
                         final_id = retry_id             # make sure output uses the actual created ID
 
-                # write back tracking link + template into the row
-                row['tracking_link'] = build_tracking_link(base_url, final_id) if dest else ''
+                # write back tracking info + template into the row
+                if dest and final_id:
+                    row['tracking_link'] = build_tracking_link(base_url, final_id)
+                    row['tracking_url'] = build_tracking_url(tracking_url_prefix, final_id)
+                    row['tracking_id'] = final_id
+                else:
+                    row['tracking_link'] = ''
+                    row['tracking_url'] = ''
+                    row['tracking_id'] = ''
                 print("DEBUG tracking_link:", row['tracking_link'])
                 adjusted_template = template_with_qr_suffix(template_raw)
                 if adjusted_template:
@@ -853,9 +996,13 @@ def assign_links_from_business_file(path: str, base_url: str,
 
                 if ops >= 400:
                     flush()
-
+            
             except Exception as e:
                 print(f"[error] row: {e}")
+                print("business_name:", business_name)
+                print("business_id:", biz_id)
+                print("FULL ROW:", row)
+                print(f"row_index: {item_idx + 1}")
                 errors += 1
                 # Track error details
                 error_biz_id = None
@@ -864,7 +1011,7 @@ def assign_links_from_business_file(path: str, base_url: str,
                 except:
                     pass
                 error_details.append({
-                    "row_number": i + 1,
+                    "row_number": item_idx + 1,
                     "business_name": business_name or "Unknown",
                     "business_id": error_biz_id,
                     "error": str(e),
@@ -1240,6 +1387,9 @@ def process_business_upload(cloud_event):
         "skip_existing": bool(manifest.get("skip_existing", True) or (metadata.get("skip_existing") in ("1", "true", "True"))),
         "geocode": bool(manifest.get("geocode", False) or (metadata.get("geocode") in ("1", "true", "True"))),
         "mapbox_token": manifest.get("mapbox_token") or metadata.get("mapbox_token") or DEFAULT_MAPBOX_TOKEN,
+        # Optional prefix for printable tracking URL in exports.
+        # If omitted, we fall back to "ihr-brief.de/<final_id>".
+        "tracking_url_prefix": manifest.get("tracking_url_prefix") or metadata.get("tracking_url_prefix"),
         #use business domain as tracking id 
     }
 
@@ -1274,6 +1424,7 @@ def process_business_upload(cloud_event):
             mapbox_token=params["mapbox_token"],
             skip_existing=params["skip_existing"],
             geocode=params["geocode"],
+            tracking_url_prefix=params.get("tracking_url_prefix"),
         )
 
         out_path = result["output_path"]

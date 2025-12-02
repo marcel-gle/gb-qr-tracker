@@ -28,6 +28,9 @@ from firebase_admin import credentials, auth, firestore
 from google.api_core.exceptions import NotFound
 from flask import Request, jsonify  # used only for the HTTP function
 
+# ---------- Environment variables ----------
+PROJECT_ID = os.environ.get("PROJECT_ID") or os.environ.get("GCP_PROJECT")
+DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
 
 # ---------- Admin SDK init ----------
 def _init_admin(project_id: Optional[str] = None, database_id: Optional[str] = None):
@@ -240,8 +243,10 @@ def main_cli():
 # ---------- Entrypoint ----------
 if __name__ == "__main__":
     # CLI mode
-    #test deploy
-    PROJECT_ID = "gb-qr-tracker-dev"
-    DATABASE_ID = "(default)"
+    # Override with defaults if not set via environment
+    if not PROJECT_ID:
+        PROJECT_ID = "gb-qr-tracker"
+    if not DATABASE_ID:
+        DATABASE_ID = "(default)"
     _init_admin(project_id=PROJECT_ID, database_id=DATABASE_ID)
     main_cli()

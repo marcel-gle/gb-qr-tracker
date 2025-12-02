@@ -36,6 +36,7 @@ CLOUDFLARE_WORKER_DEV_URL = os.environ.get("CLOUDFLARE_WORKER_DEV_URL", "https:/
 CLOUDFLARE_WORKER_PROD_URL = os.environ.get("CLOUDFLARE_WORKER_PROD_URL", "https://go.rocket-letter.de")
 GCP_FUNCTION_DEV_URL = os.environ.get("GCP_FUNCTION_DEV_URL", "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector")
 GCP_FUNCTION_PROD_URL = os.environ.get("GCP_FUNCTION_PROD_URL", "https://europe-west3-gb-qr-tracker.cloudfunctions.net/redirector")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
 # Detect environment (dev or prod) based on PROJECT_ID
 IS_PROD = PROJECT_ID and "gb-qr-tracker" in PROJECT_ID and "dev" not in PROJECT_ID
@@ -68,6 +69,15 @@ DB_VERIFICATION_WINDOW = 300  # 5 minutes in seconds
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def _cors_headers():
+    return {
+        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Max-Age": "3600",
+    }
 
 
 def _generate_hmac_signature(link_id: str) -> Tuple[str, str]:
@@ -574,6 +584,10 @@ def health_monitor(request: Request):
     Auth:
       - Expects Firebase ID token in Authorization: Bearer <token>
     """
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return ("", 204, _cors_headers())
+
     try:
         # Verify Firebase ID token
         try:
@@ -581,7 +595,7 @@ def health_monitor(request: Request):
             logger.info(f"Health monitor check authenticated for user: {uid}")
         except Exception as e:
             logger.warning(f"Authentication failed: {str(e)}")
-            return jsonify({"error": f"Unauthorized: {str(e)}"}), 401
+            return (jsonify({"error": f"Unauthorized: {str(e)}"}), 401, _cors_headers())
         
         logger.info("Starting health monitor check")
         
@@ -609,19 +623,17 @@ def health_monitor(request: Request):
                 "all_db_verified": all_db_verified,
             }
         }
-
-        #git_log_error("health_monitor_test", "TEST", "Health monitor check passed")
         
         if overall_success:
             logger.info("Health monitor check passed")
-            return jsonify(result), 200
+            return (jsonify(result), 200, _cors_headers())
         else:
             logger.warning("Health monitor check failed", extra={"result": result})
-            return jsonify(result), 500
+            return (jsonify(result), 500, _cors_headers())
             
     except Exception as e:
         error_msg = f"Health monitor check failed with exception: {str(e)}"
         logger.exception(error_msg)
         _log_error("health_monitor", "exception", error_msg)
-        return jsonify({"error": error_msg}), 500
+        return (jsonify({"error": error_msg}), 500, _cors_headers())
 

@@ -23,6 +23,7 @@ CAMPAIGN_REF_PATH = "campaigns/eebb74b8-6c5b-44b9-96ab-f4b6e3505206"
 TARGET_REF_PATH   = "campaigns/eebb74b8-6c5b-44b9-96ab-f4b6e3505206/targets/1Ooy6wos1S7UzloMPP5K"
 
 DEVICE_TYPES = ["desktop", "mobile", "tablet"]
+HIT_ORIGINS = ["direct", "cloudflare_worker"]  # match redirector sources
 CITIES = [
     ("Munich", "Bavaria", 48.1372, 11.5756),
     ("Berlin", "Berlin", 52.5200, 13.4050),
@@ -73,6 +74,7 @@ def seed_demo_data():
         os_ = random.choice(OSES)
         ua_template = random.choice(USER_AGENT_TEMPLATES)
         user_agent = ua_template.format(browser=browser)
+        hit_origin = random.choice(HIT_ORIGINS)
 
         doc = {
             "business_ref": business_ref,
@@ -94,6 +96,7 @@ def seed_demo_data():
             "template_id": "template_standart_qr_track.pdf",
             "ts": random_timestamp_within_last_14_days(),
             "is_demo": True,  # flag for easy cleanup
+            "hit_origin": hit_origin,  # "direct" or "cloudflare_worker", as in redirector
         }
 
         doc_ref = db.collection("hits").document()
