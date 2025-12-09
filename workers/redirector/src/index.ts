@@ -16,7 +16,7 @@
 // const BACKEND_FUNCTION_URL = "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector";
 
 // Optional: align with your backend rules
-const ID_PATTERN = /^[A-Za-z0-9_-]{3,100}$/;
+const ID_PATTERN = /^[A-Za-z0-9_äöüÄÖÜß-]{2,100}$/;
 
 //Helper function
 async function hmacHex(keyStr: string, msg: string) {
@@ -51,15 +51,23 @@ export default {
     }
 
     // 2) Resolve tracking ID from query (?id=...) OR path (/ID or /r/ID or /go/ID)
-    let id = (url.searchParams.get("id") || "").trim();
+    let rawId = (url.searchParams.get("id") || "").trim();
 
-    if (!id) {
+    if (!rawId) {
       const parts = path.split("/").filter(Boolean); // ["r","TRACKING"] or ["TRACKING"]
       if (parts.length >= 2 && ["r", "go", "t"].includes(parts[0])) {
-        id = parts[1].trim();
+        rawId = parts[1].trim();
       } else if (parts.length >= 1 && parts[0]) {
-        id = parts[0].trim();
+        rawId = parts[0].trim();
       }
+    }
+
+    // Decode URL-encoded characters (ä → %C3%A4)
+    let id: string | null = null;
+    try {
+      id = decodeURIComponent(rawId);
+    } catch (e) {
+      id = rawId; // fallback
     }
 
     // 3) Validate the ID (keep this in sync with your backend rules)
@@ -79,7 +87,7 @@ export default {
     headers.set("X-Original-Host", host);       // which customer domain was used
     headers.set("X-Forwarded-Proto", "https");  // clarify scheme at the edge
 
-    // reate timestamp + HMAC signature bound to this id
+    // Create timestamp + HMAC signature bound to this id
     const ts = Math.floor(Date.now() / 1000).toString();
     const sig = await hmacHex(env.WORKER_HMAC_SECRET, `${ts}:${id}`);
 

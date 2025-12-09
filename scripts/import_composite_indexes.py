@@ -3,7 +3,7 @@ import subprocess
 import shlex
 
 PROJECT = "gb-qr-tracker-dev"
-TARGET_DB = "test"  # <- change if you want another db
+TARGET_DB = "test"  # <- change if needed
 FILE = "firestore_indexes/composite-indexes.json"
 
 
@@ -38,7 +38,6 @@ def main():
                 field_args.append(f"field-path={field_path},order={order}")
             elif "arrayConfig" in fdef:
                 # Firestore only supports CONTAINS for arrays
-                # gcloud expects "array-config=contains"
                 field_args.append(f"field-path={field_path},array-config=contains")
             else:
                 raise ValueError(f"Field def has neither order nor arrayConfig: {fdef}")
@@ -51,16 +50,32 @@ def main():
             f"--query-scope={query_scope}",
         ]
 
-        # add each field-config flag
         for fa in field_args:
             cmd.append("--field-config")
             cmd.append(fa)
 
         print("\nRunning:")
         print(" ".join(shlex.quote(c) for c in cmd))
-        subprocess.run(cmd, check=True)
 
-    print("\nAll composite indexes created for database:", TARGET_DB)
+        # don't use check=True so we can handle ALREADY_EXISTS gracefully
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            stderr = result.stderr or ""
+            if "ALREADY_EXISTS" in stderr:
+                print("→ Index already exists, skipping.")
+                continue
+            else:
+                print("Command failed with stderr:")
+                print(stderr)
+                # re-raise as error so you notice unexpected problems
+                raise subprocess.CalledProcessError(
+                    result.returncode, cmd, output=result.stdout, stderr=result.stderr
+                )
+
+        print("→ Index created.")
+
+    print("\nAll composite indexes processed for database:", TARGET_DB)
 
 
 if __name__ == "__main__":
