@@ -26,6 +26,9 @@ from tqdm import tqdm
 DEFAULT_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCP_PROJECT") or "gb-qr-tracker-dev"
 DEFAULT_DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
 
+# Batch size for Firestore operations (max 500 per batch, use 450 for safety)
+BATCH_SIZE = 450
+
 # Canonical fields (shared across customers)
 CANONICAL_FIELDS = {
     "business_name",
@@ -175,16 +178,203 @@ def migrate_business(
     return stats
 
 
+def migrate_businesses_batched(
+    db: firestore.Client,
+    businesses: List[firestore.DocumentSnapshot],
+    dry_run: bool = False
+) -> Dict:
+    """
+    Migrate businesses using batch writes for better performance.
+    Returns aggregate statistics.
+    """
+    aggregate_stats = {
+        "total_businesses": len(businesses),
+        "canonical_created": 0,
+        "canonical_updated": 0,
+        "overlays_created": 0,
+        "overlays_updated": 0,
+        "errors": [],
+        "businesses_with_errors": 0,
+    }
+    
+    # Prepare all operations first
+    canonical_refs = []
+    overlay_refs = []
+    business_operations = []
+    
+    for business_doc in businesses:
+        business_id = business_doc.id
+        business_data = business_doc.to_dict() or {}
+        
+        try:
+            # Extract payloads
+            canonical_payload = extract_canonical_payload(business_data)
+            customer_payload = extract_customer_payload(business_data)
+            
+            # Get ownerIds
+            owner_ids = business_data.get("ownerIds", [])
+            if not owner_ids:
+                aggregate_stats["errors"].append(f"{business_id}: No ownerIds found")
+                owner_ids = []
+            
+            # Track canonical operation
+            canonical_ref = db.collection("businesses").document(business_id)
+            canonical_refs.append(canonical_ref)
+            
+            # Track overlay operations
+            for idx, owner_id in enumerate(owner_ids):
+                if not owner_id:
+                    continue
+                
+                customer_business_ref = (
+                    db.collection("customers")
+                    .document(owner_id)
+                    .collection("businesses")
+                    .document(business_id)
+                )
+                overlay_refs.append(customer_business_ref)
+                
+                # Prepare overlay payload
+                overlay_payload = {
+                    "business_ref": canonical_ref,
+                    **customer_payload
+                }
+                
+                # Reset hit_count for non-first owners
+                if idx > 0:
+                    overlay_payload["hit_count"] = 0
+                    overlay_payload["last_hit_at"] = None
+                
+                business_operations.append({
+                    "business_id": business_id,
+                    "owner_id": owner_id,
+                    "is_first_owner": idx == 0,
+                    "canonical_ref": canonical_ref,
+                    "canonical_payload": canonical_payload,
+                    "overlay_ref": customer_business_ref,
+                    "overlay_payload": overlay_payload,
+                })
+        
+        except Exception as e:
+            aggregate_stats["errors"].append(f"{business_id}: {str(e)}")
+            aggregate_stats["businesses_with_errors"] += 1
+    
+    if dry_run:
+        # In dry-run, just check existence
+        canonical_snaps = {}
+        if canonical_refs:
+            # Batch read canonical documents (up to 500 at a time)
+            for i in range(0, len(canonical_refs), 500):
+                batch_refs = canonical_refs[i:i+500]
+                snaps = db.get_all(batch_refs)
+                for snap in snaps:
+                    # Use document path as key for reliable matching
+                    canonical_snaps[snap.reference.path] = snap.exists
+        
+        overlay_snaps = {}
+        if overlay_refs:
+            # Batch read overlay documents (up to 500 at a time)
+            for i in range(0, len(overlay_refs), 500):
+                batch_refs = overlay_refs[i:i+500]
+                snaps = db.get_all(batch_refs)
+                for snap in snaps:
+                    # Use document path as key for reliable matching
+                    overlay_snaps[snap.reference.path] = snap.exists
+        
+        # Count what would happen
+        for op in business_operations:
+            canonical_exists = canonical_snaps.get(op["canonical_ref"].path, False)
+            if canonical_exists:
+                aggregate_stats["canonical_updated"] += 1
+            else:
+                aggregate_stats["canonical_created"] += 1
+            
+            overlay_exists = overlay_snaps.get(op["overlay_ref"].path, False)
+            if overlay_exists:
+                aggregate_stats["overlays_updated"] += 1
+            else:
+                aggregate_stats["overlays_created"] += 1
+        
+        return aggregate_stats
+    
+    # Batch check existence for canonical documents
+    canonical_existence = {}
+    if canonical_refs:
+        # Use get_all for batch reads (up to 500 at a time)
+        for i in range(0, len(canonical_refs), 500):
+            batch_refs = canonical_refs[i:i+500]
+            snaps = db.get_all(batch_refs)
+            for snap in snaps:
+                # Use document path as key for reliable matching
+                canonical_existence[snap.reference.path] = snap.exists
+    
+    # Batch check existence for overlay documents
+    overlay_existence = {}
+    if overlay_refs:
+        for i in range(0, len(overlay_refs), 500):
+            batch_refs = overlay_refs[i:i+500]
+            snaps = db.get_all(batch_refs)
+            for snap in snaps:
+                # Use document path as key for reliable matching
+                overlay_existence[snap.reference.path] = snap.exists
+    
+    # Create batches for writes
+    batch = db.batch()
+    ops_count = 0
+    
+    for op in business_operations:
+        # Add canonical operation
+        canonical_exists = canonical_existence.get(op["canonical_ref"].path, False)
+        batch.set(op["canonical_ref"], op["canonical_payload"], merge=True)
+        ops_count += 1
+        
+        if canonical_exists:
+            aggregate_stats["canonical_updated"] += 1
+        else:
+            aggregate_stats["canonical_created"] += 1
+        
+        # Add overlay operation
+        overlay_exists = overlay_existence.get(op["overlay_ref"].path, False)
+        batch.set(op["overlay_ref"], op["overlay_payload"], merge=True)
+        ops_count += 1
+        
+        if overlay_exists:
+            aggregate_stats["overlays_updated"] += 1
+        else:
+            aggregate_stats["overlays_created"] += 1
+        
+        # Commit batch when approaching limit
+        if ops_count >= BATCH_SIZE:
+            try:
+                batch.commit()
+            except Exception as e:
+                aggregate_stats["errors"].append(f"Batch commit error: {str(e)}")
+                aggregate_stats["businesses_with_errors"] += 1
+            batch = db.batch()
+            ops_count = 0
+    
+    # Commit remaining operations
+    if ops_count > 0:
+        try:
+            batch.commit()
+        except Exception as e:
+            aggregate_stats["errors"].append(f"Final batch commit error: {str(e)}")
+            aggregate_stats["businesses_with_errors"] += 1
+    
+    return aggregate_stats
+
+
 def migrate_all_businesses(
     db: firestore.Client,
     dry_run: bool = False,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    batch_mode: bool = True
 ) -> Dict:
     """
     Migrate all business documents.
     Returns aggregate statistics.
     """
-    print(f"Starting migration (dry_run={dry_run})...")
+    print(f"Starting migration (dry_run={dry_run}, batch_mode={batch_mode})...")
     
     businesses_ref = db.collection("businesses")
     
@@ -198,37 +388,41 @@ def migrate_all_businesses(
     
     print(f"Found {total} business documents to migrate")
     
-    # Aggregate statistics
-    aggregate_stats = {
-        "total_businesses": total,
-        "canonical_created": 0,
-        "canonical_updated": 0,
-        "overlays_created": 0,
-        "overlays_updated": 0,
-        "errors": [],
-        "businesses_with_errors": 0,
-    }
+    if batch_mode:
+        # Use batched approach for better performance
+        return migrate_businesses_batched(db, businesses, dry_run)
+    else:
+        # Original sequential approach (for comparison or debugging)
+        aggregate_stats = {
+            "total_businesses": total,
+            "canonical_created": 0,
+            "canonical_updated": 0,
+            "overlays_created": 0,
+            "overlays_updated": 0,
+            "errors": [],
+            "businesses_with_errors": 0,
+        }
 
-    # Process each business
-    for business_doc in tqdm(businesses, desc="Migrating businesses"):
-        business_id = business_doc.id
-        business_data = business_doc.to_dict() or {}
-        
-        stats = migrate_business(db, business_id, business_data, dry_run)
-        
-        # Aggregate statistics
-        aggregate_stats["canonical_created"] += 1 if stats["canonical_created"] else 0
-        aggregate_stats["canonical_updated"] += 1 if stats["canonical_updated"] else 0
-        aggregate_stats["overlays_created"] += stats["overlays_created"]
-        aggregate_stats["overlays_updated"] += stats["overlays_updated"]
-        
-        if stats["errors"]:
-            aggregate_stats["businesses_with_errors"] += 1
-            aggregate_stats["errors"].extend([
-                f"{business_id}: {err}" for err in stats["errors"]
-            ])
+        # Process each business
+        for business_doc in tqdm(businesses, desc="Migrating businesses"):
+            business_id = business_doc.id
+            business_data = business_doc.to_dict() or {}
+            
+            stats = migrate_business(db, business_id, business_data, dry_run)
+            
+            # Aggregate statistics
+            aggregate_stats["canonical_created"] += 1 if stats["canonical_created"] else 0
+            aggregate_stats["canonical_updated"] += 1 if stats["canonical_updated"] else 0
+            aggregate_stats["overlays_created"] += stats["overlays_created"]
+            aggregate_stats["overlays_updated"] += stats["overlays_updated"]
+            
+            if stats["errors"]:
+                aggregate_stats["businesses_with_errors"] += 1
+                aggregate_stats["errors"].extend([
+                    f"{business_id}: {err}" for err in stats["errors"]
+                ])
 
-    return aggregate_stats
+        return aggregate_stats
 
 
 def main():
@@ -258,6 +452,11 @@ def main():
         default=None,
         help="Limit number of businesses to migrate (for testing)"
     )
+    parser.add_argument(
+        "--no-batch",
+        action="store_true",
+        help="Disable batch mode (use sequential processing for debugging)"
+    )
 
     args = parser.parse_args()
 
@@ -271,7 +470,12 @@ def main():
     db = firestore.Client(project=args.project, database=args.database)
 
     # Run migration
-    stats = migrate_all_businesses(db, dry_run=args.dry_run, limit=args.limit)
+    stats = migrate_all_businesses(
+        db, 
+        dry_run=args.dry_run, 
+        limit=args.limit,
+        batch_mode=not args.no_batch
+    )
 
     # Print summary
     print("\n" + "=" * 60)
