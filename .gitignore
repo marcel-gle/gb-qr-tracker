@@ -126,3 +126,7 @@ cython_debug/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+.env.dev
+.env.prod
+data/
