@@ -1,7 +1,13 @@
+"""
+DEPRECATED: Use find_personalized_emails.py instead.
+"""
+
 from dotenv import load_dotenv
 import os
 import time
 from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 import pandas as pd
 import requests
@@ -22,10 +28,32 @@ def get_access_token(client_id: str, client_secret: str) -> str:
     return data["access_token"]
 
 
-def get_domain_search(domain: str, token: str, type: str = "all", limit: int = 100, last_id: int = 0):
+class RateLimiter:
+    """Thread-safe rate limiter using token bucket algorithm."""
+    def __init__(self, max_requests_per_hour: int):
+        self.max_requests = max_requests_per_hour
+        self.min_interval = 3600.0 / max_requests_per_hour
+        self.last_request_time = 0.0
+        self.lock = Lock()
+    
+    def wait_if_needed(self):
+        """Wait if necessary to respect rate limit."""
+        with self.lock:
+            now = time.time()
+            elapsed = now - self.last_request_time
+            if elapsed < self.min_interval:
+                sleep_time = self.min_interval - elapsed
+                time.sleep(sleep_time)
+            self.last_request_time = time.time()
+
+
+def get_domain_search(domain: str, token: str, session: requests.Session, rate_limiter: RateLimiter, type: str = "all", limit: int = 100, last_id: int = 0):
     """
     Call Snov.io domain-emails-with-info endpoint for a given domain.
+    Thread-safe with rate limiting.
     """
+    rate_limiter.wait_if_needed()
+    
     params = {
         "domain": domain,
         "type": type,
@@ -35,9 +63,12 @@ def get_domain_search(domain: str, token: str, type: str = "all", limit: int = 1
     headers = {
         "Authorization": f"Bearer {token}",
     }
-    res = requests.get("https://api.snov.io/v2/domain-emails-with-info", params=params, headers=headers)
-    res.raise_for_status()
-    return res.json()
+    try:
+        res = session.get("https://api.snov.io/v2/domain-emails-with-info", params=params, headers=headers, timeout=30)
+        res.raise_for_status()
+        return domain, res.json()
+    except Exception as e:
+        return domain, {"error": str(e)}
 
 
 def correct_url(url: str) -> str:
@@ -161,6 +192,32 @@ def infer_domain_for_row(row, domain_col: str, website_col: str, email_col: str)
     return ""
 
 
+def match_emails_to_rows(df, domain_contacts, first_name_column, last_name_column, skip_existing):
+    """Match emails to rows based on domain contacts."""
+    for i, row in df.iterrows():
+        # Skip if already has email and skip_existing is True
+        if skip_existing:
+            existing_email = row.get("best_email", "")
+            if isinstance(existing_email, str) and existing_email.strip():
+                continue
+        
+        domain = row["__domain__"]
+        if not domain:
+            continue
+
+        contacts = domain_contacts.get(domain, [])
+        if not contacts:
+            continue
+
+        first_name = row.get(first_name_column, "")
+        last_name = row.get(last_name_column, "")
+
+        best_email, email_level = choose_best_email(contacts, first_name, last_name)
+        if best_email:
+            df.at[i, "best_email"] = best_email
+            df.at[i, "email_level"] = email_level or ""
+
+
 def process_csv_with_snov(
     csv_path: str,
     client_id: str,
@@ -173,14 +230,18 @@ def process_csv_with_snov(
     first_name_column: str = "Entscheider 1 Vorname",
     last_name_column: str = "Entscheider 1 Nachname",
     max_requests_per_hour: int = 490,
+    max_workers: int = 10,  # Number of concurrent threads
+    save_interval: int = 10,  # Save every N domains processed
+    skip_existing: bool = True,  # Skip rows that already have best_email
 ) -> None:
     """
-    Main pipeline:
-    - Read CSV.
-    - Derive domain per row from Domain/Website/E-Mail-Adresse.
-    - Fetch contacts from Snov.io per unique domain.
-    - For each row, choose best email based on person's name.
-    - Write best_email and email_level columns back to CSV.
+    Optimized pipeline with concurrent requests and periodic saves.
+    
+    Speed improvements:
+    - Concurrent API requests (configurable workers)
+    - Thread-safe rate limiting
+    - HTTP session reuse
+    - Skip already processed rows
     """
     print(f"Loading CSV from {csv_path}")
     df = pd.read_csv(csv_path, encoding=encoding, delimiter=delimiter)
@@ -191,6 +252,11 @@ def process_csv_with_snov(
         df["best_email"] = ""
     if "email_level" not in df.columns:
         df["email_level"] = ""
+
+    # Skip rows that already have emails
+    if skip_existing:
+        existing_count = df["best_email"].notna() & (df["best_email"] != "")
+        print(f"Skipping {existing_count.sum()} rows that already have best_email")
 
     # Pre-compute domains per row
     domains = []
@@ -209,57 +275,85 @@ def process_csv_with_snov(
     # Get token once
     token = get_access_token(client_id, client_secret)
 
-    # Rate limiting
-    request_interval = 3600 / max_requests_per_hour
-    last_request_time = 0.0
+    # Create shared rate limiter and session
+    rate_limiter = RateLimiter(max_requests_per_hour)
+    session = requests.Session()  # Reuse connections for speed
 
-    # Fetch contacts per domain
+    # Helper function to save progress
+    save_lock = Lock()
+    def save_progress():
+        """Save current progress to CSV (thread-safe)."""
+        with save_lock:
+            temp_df = df.copy()
+            temp_df.drop(columns=["__domain__"], inplace=True)
+            temp_df.to_csv(csv_path, index=False, encoding=encoding, sep=delimiter)
+            print(f"  → Progress saved to {csv_path}")
+
+    # Fetch contacts per domain using concurrent requests
     domain_contacts = {}
-    for idx, domain in enumerate(unique_domains, start=1):
-        # Respect rate limit
-        now = time.time()
-        since_last = now - last_request_time
-        if since_last < request_interval:
-            sleep_time = request_interval - since_last
-            time.sleep(sleep_time)
+    completed = 0
+    total = len(unique_domains)
+    
+    print(f"\n🚀 Starting concurrent processing with {max_workers} workers...")
+    start_time = time.time()
+    
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_domain = {
+                executor.submit(get_domain_search, domain, token, session, rate_limiter): domain
+                for domain in unique_domains
+            }
+            
+            # Process completed tasks as they finish
+            for future in as_completed(future_to_domain):
+                domain = future_to_domain[future]
+                completed += 1
+                
+                try:
+                    result_domain, result_data = future.result()
+                    if "error" in result_data:
+                        print(f"[{completed}/{total}] ❌ Error for {result_domain}: {result_data['error']}")
+                        domain_contacts[result_domain] = []
+                    else:
+                        contacts = result_data.get("data", []) or []
+                        domain_contacts[result_domain] = contacts
+                        print(f"[{completed}/{total}] ✓ {result_domain}: {len(contacts)} contacts")
+                    
+                    # Save progress periodically
+                    if completed % save_interval == 0:
+                        # Match emails for processed domains
+                        match_emails_to_rows(df, domain_contacts, first_name_column, last_name_column, skip_existing)
+                        save_progress()
+                        elapsed = time.time() - start_time
+                        rate = completed / elapsed if elapsed > 0 else 0
+                        print(f"  → Checkpoint: {completed}/{total} domains ({rate:.1f} domains/sec)")
+                        
+                except Exception as e:
+                    print(f"[{completed}/{total}] ❌ Exception for {domain}: {e}")
+                    domain_contacts[domain] = []
+    
+    except KeyboardInterrupt:
+        print("\n⚠️  Interrupted by user. Saving progress...")
+        match_emails_to_rows(df, domain_contacts, first_name_column, last_name_column, skip_existing)
+        save_progress()
+        print(f"  → Saved progress: {len(domain_contacts)} domains processed")
+        raise
 
-        print(f"[{idx}/{len(unique_domains)}] Fetching contacts for domain: {domain}")
-        try:
-            result = get_domain_search(domain, token)
-            contacts = result.get("data", []) or []
-            domain_contacts[domain] = contacts
-            last_request_time = time.time()
-        except Exception as e:
-            print(f"Error fetching domain {domain}: {e}")
-            domain_contacts[domain] = []
+    elapsed = time.time() - start_time
+    print(f"\n✅ Completed {total} domains in {elapsed:.1f} seconds ({total/elapsed:.1f} domains/sec)")
 
-    # Match emails per row
-    updated_rows = 0
-    for i, row in df.iterrows():
-        domain = row["__domain__"]
-        if not domain:
-            continue
-
-        contacts = domain_contacts.get(domain, [])
-        if not contacts:
-            continue
-
-        first_name = row.get(first_name_column, "")
-        last_name = row.get(last_name_column, "")
-
-        best_email, email_level = choose_best_email(contacts, first_name, last_name)
-        if best_email and (not isinstance(row["best_email"], str) or not row["best_email"].strip()):
-            df.at[i, "best_email"] = best_email
-            df.at[i, "email_level"] = email_level or ""
-            updated_rows += 1
-
-    print(f"Rows updated with best_email: {updated_rows}")
+    # Final matching and save
+    match_emails_to_rows(df, domain_contacts, first_name_column, last_name_column, skip_existing)
+    
+    updated_rows = df["best_email"].notna() & (df["best_email"] != "")
+    print(f"Rows updated with best_email: {updated_rows.sum()}")
 
     # Clean up helper column
     df.drop(columns=["__domain__"], inplace=True)
 
     df.to_csv(csv_path, index=False, encoding=encoding, sep=delimiter)
-    print(f"Updated CSV saved to {csv_path}")
+    print(f"Final CSV saved to {csv_path}")
 
 
 if __name__ == "__main__":
@@ -291,6 +385,7 @@ if __name__ == "__main__":
         email_column="E-Mail-Adresse",
         first_name_column="Entscheider 1 Vorname",
         last_name_column="Entscheider 1 Nachname",
+        max_workers=10,  # Adjust based on your rate limit (60 req/min = ~10 concurrent)
     )
 
 
