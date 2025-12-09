@@ -1,0 +1,282 @@
+[
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "link_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgNiav4AK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "owner_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "last_hit_at",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/links/indexes/CICAgJim14AK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "business_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "hit_count",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/links/indexes/CICAgNiroIEK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "campaign_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "last_hit_at",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/links/indexes/CICAgJj7z4EK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "link_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgNjpgYIK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "owner_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgJjF9oIK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "owner_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "ASCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgLiIkYMK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "campaign_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "hit_count",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/links/indexes/CICAgNi47oMK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "hit_origin",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgNja0ogK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "arrayConfig": "CONTAINS",
+        "fieldPath": "search_terms"
+      },
+      {
+        "fieldPath": "hit_count",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/businesses/indexes/CICAgJiH2JAK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "owner_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "hit_count",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/links/indexes/CICAgJjmiJEK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "business_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "ts",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/hits/indexes/CICAgNjaxJEK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "owner_id",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "updated_at",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/campaigns/indexes/CICAgJiUsZIK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "arrayConfig": "CONTAINS",
+        "fieldPath": "ownerIds"
+      },
+      {
+        "fieldPath": "hit_count",
+        "order": "DESCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "DESCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/businesses/indexes/CICAgNjp5ZMK",
+    "queryScope": "COLLECTION",
+    "state": "READY"
+  }
+]

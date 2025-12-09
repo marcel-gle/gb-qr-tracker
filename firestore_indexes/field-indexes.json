@@ -1,0 +1,39 @@
+[
+  {
+    "indexConfig": {
+      "indexes": [
+        {
+          "fields": [
+            {
+              "fieldPath": "*",
+              "order": "ASCENDING"
+            }
+          ],
+          "queryScope": "COLLECTION",
+          "state": "READY"
+        },
+        {
+          "fields": [
+            {
+              "fieldPath": "*",
+              "order": "DESCENDING"
+            }
+          ],
+          "queryScope": "COLLECTION",
+          "state": "READY"
+        },
+        {
+          "fields": [
+            {
+              "arrayConfig": "CONTAINS",
+              "fieldPath": "*"
+            }
+          ],
+          "queryScope": "COLLECTION",
+          "state": "READY"
+        }
+      ]
+    },
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/__default__/fields/*"
+  }
+]
