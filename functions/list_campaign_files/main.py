@@ -134,8 +134,7 @@ def list_campaign_files(request: Any) -> tuple:
         
         # Get storage bucket from environment or use default
         storage_bucket_name = os.environ.get(
-            'STORAGE_BUCKET',
-            'gb-qr-tracker-dev.firebasestorage.app'
+            'STORAGE_BUCKET'
         )
         
         # Initialize Cloud Storage client

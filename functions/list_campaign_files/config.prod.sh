@@ -7,4 +7,5 @@ TIMEOUT="60s"
 ENV_VARS=(
   "PROJECT_ID=$PROJECT_ID"
   'DATABASE_ID=(default)'
+  "STORAGE_BUCKET=gb-qr-tracker.firebasestorage.app"
 )

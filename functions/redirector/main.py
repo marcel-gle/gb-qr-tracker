@@ -40,7 +40,7 @@ except Exception:
 
 _db = firestore.Client()
 
-ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+ID_PATTERN = re.compile(r'^[A-Za-z0-9_äöüÄÖÜß-]{1,64}$')
 ALLOWED_SCHEMES = {'http', 'https'}
 
 #HIT_TTL_DAYS = int(os.getenv('HIT_TTL_DAYS', '0'))
