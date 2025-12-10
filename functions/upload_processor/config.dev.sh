@@ -11,7 +11,7 @@ TRIGGER_ARGS=( )
 
 ENV_VARS=(
   "PROJECT_ID=$PROJECT_ID"
-  'DATABASE_ID=(default)'
+  'DATABASE_ID=test' #'DATABASE_ID=(default)'
 )
 
 SECRETS=(

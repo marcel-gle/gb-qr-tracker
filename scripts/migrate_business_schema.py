@@ -23,8 +23,8 @@ from google.cloud.firestore_v1 import ArrayUnion
 from tqdm import tqdm
 
 # Default configuration
-DEFAULT_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCP_PROJECT") or "gb-qr-tracker-dev"
-DEFAULT_DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
+DEFAULT_PROJECT_ID = "gb-qr-tracker"
+DEFAULT_DATABASE_ID = "(default)"
 
 # Batch size for Firestore operations (max 500 per batch, use 450 for safety)
 BATCH_SIZE = 450

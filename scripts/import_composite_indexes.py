@@ -2,8 +2,8 @@ import json
 import subprocess
 import shlex
 
-PROJECT = "gb-qr-tracker-dev"
-TARGET_DB = "test"  # <- change if needed
+PROJECT = "gb-qr-tracker"
+TARGET_DB = "(default)"  # <- change if needed
 FILE = "firestore_indexes/composite-indexes.json"
 
 
