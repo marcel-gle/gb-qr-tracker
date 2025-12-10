@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Initialize Firestore once
-cred = credentials.Certificate("/Users/marcelgleich/Desktop/Software/Firesbase_Service/gb-qr-tracker-firebase-adminsdk-fbsvc-1b9e04b746.json")  # path to your service account JSON
+cred = credentials.Certificate("/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json")  # path to your service account JSON
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 

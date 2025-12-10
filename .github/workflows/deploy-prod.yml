@@ -1,0 +1,86 @@
+name: Deploy (prod)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "functions/**"
+      - "deploy.sh"
+      - ".env.prod"
+      - ".github/workflows/deploy-prod.yml"
+
+jobs:
+  plan:
+    name: Detect changed functions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filters
+        with:
+          filters: |
+            redirector:
+              - 'functions/redirector/**'
+            upload_processor:
+              - 'functions/upload_processor/**'
+            delete_campaign:
+              - 'functions/delete_campaign/**'
+            health_monitor:
+              - 'functions/health_monitor/**'
+            shared:
+              - 'deploy.sh'
+              - '.env.prod'
+              - 'functions/**/config.prod.sh'
+
+      - id: set-matrix
+        run: |
+          if [[ "${{ steps.filters.outputs.shared }}" == 'true' ]]; then
+            echo "matrix={\"function\":[\"redirector\",\"upload_processor\",\"delete_campaign\",\"health_monitor\"]}" >> $GITHUB_OUTPUT
+          else
+            list=()
+            [[ "${{ steps.filters.outputs.redirector }}" == 'true' ]] && list+=('"redirector"')
+            [[ "${{ steps.filters.outputs.upload_processor }}" == 'true' ]] && list+=('"upload_processor"')
+            [[ "${{ steps.filters.outputs.delete_campaign }}" == 'true' ]] && list+=('"delete_campaign"')
+            [[ "${{ steps.filters.outputs.health_monitor }}" == 'true' ]] && list+=('"health_monitor"')
+            if [[ ${#list[@]} -eq 0 ]]; then
+              echo 'matrix={"function":[]}' >> $GITHUB_OUTPUT
+            else
+              echo "matrix={\"function\":[${list[*]}]}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  deploy:
+    name: Deploy ${{ matrix.function }} (prod)
+    needs: plan
+    if: ${{ fromJson(needs.plan.outputs.matrix).function && (join(fromJson(needs.plan.outputs.matrix).function, '') != '') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # TEMP auth with key (replace with OIDC later)
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.PROD_GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
+
+      - name: Prepare .env.prod for deploy.sh
+        run: |
+            cat > .env.prod <<'EOF'
+            PROJECT_ID=${{ secrets.PROD_GCP_PROJECT_ID }}
+            REGION=europe-west3
+            SA_NAME=cf-campaign-importer
+            SA=cf-campaign-importer@${{ secrets.PROD_GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            EOF
+
+      - name: Deploy via script
+        run: ./deploy.sh prod ${{ matrix.function }}

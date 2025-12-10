@@ -1,0 +1,13 @@
+# Google Cloud Functions
+functions-framework>=3.5.0
+Flask>=3.0.0
+
+# Google Cloud services
+google-cloud-firestore>=2.16.0
+
+# Firebase Admin SDK for authentication
+firebase-admin>=6.0.0
+
+# HTTP requests
+requests>=2.32.3
+

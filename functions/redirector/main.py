@@ -14,21 +14,22 @@
 #   LOG_HIT_ERRORS=1              # log exceptions for per-hit writes (helpful for debugging)
 #
 # Note: Do not store raw IPs. This code derives geo only and (optionally) stores a salted hash.
+#test
 
 import os
 import re
+import hmac
 import hashlib
+import time
 from ipaddress import ip_address, ip_network
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from google.api_core.exceptions import AlreadyExists
-import os, hmac, hashlib, time
-from flask import Request
-
+from flask import Request, redirect
 import requests
 from google.cloud import firestore
-from flask import Request, redirect
 from user_agents import parse as parse_ua
+
 
 try:
     import geoip2.database  # type: ignore
@@ -39,7 +40,7 @@ except Exception:
 
 _db = firestore.Client()
 
-ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+ID_PATTERN = re.compile(r'^[A-Za-z0-9_äöüÄÖÜß-]{1,64}$')
 ALLOWED_SCHEMES = {'http', 'https'}
 
 #HIT_TTL_DAYS = int(os.getenv('HIT_TTL_DAYS', '0'))
@@ -248,11 +249,13 @@ def _is_from_worker(request: Request, link_id: str) -> bool:
 
 def redirector(request: Request):
     # Health
+    #test deploy2
     if request.path.strip('/') == 'health':
         return ('ok', 200, {'Content-Type': 'text/plain', 'Cache-Control': 'no-store'})
 
     link_id = _extract_link_id(request)
     source = "cloudflare_worker" if _is_from_worker(request, link_id) else "direct"
+    print("DEGUB Source:", source)
 
     if not link_id or not ID_PATTERN.match(link_id):
         return ('Missing or invalid "id" query parameter.', 400)
@@ -292,11 +295,15 @@ def redirector(request: Request):
             'last_hit_at': SERVER_TIMESTAMP,
         })
 
-        # business aggregates (optional)
-        if isinstance(business_ref, firestore.DocumentReference):
-            batch.set(business_ref, {
+        # business aggregates (per-customer overlay)
+        if isinstance(business_ref, firestore.DocumentReference) and owner_id:
+            # Update customer-specific business overlay instead of canonical business
+            business_id = business_ref.id
+            customer_business_ref = _db.collection('customers').document(owner_id).collection('businesses').document(business_id)
+            batch.set(customer_business_ref, {
                 'hit_count': Increment(1),
                 'last_hit_at': SERVER_TIMESTAMP,
+                'updated_at': SERVER_TIMESTAMP,
             }, merge=True)
 
         # campaign aggregates (totals.hits)

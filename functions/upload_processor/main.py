@@ -12,12 +12,20 @@ import json
 import csv
 import re
 from typing import Optional, Tuple, List, Set, Dict, Iterable
+from datetime import datetime, timezone
 
 from google.cloud import storage
 from google.cloud import firestore
 from google.cloud.firestore_v1 import ArrayUnion
 from google.api_core.exceptions import AlreadyExists
 import functions_framework  # <- add this import
+from concurrent.futures import ThreadPoolExecutor, as_completed
+try:
+    # Preferred public path in recent releases
+    from google.cloud.firestore_v1.field_path import FieldPath
+except Exception:  # fallback for older/packaged versions
+    FieldPath = None
+
 
 import tldextract
 
@@ -67,13 +75,109 @@ class DuplicateCampaignCodeError(RuntimeError):
 def build_tracking_link(base_url: str, doc_id: str) -> str:
     return f"{base_url.rstrip('/')}/?id={doc_id}"
 
+def build_tracking_url(tracking_url_prefix: Optional[str], final_id: str) -> str:
+    """
+    Build the printable tracking URL shown in the export.
+
+    - If `tracking_url_prefix` is provided (e.g. "https://example.com/track"),
+      we generate "<prefix>/<final_id>".
+    - If not provided, we default to "ihr-brief.de/<final_id>".
+    """
+    if tracking_url_prefix:
+        return f"{tracking_url_prefix.rstrip('/')}/{final_id}"
+    return f"ihr-brief.de/{final_id}"
+
 def sanitize_id(value: str) -> str:
     if value is None:
         return ""
     v = str(value).strip()
-    v = re.sub(r"[^A-Za-z0-9]+", "-", v)
+    # Allow A-Z, a-z, 0-9, and German umlauts (ä, ö, ü, ß)
+    # Replace everything else with hyphens
+    v = re.sub(r"[^A-Za-z0-9äöüÄÖÜß]+", "-", v)
     v = re.sub(r"-{2,}", "-", v).strip("-")
+    # Normalize to lowercase for consistency
+    v = v.lower()
     return v
+
+def remove_tld_suffix(domain_id: str) -> str:
+    """
+    Remove common TLD suffixes from the end of a domain-based ID.
+    Examples: 'example-com' -> 'example', 'test-de' -> 'test'
+    """
+    if not domain_id:
+        return domain_id
+    
+    # Common TLD suffixes to remove (case-insensitive)
+    # Includes country codes and generic TLDs
+    tld_suffixes = [
+        '-de', '-com', '-net', '-org', '-io', '-co', '-uk', '-fr', '-it', '-es',
+        '-nl', '-be', '-at', '-ch', '-pl', '-cz', '-dk', '-se', '-no', '-fi',
+        '-au', '-ca', '-jp', '-cn', '-in', '-br', '-mx', '-ru', '-kr', '-tw',
+        '-info', '-biz', '-name', '-pro', '-mobi', '-tel', '-asia', '-jobs',
+        '-edu', '-gov', '-mil', '-int', '-aero', '-museum', '-travel'
+    ]
+    
+    domain_id_lower = domain_id.lower()
+    for suffix in tld_suffixes:
+        if domain_id_lower.endswith(suffix):
+            # Remove the suffix and any trailing dashes
+            result = domain_id[:-len(suffix)].rstrip('-')
+            return result if result else domain_id  # Don't return empty string
+    
+    return domain_id
+
+
+def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
+    """
+    Return all doc IDs that start with base_id: { base_id, base_id-1, base_id-2, ... }.
+    Uses a range query on document ID (aka __name__).
+    - Compares against DocumentReferences, not strings.
+    - Falls back to '__name__' if FieldPath isn't importable.
+    - Guards empty base to avoid scanning whole collection.
+    """
+    base_id = (base_id or "").strip()
+    if not base_id:
+        return set()
+
+    # Build DocumentReference bounds
+    start_ref = COL_LINKS.document(base_id)
+    end_ref = COL_LINKS.document(base_id + u"\uf8ff")
+
+    # Field path for document id
+    fp = FieldPath.document_id() if FieldPath else "__name__"
+
+    # Query only IDs (tiny payload)
+    q = (
+        COL_LINKS
+        .where(fp, ">=", start_ref)
+        .where(fp, "<=", end_ref)   # '<=' is fine here; can use '<' if you prefer
+        .select([])                 # no fields, just names
+    )
+
+    return {doc.id for doc in q.stream()}
+
+
+def next_id_from_cache(base_id: str, taken: set[str]) -> str:
+    """Pick base_id if free, else base_id-<n> with the smallest available n >= 1."""
+    # Guard against empty base_id - never return empty string
+    if not base_id or not base_id.strip():
+        base_id = "link"
+        print(f"[warn] Empty base_id detected in next_id_from_cache, using fallback: 'link'")
+    
+    if base_id not in taken:
+        taken.add(base_id)
+        return base_id
+    # Find the max numeric suffix already taken for this base
+    pat = re.compile(rf"^{re.escape(base_id)}-(\d+)$")
+    max_n = 0
+    for did in taken:
+        m = pat.match(did)
+        if m:
+            max_n = max(max_n, int(m.group(1)))
+    candidate = f"{base_id}-{max_n + 1}"
+    taken.add(candidate)
+    return candidate
+
 
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
     if not template:
@@ -107,20 +211,24 @@ def get_ci_key(row: dict, *names: str) -> Optional[str]:
 
 
 def csv_fieldnames_union(rows: List[dict]) -> List[str]:
+    """
+    Compute CSV headers from a list of dict rows, ensuring our tracking columns
+    appear at the end in a stable order.
+    """
+    tracking_cols = ["tracking_link", "tracking_url", "tracking_id"]
     if not rows:
-        return ['tracking_link']
+        return tracking_cols
     seen: Set[str] = set()
     ordered: List[str] = []
     for k in rows[0].keys():
-        if k not in seen:
+        if k not in seen and k not in tracking_cols:
             ordered.append(k); seen.add(k)
     for r in rows[1:]:
         for k in r.keys():
-            if k not in seen and k != 'tracking_link':
+            if k not in seen and k not in tracking_cols:
                 ordered.append(k); seen.add(k)
-    if 'tracking_link' in seen:
-        ordered = [k for k in ordered if k != 'tracking_link']
-    ordered.append('tracking_link')
+    # Append tracking columns at the end (whether or not they appeared in rows)
+    ordered.extend(tracking_cols)
     return ordered
 
 def compose_full_address(street: Optional[str], house_no: Optional[str],
@@ -211,13 +319,88 @@ def chunked(iterable: Iterable, size: int) -> Iterable[List]:
     if buf:
         yield buf
 
-def bulk_get_existing(doc_refs: List[firestore.DocumentReference]) -> Set[str]:
+def bulk_get_existing_old(doc_refs: List[firestore.DocumentReference]) -> Set[str]:
     existing: Set[str] = set()
     for chunk in chunked(doc_refs, 300):
         for snap in db.get_all(chunk):
             if snap.exists:
                 existing.add(snap.id)
     return existing
+
+def bulk_get_existing(
+    doc_refs: List[firestore.DocumentReference],
+    chunk_size: int = 500,
+    max_workers: int = 4,
+) -> Set[str]:
+    """
+    Return the set of IDs that exist among the given doc_refs.
+    Uses get_all with an empty field mask so we fetch only metadata (IDs), not fields.
+    Chunked for safety; optionally parallelized for large batches.
+    """
+    if not doc_refs:
+        return set()
+
+    existing: Set[str] = set()
+
+    def fetch_chunk(chunk: List[firestore.DocumentReference]) -> List[str]:
+        # IMPORTANT: field_paths=[] -> request no document fields (tiny payload)
+        snaps = db.get_all(chunk, field_paths=[])
+        return [snap.id for snap in snaps if getattr(snap, "exists", False)]
+
+    # Small batches: run inline
+    if len(doc_refs) <= chunk_size or max_workers <= 1:
+        for chunk in chunked(doc_refs, chunk_size):
+            for doc_id in fetch_chunk(chunk):
+                existing.add(doc_id)
+        return existing
+
+    # Larger batches: parallelize across a few workers
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = [ex.submit(fetch_chunk, chunk) for chunk in chunked(doc_refs, chunk_size)]
+        for fut in as_completed(futures):
+            for doc_id in fut.result():
+                existing.add(doc_id)
+
+    return existing
+
+
+def load_blacklist(owner_id: str) -> Set[str]:
+    """
+    Load all blacklisted business_ids for a given owner.
+    Returns a set of business_id strings.
+    """
+    if not owner_id:
+        return set()
+    
+    try:
+        blacklist_ref = db.collection('customers').document(owner_id).collection('blacklist')
+        blacklisted_ids = set()
+        
+        for doc in blacklist_ref.stream():
+            data = doc.to_dict() or {}
+            # Check business_id field
+            business_id = data.get('business_id')
+            if business_id:
+                blacklisted_ids.add(str(business_id))
+            
+            # Also check the business reference if present
+            business_ref = data.get('business')
+            if business_ref:
+                # business_ref is a DocumentReference, get its ID
+                if hasattr(business_ref, 'id'):
+                    blacklisted_ids.add(business_ref.id)
+                elif isinstance(business_ref, str):
+                    # Handle case where it's stored as a path string like "/businesses/2DC-GmbH-33602"
+                    if '/businesses/' in business_ref:
+                        parts = business_ref.split('/businesses/')
+                        if len(parts) == 2:
+                            blacklisted_ids.add(parts[1])
+        
+        print(f"[blacklist] Loaded {len(blacklisted_ids)} blacklisted business_ids for owner {owner_id}")
+        return blacklisted_ids
+    except Exception as e:
+        print(f"[warn] Failed to load blacklist for owner {owner_id}: {e}")
+        return set()
 
 
 def normalize_campaign_code(code: Optional[str]) -> str:
@@ -309,7 +492,11 @@ def get_or_create_campaign_old(owner_id: str,
 
 
 def upsert_business_payload_from_row(row: dict, ownerId: str,
-                                     coordinate: Optional[Dict[str, float]]) -> Tuple[str, Dict]:
+                                     coordinate: Optional[Dict[str, float]]) -> Tuple[str, Dict, Dict]:
+    """
+    Split business data into canonical and customer-specific payloads.
+    Returns: (biz_id, canonical_payload, customer_payload)
+    """
     business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
     street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
     house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
@@ -326,27 +513,33 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     phone = " ".join(p for p in [prefix_tel, tel] if p)
     full_addr = compose_full_address(street, house_no, plz, city, "Germany")
 
-    #print("upsert_business_payload_from_row", business_name, street, house_no, plz, city, contact_name, phone, email, salutation, full_addr, coordinate)
-
     biz_id = make_business_id(business_name, plz)
-    payload = {
+    
+    # Canonical payload (shared across customers)
+    canonical_payload = {
         "business_name": business_name,
         "street": street,
         "house_number": house_no,
         "postcode": plz,
         "city": city,
-        "name": contact_name or None,
-        "phone": phone or None,
-        "email": email or None,
         "address": full_addr or None,
-        "salutation": salutation or None,
-        "updated_at": firestore.SERVER_TIMESTAMP,
-        "hit_count": 0,
-        "business_id": biz_id,
+        "business_id": biz_id,  # Store normalized business_id in document
     }
     if coordinate:
-        payload["coordinate"] = coordinate
-    return biz_id, payload
+        canonical_payload["coordinate"] = coordinate
+    
+    # Customer-specific payload (per-customer overlay)
+    customer_payload = {
+        "phone": phone or None,
+        "email": email or None,
+        "name": contact_name or None,
+        "salutation": salutation or None,
+        "hit_count": 0,
+        "last_hit_at": None,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    
+    return biz_id, canonical_payload, customer_payload
 
 def write_back_csv(input_path: str, rows: list, suffix="_with_links") -> str:
     base, _ = os.path.splitext(input_path)
@@ -363,9 +556,13 @@ def write_back_excel(input_path: str, df, suffix="_with_links") -> str:
     base, _ = os.path.splitext(input_path)
     out_path = f"{base}{suffix}.xlsx"
     cols = list(df.columns)
-    if 'tracking_link' in cols:
-        cols = [c for c in cols if c != 'tracking_link'] + ['tracking_link']
-        df = df[cols]
+    # Ensure tracking columns exist and are placed at the end
+    tracking_cols = ["tracking_link", "tracking_url", "tracking_id"]
+    for col in tracking_cols:
+        if col not in df.columns:
+            df[col] = ""
+    cols = [c for c in df.columns if c not in tracking_cols] + tracking_cols
+    df = df[cols]
     if pd is None:
         raise RuntimeError("Excel output requires pandas/openpyxl.")
     with pd.ExcelWriter(out_path, engine='openpyxl') as writer:
@@ -384,6 +581,40 @@ def _is_common_provider(email: str) -> bool:
     domain = _extract_registrable_domain(email)
     return domain in COMMON_EMAIL_PROVIDERS if domain else False
 
+from collections import defaultdict
+
+def assign_final_ids(precomputed: List[Dict]) -> None:
+    """
+    For each unique base_id in precomputed, load existing Firestore variants once
+    and assign a collision-free final_id (base or base-<n>) to each item.
+    Mutates items in-place: item['final_id'] = ...
+    """
+    # Group rows by base
+    groups = defaultdict(list)
+    for item in precomputed:
+        if item.get("in_limit") and item.get("dest"):
+            base = item.get("base_id") or ""
+            groups[base].append(item)
+
+    # For each base, query existing variants once, then allocate final IDs
+    for base_id, items in groups.items():
+        if not base_id:
+            # Ensure empty base_id gets a fallback
+            base_id = "link"
+            print(f"[warn] Empty base_id in assign_final_ids, using fallback: 'link'")
+        taken = existing_variants_for_base(COL_LINKS, base_id)
+        for item in items:
+            item["final_id"] = next_id_from_cache(base_id, taken)
+            # Double-check: ensure final_id is never empty
+            if not item["final_id"] or not item["final_id"].strip():
+                fallback_id = f"link-{len(taken) + 1}"
+                print(f"[warn] final_id was empty for base_id '{base_id}', using fallback: '{fallback_id}'")
+                item["final_id"] = fallback_id
+                taken.add(fallback_id)
+
+
+
+
 # ---------------------------
 # Core flow (unchanged logic, minus argparse)
 # ---------------------------
@@ -397,13 +628,26 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     limit: int,
                                     mapbox_token: Optional[str],
                                     skip_existing: bool,
-                                    geocode: bool = True):
+                                    geocode: bool = True,
+                                    tracking_url_prefix: Optional[str] = None):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
+    blacklisted_count = 0
+    blacklisted_details = []
+    error_details = []
+    excluded_no_destination = 0
+    geocoding_successful = 0
+    geocoding_failed = 0
+    processing_start = datetime.now(timezone.utc)
+    
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
 
-    #print("assign_links_from_business_file ownerId:", ownerId)
+    print("assign_links_from_business_file ownerId:", ownerId)
+    
+    # Load blacklist at the start
+    blacklisted_business_ids = load_blacklist(ownerId)
+    
     #print("Geocode:", geocode, "Mapbox token:", "yes" if mapbox_token else "no")
 
     if is_excel:
@@ -445,8 +689,10 @@ def assign_links_from_business_file(path: str, base_url: str,
     total_rows = len(rows)
     # How will I handle this if I use business ids from email?
     campaign_ref = get_or_create_campaign(ownerId, campaign_id, campaign_name, campaign_code)
+    print("Using campaign ref id:", campaign_ref.id)
 
     geo_cache: Dict[str, Dict] = {}
+
     def maybe_geocode(row: dict) -> Optional[Dict]:
         if not geocode or not mapbox_token:
             return None
@@ -461,95 +707,202 @@ def assign_links_from_business_file(path: str, base_url: str,
             geo_cache[addr] = geocode_mapbox(addr, mapbox_token) or None
         return geo_cache[addr]
 
+
+    print("Total rows in input file:", total_rows)
     precomputed: List[Dict] = []
     for i, row in enumerate(rows):
         in_limit = (limit <= 0) or (i < limit)
+        
+        # Check if business is blacklisted BEFORE other processing
+        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
+        plz = get_ci(row, 'PLZ', 'Postleitzahl')
+        biz_id = make_business_id(business_name, plz)
+        print("DEBUG biz_id:", biz_id)
+        
+        is_blacklisted = biz_id in blacklisted_business_ids
+        if is_blacklisted:
+            print(f"[blacklist] Skipping blacklisted business: {biz_id} (row {i+1})")
+            blacklisted_count += 1
+            # Track blacklisted business details
+            blacklisted_details.append({
+                "business_id": biz_id,
+                "business_name": business_name,
+                "row_number": i + 1,
+                "plz": plz,
+                "city": get_ci(row, 'Ort', 'Stadt', 'City')
+            })
+            # Mark row to be excluded from final output
+            row['_blacklisted'] = True
+            precomputed.append({"in_limit": False, "row": row, "blacklisted": True})
+            continue
+        
         if not in_limit:
-            precomputed.append({"in_limit": False, "row": row})
+            precomputed.append({"in_limit": False, "row": row, "blacklisted": False})
             continue
 
-        doc_id_from_row = get_ci(row, 'id', 'link_id') #probably dont want that
+        doc_id_from_row = get_ci(row, 'id', 'link_id')  # may be None
         dest = get_ci(row, 'destination', 'url') or destination
-        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
         template_key = get_ci_key(row, 'Template', 'template')
         template_raw = row.get(template_key) if template_key else None
 
+        print("DEBUG campaign_code_from_business:", campaign_code_from_business)
+        print("DEBUG doc_id_from_row:", doc_id_from_row)
+        print("DEBUG business_name:", business_name)
+        print("DEBUG campaign_code:", campaign_code)
+        print("DEBUG i:", i)
+        print("DEBUG destination:", destination)
+        print("DEBUG template_key:", template_key)
+        print("DEBUG template_raw:", template_raw)
 
-        if campaign_code_from_business:
+        # Check for "Domain" column first - this takes priority
+        domain_from_row = get_ci(row, 'Domain', 'domain')
+        print("DEBUG domain_from_row:", domain_from_row)
+        
+        using_domain_column = False
+        if domain_from_row and domain_from_row.strip():
+            # Use Domain column as base_id if present
+            base_id = domain_from_row
+            using_domain_column = True
+            print("DEBUG using Domain column as base_id:", base_id)
+        elif campaign_code_from_business:
             email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
-
-            if _is_common_provider(email):
-                #fallback
-                doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
+            print("DEBUG email:", email)
+            if not email:
+                # No email provided - use clean business name from "Namenszeile"
+                print("DEBUG business_name:", business_name)
+                base_id = _extract_clean_business_name(business_name)
+            elif _is_common_provider(email):
+                base_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
             else:
-                doc_id = _extract_registrable_domain(email) if email else None
-
-            print("Extracted doc_id from email", email, "->", doc_id)
-
+                # Business email - use domain
+                print("DEBUG email:", email)
+                base_id = _extract_registrable_domain(email)
+                using_domain_column = True  # Also remove TLD from email-extracted domains
         else:
-            doc_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}" # Tracking ids are created here
+            base_id = doc_id_from_row or business_name or f"{(campaign_code or 'L').upper()}-{i+1}"
+
+        base_id = sanitize_id(base_id or "")
+        
+        # Remove TLD suffixes from domain-based IDs
+        if using_domain_column and base_id:
+            base_id_before = base_id
+            base_id = remove_tld_suffix(base_id)
+            if base_id_before != base_id:
+                print(f"DEBUG removed TLD suffix: '{base_id_before}' -> '{base_id}'")
+
+        print("DEBUG base_id:", base_id)
+
+        if not base_id:
+            print("⚠️ [DEBUG EMPTY BASE_ID] row:", i+1)
+            print("    business_name:", repr(business_name))
+            print("    email:", repr(email))
+            print("    doc_id_from_row:", repr(doc_id_from_row))
+            print("    original base:", repr(orig_base if 'orig_base' in locals() else None))
+            print("    after sanitize:", repr(base_id))
+            print("    Using campaign_code:", campaign_code)
+            print("    FULL ROW:", row)
 
         precomputed.append({
             "in_limit": True,
             "row": row,
             "dest": dest,
-            "doc_id": doc_id,
+            "base_id": base_id,          # <— store base
             "business_name": business_name,
             "template_raw": template_raw,
-            "template_key": template_key
+            "template_key": template_key,
+            "blacklisted": False
         })
 
-    existing_ids: Set[str] = set()
+    assign_final_ids(precomputed)
 
-    print("PRE CHECK skip_existing:", skip_existing)
-    if skip_existing:
-        print("Line 410 skip_existing", skip_existing, "precomputing existing link ids...")
-
-        link_refs = [COL_LINKS.document(item["doc_id"]) for item in precomputed
-                     if item.get("in_limit") and item.get("dest")]
-        
-        existing_ids = bulk_get_existing(link_refs)
-        print("Existing ids computed:", len(existing_ids))
-        if existing_ids:
-            print(f"[pre-scan] Found {len(existing_ids)} existing link ids (will skip creating those).")
+    print("Precomputed", precomputed[:3])
+    print("Len precomputed:", len(precomputed))
 
     batch = db.batch()
     ops = 0
     def flush():
         nonlocal batch, ops
         if ops:
-            batch.commit()
-            batch = db.batch()
-            ops = 0
+            try:
+                batch.commit()
+                print(f"[batch] Committed {ops} operations successfully")
+            except Exception as e:
+                print(f"[ERROR] Batch commit failed: {e}")
+                print(f"[ERROR] This batch had {ops} operations")
+                raise  # Re-raise to be caught by outer handler
+            finally:
+                batch = db.batch()
+                ops = 0
 
     pbar = tqdm(precomputed, desc="Processing rows", unit="row")
     try:
-        for item in pbar:
+        for item_idx, item in enumerate(pbar):
             row = item["row"]
             if not item["in_limit"]:
                 row['tracking_link'] = ''
                 continue
 
             dest = item.get("dest")
-            doc_id = item.get("doc_id")
+            final_id = item.get("final_id")    # <- use the ID allocated earlier
             business_name = item.get("business_name")
             template_raw = item.get("template_raw")
             template_key = item.get("template_key")
 
+            # Validate final_id before proceeding - prevent empty final_id errors
+            if dest and (not final_id or not final_id.strip()):
+                print(f"[ERROR] Empty final_id detected! Row data:")
+                print(f"  - dest: {dest}")
+                print(f"  - final_id: '{final_id}' (type: {type(final_id)}, len: {len(final_id) if final_id else 0})")
+                print(f"  - base_id: {item.get('base_id')}")
+                print(f"  - business_name: {business_name}")
+                print(f"  - row_index: {item_idx + 1}")
+                # Set dest to None to skip link creation for this row
+                dest = None
+                item["dest"] = None
+                errors += 1
+                error_details.append({
+                    "row_number": item_idx + 1,
+                    "business_name": business_name or "Unknown",
+                    "error": "Empty final_id detected - link creation skipped",
+                    "error_type": "ValidationError"
+                })
+
+            print("DEBUG final_id:", final_id)
+
             try:
                 coordinate = maybe_geocode(row)
-                biz_id, biz_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
+                # Track geocoding stats
+                if geocode:
+                    if coordinate:
+                        geocoding_successful += 1
+                    else:
+                        geocoding_failed += 1
+                
+                biz_id, canonical_payload, customer_payload = upsert_business_payload_from_row(row, ownerId, coordinate)
                 biz_ref = COL_BUSINESSES.document(biz_id)
+                current_biz_id = biz_id  # Store for error tracking
 
-                batch.set(biz_ref, {**biz_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
+                # Upsert canonical business document
+                batch.set(biz_ref, {**canonical_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
                 batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
 
+                # Upsert customer-specific overlay
+                customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
+                batch.set(customer_business_ref, {
+                    "business_ref": biz_ref,
+                    **customer_payload
+                }, merge=True); ops += 1
+
+                # target
                 target_ref = campaign_ref.collection('targets').document()
-                link_ref = COL_LINKS.document(doc_id)
                 status = "validated" if dest else "excluded"
                 snapshot = snapshot_mailing_from_row(row, business_name)
 
-                target_payload = { #TODO/BUG: I dont want to create targets if links are skipped
+                # reference to link doc (by final_id)
+                # FIX: Only create link_ref if dest exists AND final_id is valid (not empty)
+                link_ref = COL_LINKS.document(final_id) if (dest and final_id and final_id.strip()) else None
+
+                target_payload = {
                     "business_ref": biz_ref,
                     "status": "linked" if dest else status,
                     "reason_excluded": None if dest else "No destination",
@@ -561,40 +914,79 @@ def assign_links_from_business_file(path: str, base_url: str,
                 }
                 batch.set(target_ref, target_payload); ops += 1
                 created_targets += 1
+                
+                # Track excluded rows (no destination)
+                if not dest:
+                    excluded_no_destination += 1
+
+                print("DEBUG target_payload:", target_payload)
+                print("DEBUG dest:", dest)
 
                 if dest:
-                    if skip_existing and doc_id in existing_ids:
-                        print("[skip] link with id", doc_id, "already exists")
-                    else:
-                        try:
-                            # never overwrite: create will error if the doc exists
-                            batch.create(link_ref, {
-                                "campaign_ref": campaign_ref,
-                                "business_ref": biz_ref,
-                                "target_ref": target_ref,
-                                "destination": dest,
-                                "template_id": template_with_qr_suffix(template_raw),
-                                "short_code": doc_id,
-                                "active": True,
-                                "hit_count": 0,
-                                "created_at": firestore.SERVER_TIMESTAMP,
-                                "last_hit_at": None,
-                                "owner_id": ownerId,
-                                "snapshot_mailing": snapshot,
-                                "campaign_name": campaign_name,
-                            })
-                            ops += 1
-                            created_links += 1
-                        except AlreadyExists:
-                            if skip_existing:
-                                print("[skip] link with id", doc_id, "already exists")
-                            else:
-                                raise RuntimeError(
-                                    f"Link ID '{doc_id}' already exists. "
-                                    "Refusing to overwrite. Enable skip_existing to bypass."
-                                )
+                    # Try to create link with final_id. If a rare race hits, retry once with the next suffix.
+                    try:
+                        print(f"Creating link with ID: {final_id}")
+                        batch.create(COL_LINKS.document(final_id), {
+                            "campaign_ref": campaign_ref,
+                            "business_ref": biz_ref,
+                            "target_ref": target_ref,
+                            "destination": dest,
+                            "template_id": template_with_qr_suffix(template_raw),
+                            "short_code": final_id,   # mirror the human-readable ID
+                            "active": True,
+                            "hit_count": 0,
+                            "created_at": firestore.SERVER_TIMESTAMP,
+                            "last_hit_at": None,
+                            "owner_id": ownerId,
+                            "snapshot_mailing": snapshot,
+                            "campaign_name": campaign_name,
+                        })
+                        ops += 1
+                        created_links += 1
+                    except AlreadyExists:
+                        # Recompute suffix (another worker probably grabbed our final_id)
+                        print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
+                        base = item.get("base_id") or final_id or "link"
+                        if not base or not base.strip():
+                            base = "link"
+                            print(f"[warn] Empty base in retry logic, using fallback: 'link'")
+                        taken = existing_variants_for_base(COL_LINKS, base)
+                        retry_id = next_id_from_cache(base, taken)
+                        
+                        # Double-check retry_id is not empty
+                        if not retry_id or not retry_id.strip():
+                            retry_id = f"link-{len(taken) + 1}"
+                            print(f"[warn] retry_id was empty, using fallback: '{retry_id}'")
 
-                row['tracking_link'] = build_tracking_link(base_url, doc_id) if dest else ''
+                        batch.create(COL_LINKS.document(retry_id), {
+                            "campaign_ref": campaign_ref,
+                            "business_ref": biz_ref,
+                            "target_ref": target_ref,
+                            "destination": dest,
+                            "template_id": template_with_qr_suffix(template_raw),
+                            "short_code": retry_id,
+                            "active": True,
+                            "hit_count": 0,
+                            "created_at": firestore.SERVER_TIMESTAMP,
+                            "last_hit_at": None,
+                            "owner_id": ownerId,
+                            "snapshot_mailing": snapshot,
+                            "campaign_name": campaign_name,
+                        })
+                        ops += 1
+                        created_links += 1
+                        final_id = retry_id             # make sure output uses the actual created ID
+
+                # write back tracking info + template into the row
+                if dest and final_id:
+                    row['tracking_link'] = build_tracking_link(base_url, final_id)
+                    row['tracking_url'] = build_tracking_url(tracking_url_prefix, final_id)
+                    row['tracking_id'] = final_id
+                else:
+                    row['tracking_link'] = ''
+                    row['tracking_url'] = ''
+                    row['tracking_id'] = ''
+                print("DEBUG tracking_link:", row['tracking_link'])
                 adjusted_template = template_with_qr_suffix(template_raw)
                 if adjusted_template:
                     if template_key:
@@ -604,10 +996,27 @@ def assign_links_from_business_file(path: str, base_url: str,
 
                 if ops >= 400:
                     flush()
-
+            
             except Exception as e:
                 print(f"[error] row: {e}")
+                print("business_name:", business_name)
+                print("business_id:", biz_id)
+                print("FULL ROW:", row)
+                print(f"row_index: {item_idx + 1}")
                 errors += 1
+                # Track error details
+                error_biz_id = None
+                try:
+                    error_biz_id = current_biz_id if 'current_biz_id' in locals() else None
+                except:
+                    pass
+                error_details.append({
+                    "row_number": item_idx + 1,
+                    "business_name": business_name or "Unknown",
+                    "business_id": error_biz_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                })
                 row['tracking_link'] = ''
 
     finally:
@@ -617,6 +1026,7 @@ def assign_links_from_business_file(path: str, base_url: str,
         except Exception:
             pass
 
+
     COL_CAMPAIGNS.document(campaign_ref.id).set(
         {"totals.targets": firestore.Increment(created_targets),
          "totals.links": firestore.Increment(created_links),
@@ -624,16 +1034,46 @@ def assign_links_from_business_file(path: str, base_url: str,
         merge=True
     )
 
+    # Filter out blacklisted rows before writing output
+    filtered_rows = [r for r in rows if not r.get('_blacklisted', False)]
+    
     if is_excel:
         if pd is None:
             raise RuntimeError("Excel output requires pandas/openpyxl")
-        out_df = pd.DataFrame(rows)
+        out_df = pd.DataFrame(filtered_rows)
         out_path = write_back_excel(path, out_df)
     else:
-        out_path = write_back_csv(path, rows)
+        out_path = write_back_csv(path, filtered_rows)
 
-    print(f"Done. created_links={created_links} created_targets={created_targets} skipped={skipped} errors={errors}")
-    return out_path
+    processing_end = datetime.now(timezone.utc)
+    
+    # Prepare statistics
+    statistics = {
+        "created_links": created_links,
+        "created_targets": created_targets,
+        "skipped": skipped,
+        "errors": errors,
+        "blacklisted_count": blacklisted_count,
+        "blacklisted_details": blacklisted_details,
+        "error_details": error_details,
+        "excluded_no_destination": excluded_no_destination,
+        "geocoding_stats": {
+            "enabled": geocode,
+            "successful": geocoding_successful,
+            "failed": geocoding_failed
+        },
+        "total_rows": total_rows,
+        "processed_rows": len(filtered_rows)
+    }
+
+    print(f"Done. created_links={created_links} created_targets={created_targets} skipped={skipped} errors={errors} blacklisted={blacklisted_count}")
+    
+    return {
+        "output_path": out_path,
+        "statistics": statistics,
+        "processing_start": processing_start,
+        "processing_end": processing_end
+    }
 
 # ---------------------------
 # GCS helpers
@@ -667,6 +1107,72 @@ def _content_type_for(path: str) -> str:
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return "application/octet-stream"
 
+def generate_upload_report(
+    statistics: Dict,
+    campaign_info: Dict,
+    input_file_info: Dict,
+    output_file_path: str,
+    processing_start: datetime,
+    processing_end: datetime,
+    owner_id: str
+) -> Dict:
+    """
+    Generate a comprehensive upload report.
+    
+    Returns a dictionary that can be serialized to JSON.
+    """
+    duration = (processing_end - processing_start).total_seconds()
+    
+    report = {
+        "upload_id": f"{campaign_info.get('campaign_id', 'unknown')}-{int(processing_start.timestamp())}",
+        "timestamp": processing_end.isoformat(),
+        "campaign": {
+            "campaign_id": campaign_info.get("campaign_id"),
+            "campaign_name": campaign_info.get("campaign_name"),
+            "campaign_code": campaign_info.get("campaign_code"),
+        },
+        "input_file": input_file_info,
+        "processing": {
+            "started_at": processing_start.isoformat(),
+            "completed_at": processing_end.isoformat(),
+            "duration_seconds": round(duration, 2)
+        },
+        "statistics": {
+            "total_rows": statistics.get("total_rows", 0),
+            "processed_rows": statistics.get("processed_rows", 0),
+            "successful_links": statistics.get("created_links", 0),
+            "targets_created": statistics.get("created_targets", 0),
+            "blacklisted": {
+                "count": statistics.get("blacklisted_count", 0),
+                "businesses": statistics.get("blacklisted_details", [])
+            },
+            "skipped": {
+                "count": statistics.get("skipped", 0),
+                "reason": "limit_exceeded"
+            },
+            "errors": {
+                "count": statistics.get("errors", 0),
+                "details": statistics.get("error_details", [])
+            },
+            "excluded": {
+                "count": statistics.get("excluded_no_destination", 0),
+                "reason": "no_destination"
+            },
+            "geocoding": statistics.get("geocoding_stats", {
+                "enabled": False,
+                "successful": 0,
+                "failed": 0
+            })
+        },
+        "output_files": {
+            "with_links": output_file_path
+        },
+        "status": "completed",
+        "owner_id": owner_id
+    }
+    
+    return report
+
 def _delete_prefix(bucket: storage.Bucket, prefix: str) -> int:
     """
     Deletes all blobs under the given prefix. Returns number of deleted blobs.
@@ -684,6 +1190,101 @@ def _delete_prefix(bucket: storage.Bucket, prefix: str) -> int:
             print(f"[cleanup] Warn: failed to delete {blob.name}: {e}")
     print(f"[cleanup] Deleted {deleted} blobs under {prefix}")
     return deleted
+
+
+
+
+def _extract_clean_business_name(business_name: Optional[str]) -> Optional[str]:
+    """
+    Extract a clean, short business name from a full business name.
+    Removes common business suffixes, handles special characters, and keeps it concise.
+    """
+    if not business_name:
+        return None
+
+    name = str(business_name).strip()
+
+    # --- 1️⃣ Convert umlauts early ---
+    umlaut_map = {
+        'ä': 'ae', 'ö': 'oe', 'ü': 'ue',
+        'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue',
+        'ß': 'ss'
+    }
+    for umlaut, replacement in umlaut_map.items():
+        name = name.replace(umlaut, replacement)
+
+    # --- 2️⃣ Handle "&" and "@" correctly ---
+    # Join words directly so "A & B" → "AundB", "a@m" → "aatm"
+    name = re.sub(r'\s*&\s*', 'und', name)
+    name = re.sub(r'&', 'und', name)
+    name = re.sub(r'\s*@\s*', 'at', name)
+    name = name.replace('@', 'at')
+
+    # --- 3️⃣ Remove leading special characters and normalize hyphens ---
+    name = re.sub(r'^[/\s\-_]+', '', name)
+    name = re.sub(r'\s*-\s*', '-', name)
+
+    # --- 4️⃣ Remove legal suffixes anywhere (not just at the end) ---
+    suffix_token = (
+        r'(?:gmbh(?:\s*und\s*co\.?\s*kg)?|'  # GmbH + GmbH und Co. KG
+        r'co\.?\s*kg|'
+        r'kg|ag|mbh|e\.?v\.?|ug|ohg|gbr|inc\.?|ltd\.?|llc|corp\.?)'
+    )
+    name = re.sub(rf'(?i)(^|[\s\-_]){suffix_token}($|[\s\-_])', ' ', name)
+    name = re.sub(r'(?i)gmbhundco', ' ', name)  # handle glued-together variant
+
+    # --- 5️⃣ Normalize whitespace and separators ---
+    name = re.sub(r'[_/]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+
+    if not name:
+        return None
+
+    # --- 6️⃣ Split and remove trailing numbers (ZIP codes etc.) ---
+    parts = name.split()
+    while parts and re.fullmatch(r'\d+', parts[-1]):
+        parts.pop()
+    if not parts:
+        return None
+
+    # --- 7️⃣ Clean each part ---
+    clean_parts = []
+    for p in parts:
+        p = p.lower()
+        p = re.sub(r'[^a-z0-9\-]+', '-', p)
+        p = re.sub(r'-{2,}', '-', p).strip('-')
+        if p:
+            clean_parts.append(p)
+    if not clean_parts:
+        return None
+
+    # --- 8️⃣ Decide how many words to include ---
+    first = clean_parts[0]
+    rest = clean_parts[1:]
+    stopwords = {'und', 'and', 'the', 'der', 'die', 'das', 'für', 'fuer', 'co', 'kg', 'mbh'}
+
+    result_parts = [first]
+    if rest:
+        second = rest[0]
+        first_len = len(first.replace('-', ''))
+        combined_len = len(first) + 1 + len(second)
+        first_is_numeric = first.isdigit()
+
+        include_second = False
+        if first_len <= 2 or first_is_numeric:
+            include_second = True
+        elif combined_len <= 20 and first_len <= 8 and ('-' not in first or first_len <= 4):
+            include_second = True
+
+        if include_second and second not in stopwords:
+            result_parts.append(second)
+
+    # --- 9️⃣ Final normalization ---
+    result = '-'.join(result_parts)
+    result = re.sub(r'-{2,}', '-', result).strip('-')
+
+    return result if result else None
+
 
 
 # ---------------------------
@@ -786,6 +1387,9 @@ def process_business_upload(cloud_event):
         "skip_existing": bool(manifest.get("skip_existing", True) or (metadata.get("skip_existing") in ("1", "true", "True"))),
         "geocode": bool(manifest.get("geocode", False) or (metadata.get("geocode") in ("1", "true", "True"))),
         "mapbox_token": manifest.get("mapbox_token") or metadata.get("mapbox_token") or DEFAULT_MAPBOX_TOKEN,
+        # Optional prefix for printable tracking URL in exports.
+        # If omitted, we fall back to "ihr-brief.de/<final_id>".
+        "tracking_url_prefix": manifest.get("tracking_url_prefix") or metadata.get("tracking_url_prefix"),
         #use business domain as tracking id 
     }
 
@@ -804,22 +1408,28 @@ def process_business_upload(cloud_event):
     # ---------------------------
     # Process (with minimal changes): on DuplicateCampaignCodeError, delete folder & log
     # ---------------------------
+    processing_start = datetime.now(timezone.utc)
     try:
         # Process
-        out_path = assign_links_from_business_file(
+        result = assign_links_from_business_file(
             path=local_in,
             base_url=base_url,
             destination=params["destination"],
             campaign_code=params["campaign_code"],
             campaign_name=params["campaign_name"],
-            campaign_code_from_business=params["campaign_code_from_business"],
+            campaign_code_from_business=True, #params["campaign_code_from_business"]
             campaign_id=params["campaign_id"],
             ownerId=ownerId,
             limit=params["limit"],
             mapbox_token=params["mapbox_token"],
             skip_existing=params["skip_existing"],
             geocode=params["geocode"],
+            tracking_url_prefix=params.get("tracking_url_prefix"),
         )
+
+        out_path = result["output_path"]
+        statistics = result["statistics"]
+        processing_end = result.get("processing_end", datetime.now(timezone.utc))
 
         # Upload output next to input (same folder), with suffix
         out_name = os.path.basename(out_path)
@@ -827,6 +1437,51 @@ def process_business_upload(cloud_event):
         _upload_blob(bucket, out_path, dest_blob, _content_type_for(out_path))
 
         print(f"[done] Wrote: gs://{bucket_name}/{dest_blob}")
+
+        # Generate and upload report
+        report = generate_upload_report(
+            statistics=statistics,
+            campaign_info={
+                "campaign_id": params["campaign_id"],
+                "campaign_name": params["campaign_name"],
+                "campaign_code": params["campaign_code"]
+            },
+            input_file_info={
+                "name": os.path.basename(object_name),
+                "path": object_name,
+                "total_rows": statistics.get("total_rows", 0)
+            },
+            output_file_path=f"gs://{bucket_name}/{dest_blob}",
+            processing_start=result.get("processing_start", processing_start),
+            processing_end=processing_end,
+            owner_id=ownerId
+        )
+
+        # Save report to local file
+        report_path = os.path.join("/tmp", "upload_report.json")
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+
+        # Upload report to GCS
+        report_blob_name = f"{prefix_dir}/upload_report.json"
+        _upload_blob(bucket, report_path, report_blob_name, "application/json")
+
+        print(f"[report] Uploaded report: gs://{bucket_name}/{report_blob_name}")
+
+        # Log summary
+        print(json.dumps({
+            "event": "upload_completed",
+            "campaign_id": params["campaign_id"],
+            "statistics": {
+                "total_rows": statistics.get("total_rows", 0),
+                "links_created": statistics.get("created_links", 0),
+                "targets_created": statistics.get("created_targets", 0),
+                "blacklisted": statistics.get("blacklisted_count", 0),
+                "errors": statistics.get("errors", 0),
+                "excluded_no_destination": statistics.get("excluded_no_destination", 0)
+            },
+            "report_path": f"gs://{bucket_name}/{report_blob_name}"
+        }, ensure_ascii=False))
 
     except DuplicateCampaignCodeError as e:
         # Clear, structured logs about the duplicate + cleanup
@@ -878,4 +1533,43 @@ def process_business_upload(cloud_event):
             }, ensure_ascii=False))
 
         # Re-raise so the invocation is marked failed and the error appears in logs
+        raise
+    
+    except Exception as e:
+        # Generate error report for other exceptions
+        processing_end = datetime.now(timezone.utc)
+        try:
+            error_report = {
+                "status": "failed",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "timestamp": processing_end.isoformat(),
+                "input_file": {
+                    "name": os.path.basename(object_name),
+                    "path": object_name
+                },
+                "campaign": {
+                    "campaign_id": params.get("campaign_id"),
+                    "campaign_name": params.get("campaign_name"),
+                    "campaign_code": params.get("campaign_code")
+                },
+                "processing": {
+                    "started_at": processing_start.isoformat(),
+                    "failed_at": processing_end.isoformat(),
+                    "duration_seconds": round((processing_end - processing_start).total_seconds(), 2)
+                },
+                "owner_id": ownerId
+            }
+            
+            report_path = os.path.join("/tmp", "upload_report_error.json")
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(error_report, f, indent=2, ensure_ascii=False)
+            
+            report_blob_name = f"{prefix_dir}/upload_report_error.json"
+            _upload_blob(bucket, report_path, report_blob_name, "application/json")
+            print(f"[report] Uploaded error report: gs://{bucket_name}/{report_blob_name}")
+        except Exception as report_error:
+            print(f"[warn] Failed to generate error report: {report_error}")
+        
+        # Re-raise the original exception
         raise
