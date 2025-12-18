@@ -330,6 +330,16 @@ def redirector(request: Request):
     xff = request.headers.get('X-Forwarded-For', '')
     client_ip = _first_ip_from_xff(xff)
 
+    # Detect if this is a health monitor test request
+    # Primary check: link_id pattern (most reliable - test links use "monitor-test-*" pattern)
+    # Secondary check: User-Agent header (backup, may not always be preserved through proxies)
+    # Note: Health monitor deletes these hits after verification, but marking them helps with
+    # migration and allows filtering if deletion behavior changes in the future
+    is_test_data = (
+        link_id.startswith('monitor-test') or  # Primary: test link ID pattern
+        ua_str.startswith('HealthMonitor/')    # Secondary: health monitor user agent
+    )
+
     hit = {
         'link_id': link_id,
         'campaign_ref': campaign_ref,
@@ -345,6 +355,10 @@ def redirector(request: Request):
         "campaign_name": campaign_name,
         "hit_origin": source, #shows if it is from link or qr code
     }
+    
+    # Mark test data from health monitor
+    if is_test_data:
+        hit['is_test_data'] = True
     if referer:
         hit['referer'] = referer[:512]
 
@@ -371,7 +385,11 @@ def redirector(request: Request):
         if ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
             uniq_ref = campaign_ref.collection('unique_ips').document(ip_hash)
             # create if not exists; increment totals.unique_ips only on first seen
-            uniq_ref.create({'first_seen': SERVER_TIMESTAMP})
+            unique_ip_data = {'first_seen': SERVER_TIMESTAMP}
+            # Mark as test data if the hit is test data
+            if is_test_data:
+                unique_ip_data['is_test_data'] = True
+            uniq_ref.create(unique_ip_data)
             campaign_ref.set({'totals.unique_ips': Increment(1)}, merge=True)
     except AlreadyExists:
         pass  # already counted
