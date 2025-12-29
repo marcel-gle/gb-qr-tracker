@@ -24,8 +24,8 @@ from google.cloud import firestore
 from tqdm import tqdm
 
 # Default configuration
-DEFAULT_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCP_PROJECT") or "gb-qr-tracker-dev"
-DEFAULT_DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
+DEFAULT_PROJECT_ID = "gb-qr-tracker-dev"
+DEFAULT_DATABASE_ID = "test"
 DEFAULT_TEST_LINK_ID = "monitor-test-001"
 
 # Batch size for Firestore operations (max 500 per batch, use 450 for safety)
@@ -53,6 +53,7 @@ def mark_hits_test_data(
     marked_count = 0
     batch = db.batch()
     batch_count = 0
+    processed_hit_ids = set()  # Track processed hits to avoid double-counting
     
     # Query 1: Hits with test link_id
     print(f"  Querying hits with link_id == '{test_link_id}'...")
@@ -65,6 +66,10 @@ def mark_hits_test_data(
         if hit_data.get('is_test_data') is True:
             continue
         
+        # Skip if already processed
+        if hit.id in processed_hit_ids:
+            continue
+        
         if not dry_run:
             batch.update(hit.reference, {'is_test_data': True})
             batch_count += 1
@@ -72,6 +77,7 @@ def mark_hits_test_data(
                 batch.commit()
                 batch = db.batch()
                 batch_count = 0
+        processed_hit_ids.add(hit.id)
         marked_count += 1
     
     # Query 2: Hits with is_demo == True
@@ -86,6 +92,10 @@ def mark_hits_test_data(
             if hit_data.get('is_test_data') is True:
                 continue
             
+            # Skip if already processed
+            if hit.id in processed_hit_ids:
+                continue
+            
             if not dry_run:
                 batch.update(hit.reference, {'is_test_data': True})
                 batch_count += 1
@@ -93,6 +103,7 @@ def mark_hits_test_data(
                     batch.commit()
                     batch = db.batch()
                     batch_count = 0
+            processed_hit_ids.add(hit.id)
             marked_count += 1
     
     # Query 3: Hits with user_agent starting with "HealthMonitor/"
@@ -123,7 +134,9 @@ def mark_hits_test_data(
             if user_agent.startswith('HealthMonitor/'):
                 # Skip if already marked
                 if hit_data.get('is_test_data') is not True:
-                    health_monitor_hits.append(hit)
+                    # Skip if already processed
+                    if hit.id not in processed_hit_ids:
+                        health_monitor_hits.append(hit)
         
         if len(page_hits) < page_size:
             break
@@ -140,6 +153,7 @@ def mark_hits_test_data(
                 batch.commit()
                 batch = db.batch()
                 batch_count = 0
+        processed_hit_ids.add(hit.id)
         marked_count += 1
     
     # Commit remaining batch
@@ -296,6 +310,7 @@ def mark_businesses_test_data(
     Mark businesses as test data if they're associated with test links.
     This is a conservative approach - only mark businesses that are exclusively
     used by test links (all links referencing the business are test links).
+    Additionally, businesses must match test pattern (business_id or business_name).
     
     Returns the number of businesses marked.
     """
@@ -341,7 +356,7 @@ def mark_businesses_test_data(
     
     print(f"  Found {len(test_business_refs)} unique businesses in test links")
     
-    # For each business, check if ALL links referencing it are test links
+    # For each business, check if ALL links referencing it are test links AND matches test pattern
     businesses_to_mark = []
     for business_id in tqdm(test_business_refs, desc="  Checking businesses"):
         business_ref = businesses_ref.document(business_id)
@@ -353,6 +368,21 @@ def mark_businesses_test_data(
         business_data = business_snap.to_dict() or {}
         # Skip if already marked
         if business_data.get('is_test_data') is True:
+            continue
+        
+        # Additional security check: verify business matches test pattern
+        # Check business_id pattern (e.g., "monitor-test-001-10000")
+        business_name = business_data.get('business_name', '') or ''
+        
+        # Business must match test pattern in ID or name
+        is_test_business_pattern = (
+            business_id.startswith('monitor-test') or
+            business_name.upper().startswith('MONITOR-TEST') or
+            business_name.lower().startswith('monitor-test')
+        )
+        
+        if not is_test_business_pattern:
+            # Skip businesses that don't match test pattern (extra safety)
             continue
         
         # Find all links that reference this business
@@ -369,6 +399,7 @@ def mark_businesses_test_data(
                 all_test = False
                 break
         
+        # Only mark if: matches test pattern AND all links are test links
         if all_test and len(links_with_business) > 0:
             businesses_to_mark.append(business_ref)
     
