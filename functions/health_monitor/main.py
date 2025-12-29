@@ -199,16 +199,20 @@ def _perform_test_scan_direct(gcp_url: str, link_id: str, env: str) -> Tuple[boo
 
 def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datetime) -> Tuple[bool, Optional[str], Optional[Dict], Optional[firestore.DocumentReference]]:
     """
-    Verify that a hit was written to Firestore.
+    Verify that a test hit was written to Firestore test_hits collection.
     Returns (success, error_message, hit_data, hit_doc_ref).
+    
+    Note: For test requests, hits are written to test_hits collection and counters
+    are not updated, so we only verify the hit exists, not the link counters.
     """
     try:
         # Calculate time window for search
         window_start = scan_time - timedelta(seconds=DB_VERIFICATION_WINDOW)
         
-        # Query hits collection for recent hits with this link_id
+        # Query test_hits collection for recent hits with this link_id
+        # Test hits are written to test_hits collection to avoid polluting production data
         # Note: We query without order_by to avoid index requirements, then sort in Python
-        hits_ref = _db.collection('hits')
+        hits_ref = _db.collection('test_hits')
         query = hits_ref.where('link_id', '==', link_id).limit(20)
         
         hits = list(query.stream())
@@ -245,31 +249,22 @@ def _verify_hit_in_database(link_id: str, expected_origin: str, scan_time: datet
                     continue
         
         if not found_hit:
-            return False, f"No matching hit found in database (link_id={link_id}, origin={expected_origin}, window={DB_VERIFICATION_WINDOW}s)", None, None
+            return False, f"No matching test hit found in test_hits collection (link_id={link_id}, origin={expected_origin}, window={DB_VERIFICATION_WINDOW}s)", None, None
         
-        # Verify link document was updated
+        # Verify link document exists (but don't check counters since we skip updating them for test requests)
         link_ref = _db.collection('links').document(link_id)
         link_doc = link_ref.get()
         
         if not link_doc.exists:
             return False, f"Link document {link_id} not found", found_hit, found_hit_ref
         
-        link_data = link_doc.to_dict()
-        hit_count = link_data.get('hit_count', 0)
-        last_hit_at = link_data.get('last_hit_at')
-        
-        # Basic verification - hit_count should be > 0, last_hit_at should exist
-        if hit_count == 0:
-            return False, f"Link hit_count is 0, expected > 0", found_hit, found_hit_ref
-        
-        if not last_hit_at:
-            return False, f"Link last_hit_at is missing", found_hit, found_hit_ref
-        
+        # For test requests, we skip counter updates, so we only verify the hit was written
+        # The hit existing in test_hits collection is sufficient verification
         return True, None, {
             "hit": found_hit,
             "link": {
-                "hit_count": hit_count,
-                "last_hit_at": str(last_hit_at) if last_hit_at else None
+                "exists": True,
+                "note": "Counters not updated for test requests"
             }
         }, found_hit_ref
         
@@ -281,17 +276,14 @@ def _delete_hit(hit_ref: Optional[firestore.DocumentReference]) -> bool:
     """
     Delete a hit document from Firestore.
     Returns True if successful, False otherwise.
-    """
-    if not hit_ref:
-        return False
     
-    try:
-        hit_ref.delete()
-        logger.info(f"Deleted health check hit: {hit_ref.id}")
-        return True
-    except Exception as e:
-        logger.warning(f"Failed to delete health check hit {hit_ref.id}: {str(e)}")
-        return False
+    Note: Test hits are now written to test_hits collection and can remain there
+    for debugging purposes. This function is kept for backwards compatibility
+    but deletion is no longer performed automatically.
+    """
+    # Test hits are now in test_hits collection and can remain for debugging
+    # No need to delete them automatically
+    return True
 
 
 def _verify_firebase_token(request: Request) -> str:
@@ -304,6 +296,25 @@ def _verify_firebase_token(request: Request) -> str:
     id_token = authz.split(" ", 1)[1].strip()
     decoded = fb_auth.verify_id_token(id_token, check_revoked=True)
     return decoded["uid"]
+
+
+def _authenticate_request(request: Request) -> str:
+    """
+    Authenticate request from either frontend (Firebase ID token) or Cloud Scheduler.
+    
+    Cloud Scheduler requests are identified by User-Agent header and skip Firebase token
+    verification since Cloud Functions already validates IAM permissions for service accounts.
+    
+    Returns user/service identifier.
+    """
+    user_agent = request.headers.get("User-Agent", "")
+    
+    # Cloud Scheduler requests - skip token verification (IAM is already validated by Cloud Functions)
+    if "Google-Cloud-Scheduler" in user_agent:
+        return "cloud-scheduler"
+    
+    # Frontend requests - verify Firebase ID token
+    return _verify_firebase_token(request)
 
 
 def _log_error(component: str, check_type: str, error: str, details: Optional[Dict] = None):
@@ -321,93 +332,97 @@ def _log_error(component: str, check_type: str, error: str, details: Optional[Di
 
 
 def _check_all_health_endpoints() -> Dict:
-    """Check all health endpoints."""
-    results = {
-        "worker_dev": {"success": False, "error": None},
-        "worker_prod": {"success": False, "error": None},
-        "gcp_dev": {"success": False, "error": None},
-        "gcp_prod": {"success": False, "error": None},
-    }
+    """Check health endpoints for the current environment only."""
+    # Determine current environment
+    current_env = "dev" if IS_DEV else ("prod" if IS_PROD else "unknown")
     
-    # Check Cloudflare Worker (dev)
+    if current_env == "unknown":
+        return {
+            "error": "Could not determine environment from PROJECT_ID",
+            "worker": {"success": False, "error": "Unknown environment"},
+            "gcp": {"success": False, "error": "Unknown environment"}
+        }
+    
+    results = {}
+    
+    # Select URLs based on current environment
+    if current_env == "dev":
+        worker_url = CLOUDFLARE_WORKER_DEV_URL
+        gcp_url = GCP_FUNCTION_DEV_URL
+    else:  # prod
+        worker_url = CLOUDFLARE_WORKER_PROD_URL
+        gcp_url = GCP_FUNCTION_PROD_URL
+    
+    # Check Cloudflare Worker
     success, error = _check_health_endpoint(
-        f"{CLOUDFLARE_WORKER_DEV_URL}/health",
-        "Cloudflare Worker (dev)"
+        f"{worker_url}/health",
+        f"Cloudflare Worker ({current_env})"
     )
-    results["worker_dev"] = {"success": success, "error": error}
+    results["worker"] = {"success": success, "error": error}
     if not success:
-        _log_error("cloudflare_worker", "health_check", error or "Unknown error", {"environment": "dev"})
+        _log_error("cloudflare_worker", "health_check", error or "Unknown error", {"environment": current_env})
     
-    # Check Cloudflare Worker (prod)
+    # Check additional domains (only in prod)
+    if current_env == "prod":
+        for domain in ADDITIONAL_DOMAIN_LIST:
+            domain_key = domain.replace(".", "_").replace("-", "_")
+            domain_url = f"https://{domain}"
+            success, error = _check_health_endpoint(
+                f"{domain_url}/health",
+                f"Cloudflare Worker ({domain})"
+            )
+            results[f"worker_{domain_key}"] = {"success": success, "error": error}
+            if not success:
+                _log_error("cloudflare_worker", "health_check", error or "Unknown error", {"domain": domain})
+    
+    # Check GCP Function
     success, error = _check_health_endpoint(
-        f"{CLOUDFLARE_WORKER_PROD_URL}/health",
-        "Cloudflare Worker (prod)"
+        f"{gcp_url}/health",
+        f"GCP Function ({current_env})"
     )
-    results["worker_prod"] = {"success": success, "error": error}
+    results["gcp"] = {"success": success, "error": error}
     if not success:
-        _log_error("cloudflare_worker", "health_check", error or "Unknown error", {"environment": "prod"})
-    
-    # Check additional domains (health endpoints)
-    for domain in ADDITIONAL_DOMAIN_LIST:
-        domain_key = domain.replace(".", "_").replace("-", "_")
-        results[f"worker_{domain_key}"] = {"success": False, "error": None}
-        
-        # Check health endpoint for this domain
-        domain_url = f"https://{domain}"
-        success, error = _check_health_endpoint(
-            f"{domain_url}/health",
-            f"Cloudflare Worker ({domain})"
-        )
-        results[f"worker_{domain_key}"] = {"success": success, "error": error}
-        if not success:
-            _log_error("cloudflare_worker", "health_check", error or "Unknown error", {"domain": domain})
-    
-    # Check GCP Function (dev)
-    success, error = _check_health_endpoint(
-        f"{GCP_FUNCTION_DEV_URL}/health",
-        "GCP Function (dev)"
-    )
-    results["gcp_dev"] = {"success": success, "error": error}
-    if not success:
-        _log_error("gcp_function", "health_check", error or "Unknown error", {"environment": "dev"})
-    
-    # Check GCP Function (prod)
-    success, error = _check_health_endpoint(
-        f"{GCP_FUNCTION_PROD_URL}/health",
-        "GCP Function (prod)"
-    )
-    results["gcp_prod"] = {"success": success, "error": error}
-    if not success:
-        _log_error("gcp_function", "health_check", error or "Unknown error", {"environment": "prod"})
+        _log_error("gcp_function", "health_check", error or "Unknown error", {"environment": current_env})
     
     return results
 
 
 def _perform_test_scans() -> Dict:
-    """Perform test scans via both paths and verify database."""
-    results = {
-        "worker_dev": {"success": False, "error": None, "db_verified": False},
-        "worker_prod": {"success": False, "error": None, "db_verified": False},
-        "direct_dev": {"success": False, "error": None, "db_verified": False},
-        "direct_prod": {"success": False, "error": None, "db_verified": False},
-    }
+    """Perform test scans for the current environment only and verify database."""
+    # Determine current environment
+    current_env = "dev" if IS_DEV else ("prod" if IS_PROD else "unknown")
     
-    # Initialize results for additional domains
-    for domain in ADDITIONAL_DOMAIN_LIST:
-        domain_key = domain.replace(".", "_").replace("-", "_")
-        results[f"worker_{domain_key}"] = {"success": False, "error": None, "db_verified": False}
+    if current_env == "unknown":
+        return {
+            "error": "Could not determine environment from PROJECT_ID",
+            "worker": {"success": False, "error": "Unknown environment", "db_verified": False},
+            "direct": {"success": False, "error": "Unknown environment", "db_verified": False}
+        }
+    
+    results = {}
+    
+    # Select URLs based on current environment
+    if current_env == "dev":
+        worker_url = CLOUDFLARE_WORKER_DEV_URL
+        gcp_url = GCP_FUNCTION_DEV_URL
+    else:  # prod
+        worker_url = CLOUDFLARE_WORKER_PROD_URL
+        gcp_url = GCP_FUNCTION_PROD_URL
     
     scan_time = datetime.now(timezone.utc)
     
-    # Test via Cloudflare Worker (dev)
+    # Test via Cloudflare Worker
     success, error, response_info = _perform_test_scan_worker(
-        CLOUDFLARE_WORKER_DEV_URL,
+        worker_url,
         TEST_LINK_ID,
-        "dev"
+        current_env
     )
-    results["worker_dev"]["success"] = success
-    results["worker_dev"]["error"] = error
-    results["worker_dev"]["response"] = response_info
+    results["worker"] = {
+        "success": success,
+        "error": error,
+        "response": response_info,
+        "db_verified": False
+    }
     
     if success:
         # Verify in database
@@ -416,101 +431,69 @@ def _perform_test_scans() -> Dict:
             "cloudflare_worker",
             scan_time
         )
-        results["worker_dev"]["db_verified"] = db_success
-        if db_success:
-            # Delete the hit after successful verification
-            _delete_hit(hit_ref)
-        else:
-            results["worker_dev"]["db_error"] = db_error
+        results["worker"]["db_verified"] = db_success
+        if not db_success:
+            results["worker"]["db_error"] = db_error
             _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
-                "environment": "dev",
+                "environment": current_env,
                 "link_id": TEST_LINK_ID
             })
     else:
         _log_error("cloudflare_worker", "test_scan", error or "Unknown error", {
-            "environment": "dev",
+            "environment": current_env,
             "link_id": TEST_LINK_ID
         })
     
-    # Test via Cloudflare Worker (prod)
-    success, error, response_info = _perform_test_scan_worker(
-        CLOUDFLARE_WORKER_PROD_URL,
-        TEST_LINK_ID,
-        "prod"
-    )
-    results["worker_prod"]["success"] = success
-    results["worker_prod"]["error"] = error
-    results["worker_prod"]["response"] = response_info
-    
-    if success:
-        # Verify in database
-        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
-            TEST_LINK_ID,
-            "cloudflare_worker",
-            scan_time
-        )
-        results["worker_prod"]["db_verified"] = db_success
-        if db_success:
-            # Delete the hit after successful verification
-            _delete_hit(hit_ref)
-        else:
-            results["worker_prod"]["db_error"] = db_error
-            _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
-                "environment": "prod",
-                "link_id": TEST_LINK_ID
-            })
-    else:
-        _log_error("cloudflare_worker", "test_scan", error or "Unknown error", {
-            "environment": "prod",
-            "link_id": TEST_LINK_ID
-        })
-    
-    # Test additional domains via Cloudflare Worker
-    for domain in ADDITIONAL_DOMAIN_LIST:
-        domain_key = domain.replace(".", "_").replace("-", "_")
-        domain_url = f"https://{domain}"
-        
-        success, error, response_info = _perform_test_scan_worker(
-            domain_url,
-            TEST_LINK_ID,
-            domain
-        )
-        results[f"worker_{domain_key}"]["success"] = success
-        results[f"worker_{domain_key}"]["error"] = error
-        results[f"worker_{domain_key}"]["response"] = response_info
-        
-        if success:
-            # Verify in database
-            db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
+    # Test additional domains via Cloudflare Worker (only in prod)
+    if current_env == "prod":
+        for domain in ADDITIONAL_DOMAIN_LIST:
+            domain_key = domain.replace(".", "_").replace("-", "_")
+            domain_url = f"https://{domain}"
+            
+            success, error, response_info = _perform_test_scan_worker(
+                domain_url,
                 TEST_LINK_ID,
-                "cloudflare_worker",
-                scan_time
+                domain
             )
-            results[f"worker_{domain_key}"]["db_verified"] = db_success
-            if db_success:
-                # Delete the hit after successful verification
-                _delete_hit(hit_ref)
+            results[f"worker_{domain_key}"] = {
+                "success": success,
+                "error": error,
+                "response": response_info,
+                "db_verified": False
+            }
+            
+            if success:
+                # Verify in database
+                db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
+                    TEST_LINK_ID,
+                    "cloudflare_worker",
+                    scan_time
+                )
+                results[f"worker_{domain_key}"]["db_verified"] = db_success
+                if not db_success:
+                    results[f"worker_{domain_key}"]["db_error"] = db_error
+                    _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
+                        "domain": domain,
+                        "link_id": TEST_LINK_ID
+                    })
             else:
-                results[f"worker_{domain_key}"]["db_error"] = db_error
-                _log_error("cloudflare_worker", "db_verification", db_error or "Unknown error", {
+                _log_error("cloudflare_worker", "test_scan", error or "Unknown error", {
                     "domain": domain,
                     "link_id": TEST_LINK_ID
                 })
-        else:
-            _log_error("cloudflare_worker", "test_scan", error or "Unknown error", {
-                "domain": domain,
-                "link_id": TEST_LINK_ID
-            })
     
-    # Test via Direct GCP Function (dev)
+    # Test via Direct GCP Function
     success, error, response_info = _perform_test_scan_direct(
-        GCP_FUNCTION_DEV_URL,
+        gcp_url,
         TEST_LINK_ID,
-        "dev"
+        current_env
     )
-    results["direct_dev"]["success"] = success
-    results["direct_dev"]["error"] = error
-    results["direct_dev"]["response"] = response_info
+    results["direct"] = {
+        "success": success,
+        "error": error,
+        "response": response_info,
+        "db_verified": False
+    }
     
     if success:
         # Verify in database
@@ -519,55 +502,17 @@ def _perform_test_scans() -> Dict:
             "direct",
             scan_time
         )
-        results["direct_dev"]["db_verified"] = db_success
-        if db_success:
-            # Delete the hit after successful verification
-            _delete_hit(hit_ref)
-        else:
-            results["direct_dev"]["db_error"] = db_error
+        results["direct"]["db_verified"] = db_success
+        if not db_success:
+            results["direct"]["db_error"] = db_error
             _log_error("gcp_function", "db_verification", db_error or "Unknown error", {
-                "environment": "dev",
+                "environment": current_env,
                 "link_id": TEST_LINK_ID,
                 "path": "direct"
             })
     else:
         _log_error("gcp_function", "test_scan", error or "Unknown error", {
-            "environment": "dev",
-            "link_id": TEST_LINK_ID,
-            "path": "direct"
-        })
-    
-    # Test via Direct GCP Function (prod)
-    success, error, response_info = _perform_test_scan_direct(
-        GCP_FUNCTION_PROD_URL,
-        TEST_LINK_ID,
-        "prod"
-    )
-    results["direct_prod"]["success"] = success
-    results["direct_prod"]["error"] = error
-    results["direct_prod"]["response"] = response_info
-    
-    if success:
-        # Verify in database
-        db_success, db_error, db_data, hit_ref = _verify_hit_in_database(
-            TEST_LINK_ID,
-            "direct",
-            scan_time
-        )
-        results["direct_prod"]["db_verified"] = db_success
-        if db_success:
-            # Delete the hit after successful verification
-            _delete_hit(hit_ref)
-        else:
-            results["direct_prod"]["db_error"] = db_error
-            _log_error("gcp_function", "db_verification", db_error or "Unknown error", {
-                "environment": "prod",
-                "link_id": TEST_LINK_ID,
-                "path": "direct"
-            })
-    else:
-        _log_error("gcp_function", "test_scan", error or "Unknown error", {
-            "environment": "prod",
+            "environment": current_env,
             "link_id": TEST_LINK_ID,
             "path": "direct"
         })
@@ -582,17 +527,18 @@ def health_monitor(request: Request):
     Checks health endpoints, performs test scans, and verifies database.
     
     Auth:
-      - Expects Firebase ID token in Authorization: Bearer <token>
+      - Frontend: Expects Firebase ID token in Authorization: Bearer <token>
+      - Cloud Scheduler: Identified by User-Agent header, IAM permissions validated by Cloud Functions
     """
     # Handle CORS preflight
     if request.method == "OPTIONS":
         return ("", 204, _cors_headers())
 
     try:
-        # Verify Firebase ID token
+        # Authenticate request (handles both Firebase ID tokens and Cloud Scheduler)
         try:
-            uid = _verify_firebase_token(request)
-            logger.info(f"Health monitor check authenticated for user: {uid}")
+            user_id = _authenticate_request(request)
+            logger.info(f"Health monitor check authenticated for: {user_id}")
         except Exception as e:
             logger.warning(f"Authentication failed: {str(e)}")
             return (jsonify({"error": f"Unauthorized: {str(e)}"}), 401, _cors_headers())
@@ -606,14 +552,19 @@ def health_monitor(request: Request):
         test_results = _perform_test_scans()
         
         # Compile summary
-        all_health_ok = all(r["success"] for r in health_results.values())
-        all_tests_ok = all(r["success"] for r in test_results.values())
-        all_db_verified = all(r.get("db_verified", False) for r in test_results.values())
+        # Filter out any error entries and get only actual check results
+        health_check_results = {k: v for k, v in health_results.items() if k != "error" and isinstance(v, dict) and "success" in v}
+        test_scan_results = {k: v for k, v in test_results.items() if k != "error" and isinstance(v, dict) and "success" in v}
+        
+        all_health_ok = all(r.get("success", False) for r in health_check_results.values()) if health_check_results else False
+        all_tests_ok = all(r.get("success", False) for r in test_scan_results.values()) if test_scan_results else False
+        all_db_verified = all(r.get("db_verified", False) for r in test_scan_results.values()) if test_scan_results else False
         
         overall_success = all_health_ok and all_tests_ok and all_db_verified
         
         result = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "environment": "dev" if IS_DEV else ("prod" if IS_PROD else "unknown"),
             "overall_success": overall_success,
             "health_checks": health_results,
             "test_scans": test_results,
@@ -626,6 +577,7 @@ def health_monitor(request: Request):
         
         if overall_success:
             logger.info("Health monitor check passed")
+            logger.info(f"Result: {result}")
             return (jsonify(result), 200, _cors_headers())
         else:
             logger.warning("Health monitor check failed", extra={"result": result})

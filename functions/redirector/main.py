@@ -283,41 +283,51 @@ def redirector(request: Request):
     owner_id     = data.get('owner_id')
     campaign_name = data.get("campaign_name")
 
+    # Detect if this is a health monitor test request
+    # Primary check: link_id pattern (most reliable - test links use "monitor-test-*" pattern)
+    # Secondary check: User-Agent header (backup, may not always be preserved through proxies)
+    is_test_data = (
+        link_id.startswith('monitor-test') or  # Primary: test link ID pattern
+        request.headers.get('User-Agent', '').startswith('HealthMonitor/')  # Secondary: health monitor user agent
+    )
+
     # --- Batch: update link (+ business, + campaign totals.hits) ---
-    try:
-        batch = _db.batch()
+    # Skip counter updates for test requests to prevent polluting production metrics
+    if not is_test_data:
+        try:
+            batch = _db.batch()
 
-        # link aggregates
-        print("Updating link hit count:", link_ref)
-        print("Link REF server timestamp:", SERVER_TIMESTAMP)
-        batch.update(link_ref, {
-            'hit_count': Increment(1),
-            'last_hit_at': SERVER_TIMESTAMP,
-        })
-
-        # business aggregates (per-customer overlay)
-        if isinstance(business_ref, firestore.DocumentReference) and owner_id:
-            # Update customer-specific business overlay instead of canonical business
-            business_id = business_ref.id
-            customer_business_ref = _db.collection('customers').document(owner_id).collection('businesses').document(business_id)
-            batch.set(customer_business_ref, {
+            # link aggregates
+            print("Updating link hit count:", link_ref)
+            print("Link REF server timestamp:", SERVER_TIMESTAMP)
+            batch.update(link_ref, {
                 'hit_count': Increment(1),
                 'last_hit_at': SERVER_TIMESTAMP,
-                'updated_at': SERVER_TIMESTAMP,
-            }, merge=True)
+            })
 
-        # campaign aggregates (totals.hits)
-        if isinstance(campaign_ref, firestore.DocumentReference):
-            batch.set(campaign_ref, {
-                'totals.hits': Increment(1),
-                'updated_at': SERVER_TIMESTAMP,
-                'last_hit_at': SERVER_TIMESTAMP,
-            }, merge=True)
+            # business aggregates (per-customer overlay)
+            if isinstance(business_ref, firestore.DocumentReference) and owner_id:
+                # Update customer-specific business overlay instead of canonical business
+                business_id = business_ref.id
+                customer_business_ref = _db.collection('customers').document(owner_id).collection('businesses').document(business_id)
+                batch.set(customer_business_ref, {
+                    'hit_count': Increment(1),
+                    'last_hit_at': SERVER_TIMESTAMP,
+                    'updated_at': SERVER_TIMESTAMP,
+                }, merge=True)
 
-        batch.commit()
-    except Exception:
-        # Never block redirect on aggregates
-        pass
+            # campaign aggregates (totals.hits)
+            if isinstance(campaign_ref, firestore.DocumentReference):
+                batch.set(campaign_ref, {
+                    'totals.hits': Increment(1),
+                    'updated_at': SERVER_TIMESTAMP,
+                    'last_hit_at': SERVER_TIMESTAMP,
+                }, merge=True)
+
+            batch.commit()
+        except Exception:
+            # Never block redirect on aggregates
+            pass
 
     # --- Build hit doc ---
     ua_str = request.headers.get('User-Agent', '') or ''
@@ -329,16 +339,6 @@ def redirector(request: Request):
 
     xff = request.headers.get('X-Forwarded-For', '')
     client_ip = _first_ip_from_xff(xff)
-
-    # Detect if this is a health monitor test request
-    # Primary check: link_id pattern (most reliable - test links use "monitor-test-*" pattern)
-    # Secondary check: User-Agent header (backup, may not always be preserved through proxies)
-    # Note: Health monitor deletes these hits after verification, but marking them helps with
-    # migration and allows filtering if deletion behavior changes in the future
-    is_test_data = (
-        link_id.startswith('monitor-test') or  # Primary: test link ID pattern
-        ua_str.startswith('HealthMonitor/')    # Secondary: health monitor user agent
-    )
 
     hit = {
         'link_id': link_id,
@@ -374,28 +374,31 @@ def redirector(request: Request):
     except Exception:
         ip_hash = None  # ensure defined if used later
     # write hit (never block)
+    # For test data, write to separate test_hits collection to avoid polluting production data
     try:
-        _db.collection('hits').add(hit)
+        if is_test_data:
+            _db.collection('test_hits').add(hit)
+        else:
+            _db.collection('hits').add(hit)
     except Exception:
         if LOG_HIT_ERRORS:
             import logging; logging.exception("Hit write failed")
 
     # Optional: first-seen unique IP per campaign (write-time aggregation)
-    try:
-        if ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
-            uniq_ref = campaign_ref.collection('unique_ips').document(ip_hash)
-            # create if not exists; increment totals.unique_ips only on first seen
-            unique_ip_data = {'first_seen': SERVER_TIMESTAMP}
-            # Mark as test data if the hit is test data
-            if is_test_data:
-                unique_ip_data['is_test_data'] = True
-            uniq_ref.create(unique_ip_data)
-            campaign_ref.set({'totals.unique_ips': Increment(1)}, merge=True)
-    except AlreadyExists:
-        pass  # already counted
-    except Exception:
-        # do not block redirect
-        pass
+    # Skip for test data to prevent polluting production metrics
+    if not is_test_data:
+        try:
+            if ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
+                uniq_ref = campaign_ref.collection('unique_ips').document(ip_hash)
+                # create if not exists; increment totals.unique_ips only on first seen
+                unique_ip_data = {'first_seen': SERVER_TIMESTAMP}
+                uniq_ref.create(unique_ip_data)
+                campaign_ref.set({'totals.unique_ips': Increment(1)}, merge=True)
+        except AlreadyExists:
+            pass  # already counted
+        except Exception:
+            # do not block redirect
+            pass
 
     # Redirect
     resp = redirect(destination, code=302)
