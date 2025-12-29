@@ -1,0 +1,65 @@
+# Migration Registry
+# This file tracks all database migrations and their execution status.
+# 
+# Migration Format:
+# - id: Unique identifier (YYYYMMDD_NNN format)
+# - name: Human-readable name
+# - script: Path to the migration script
+# - description: What the migration does
+# - created_date: When the migration was created
+# - status: pending | applied | rolled_back
+# - applied_date: When it was executed (if applied)
+# - applied_by: Who ran it (if applied)
+# - environments: List of environments where it was applied (dev, prod)
+# - dependencies: Other migration IDs that must run first
+# - reversible: Whether the migration can be rolled back
+
+migrations:
+  - id: "20241228_001"
+    name: "Delete Test Hits from Hits Collection"
+    script: "scripts/migrate_delete_test_hits.py"
+    description: "Removes test hits from hits collection after migrating to test_hits collection. Identifies test hits by link_id starting with 'monitor-test', is_test_data flag, or HealthMonitor user agent."
+    created_date: "2025-12-28"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+
+  - id: "20241228_002"
+    name: "Mark Test Data"
+    script: "scripts/mark_test_data.py"
+    description: "Marks existing test data documents with is_test_data: true flag across hits, links, campaigns, businesses, unique_ips, and customer_businesses collections."
+    created_date: "2025-12-28"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+
+  - id: "20241228_003"
+    name: "Migrate Schema v2"
+    script: "scripts/migrate_schema_v2.py"
+    description: "Migrates to schema version 2 with new reference structure. Migrates links and hits from source to destination database with new schema."
+    created_date: "2025-12-28"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+
+  - id: "20241228_004"
+    name: "Migrate Schema v1"
+    script: "scripts/migrate_schema_v1.py"
+    description: "Backfills Firestore schema to the new ownership model. Sets owner_id from old 'customer' label, ensures businesses have ownerIds array, and creates customer skeleton docs."
+    created_date: "2025-12-28"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+

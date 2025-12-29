@@ -264,5 +264,12 @@ gcloud scheduler jobs run health-monitor-dev \
 - Create the test link in Firestore
 - Verify HMAC secret is correct
 - Check that all endpoints are accessible
-- Verify Firestore permissions
+- Verify Firestore permissions allow read/write to `test_hits` collection
+
+**Test Data Isolation:**
+- Test hits are written to `test_hits` collection (not `hits` collection) to avoid polluting production data
+- Link and campaign counters are NOT updated for test requests (this is intentional)
+- Test link and campaign documents remain in normal collections (`links` and `campaigns`) but are marked with `is_test_data: true`
+- Frontend should filter out test links/campaigns when displaying data (only 2 documents to filter)
+- Test hits can be cleaned up independently via scripts if needed
 

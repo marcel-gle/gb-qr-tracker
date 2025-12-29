@@ -48,9 +48,11 @@ WARNING: Health monitor check failed {"result": {"overall_success": false, ...}}
 
 3. **Database Verification Failures:**
    ```
-   ERROR: [HEALTH_MONITOR_FAIL] cloudflare_worker - db_verification: No matching hit found in database | Details: {"environment": "dev", "link_id": "monitor-test-001"}
-   ERROR: [HEALTH_MONITOR_FAIL] gcp_function - db_verification: Link hit_count is 0, expected > 0 | Details: {"environment": "prod", "link_id": "monitor-test-001", "path": "direct"}
+   ERROR: [HEALTH_MONITOR_FAIL] cloudflare_worker - db_verification: No matching test hit found in test_hits collection | Details: {"environment": "dev", "link_id": "monitor-test-001"}
+   ERROR: [HEALTH_MONITOR_FAIL] gcp_function - db_verification: Link document monitor-test-001 not found | Details: {"environment": "prod", "link_id": "monitor-test-001", "path": "direct"}
    ```
+   
+   **Note:** Test hits are written to `test_hits` collection (not `hits`). Link counters are not checked since they're not updated for test requests.
 
 4. **Exceptions:**
    ```

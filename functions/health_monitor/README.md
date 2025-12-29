@@ -5,8 +5,10 @@ This Cloud Function monitors the health and functionality of the redirector syst
 2. Checking health endpoints for additional domains (e.g., ihr-brief.de, www.ihr-brief.de)
 3. Performing actual test redirect scans via both paths (Worker and Direct)
 4. Performing test scans for additional domains via Cloudflare Worker
-5. Verifying data is correctly written to Firestore
+5. Verifying data is correctly written to Firestore (test hits are written to `test_hits` collection)
 6. Logging errors for Cloud Monitoring alerts
+
+**Important**: Test hits are written to a separate `test_hits` collection to avoid polluting production data. Counter updates (link `hit_count`, campaign `totals.hits`, etc.) are skipped for test requests to keep production metrics accurate.
 
 ## Setup
 
@@ -263,8 +265,10 @@ Error logs include the component, check type, and error details for easy debuggi
 
 ### Database verification failures
 - Ensure the test link is active (`active: true`)
-- Check that Firestore permissions allow the function to read/write
-- Verify the hit was actually created (may take a few seconds)
+- Check that Firestore permissions allow the function to read/write to `test_hits` collection
+- Verify the hit was actually created in `test_hits` collection (may take a few seconds)
+- Note: Test hits are written to `test_hits` collection, not `hits` collection
+- Note: Link counters are not updated for test requests (this is intentional to avoid polluting production metrics)
 
 ### Timeout errors
 - Increase `REQUEST_TIMEOUT` in the code if network is slow
