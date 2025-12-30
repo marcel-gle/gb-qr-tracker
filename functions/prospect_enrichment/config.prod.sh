@@ -12,6 +12,7 @@ TRIGGER_ARGS=( )
 ENV_VARS=(
   "PROJECT_ID=$PROJECT_ID"
   'DATABASE_ID=(default)'
+  'PROSPECT_ENRICHMENT_DISABLED='  # Set to 'true' to disable the function
 )
 
 SECRETS=(

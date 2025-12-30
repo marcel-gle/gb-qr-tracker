@@ -901,6 +901,11 @@ def enrich_prospect(cloud_event):
     Triggered by: google.cloud.firestore.document.v1.created
     Event data shape: https://cloud.google.com/eventarc/docs/cloudevents#firestore
     """
+    # Check if function is disabled via environment variable
+    if os.environ.get("PROSPECT_ENRICHMENT_DISABLED", "").lower() in ("true", "1", "yes"):
+        logger.info("⏭️  Prospect enrichment is disabled via PROSPECT_ENRICHMENT_DISABLED environment variable")
+        return
+    
     function_start_time = time.time()
     logger.info("=" * 60)
     logger.info("PROSPECT ENRICHMENT FUNCTION TRIGGERED")
@@ -1023,6 +1028,18 @@ def enrich_prospect(cloud_event):
         
         hit_data = hit_doc.to_dict()
         logger.debug(f"Hit document fields: {list(hit_data.keys())}")
+        
+        # Skip health check hits
+        link_id = hit_data.get("link_id", "")
+        user_agent = hit_data.get("user_agent", "")
+        is_health_check = (
+            link_id.startswith('monitor-test') or
+            (user_agent and user_agent.startswith('HealthMonitor/'))
+        )
+        
+        if is_health_check:
+            logger.info(f"⏭️  Skipping health check hit: {hit_id} (link_id={link_id}, user_agent={user_agent[:50] if user_agent else 'N/A'})")
+            return
         
         # Extract owner_id and business_ref
         owner_id = hit_data.get("owner_id")
