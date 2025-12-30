@@ -1,3 +1,8 @@
+"""
+This script is used to scrape the imprint data from the website and enrich the CSV file from oceanio.com with the data.
+It uses the OpenAI API to extract the data.
+"""
+
 import os
 import csv
 import time

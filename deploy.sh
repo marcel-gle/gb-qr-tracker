@@ -64,6 +64,36 @@ case "${TRIGGER_KIND}" in
       CMD+=( "${TRIGGER_ARGS[@]}" )
     fi
     ;;
+  firestore)
+    : "${TRIGGER_EVENT:?missing TRIGGER_EVENT for firestore trigger}"
+    : "${TRIGGER_RESOURCE:?missing TRIGGER_RESOURCE for firestore trigger}"
+    # For Gen 2 Firestore triggers, use event-filters instead of trigger-event/resource
+    # Parse TRIGGER_RESOURCE to extract database and path pattern
+    # Format: projects/${PROJECT_ID}/databases/(default)/documents/hits/{document}
+    if [[ "${TRIGGER_RESOURCE}" =~ databases/([^/]+)/documents/(.+) ]]; then
+      DATABASE_NAME="${BASH_REMATCH[1]}"
+      PATH_PATTERN="${BASH_REMATCH[2]}"
+      # Convert {document} to {documentId} for path pattern (Gen 2 uses documentId)
+      # Use sed to replace {document} with {documentId} without escaping
+      PATH_PATTERN=$(echo "${PATH_PATTERN}" | sed 's/{document}/{documentId}/g')
+      
+      CMD+=( --trigger-event-filters="type=${TRIGGER_EVENT}" )
+      # Database filter is required - always include it
+      CMD+=( --trigger-event-filters="database=${DATABASE_NAME}" )
+      CMD+=( --trigger-event-filters-path-pattern="document=${PATH_PATTERN}" )
+      # Add trigger location if specified (for database location matching)
+      if [[ -n "${TRIGGER_LOCATION:-}" ]]; then
+        CMD+=( --trigger-location="${TRIGGER_LOCATION}" )
+      fi
+    else
+      echo "ERROR: Invalid TRIGGER_RESOURCE format: ${TRIGGER_RESOURCE}"
+      echo "Expected format: projects/.../databases/(default)/documents/hits/{document}"
+      exit 1
+    fi
+    if ((${#TRIGGER_ARGS[@]})); then
+      CMD+=( "${TRIGGER_ARGS[@]}" )
+    fi
+    ;;
   *)
     echo "Unknown TRIGGER_KIND='${TRIGGER_KIND}'"; exit 1;;
 esac
