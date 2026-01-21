@@ -8,6 +8,7 @@ import csv
 import time
 import json
 import re
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,12 +19,39 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from tqdm import tqdm
 
+# ---------------- Load environment variables from .env file ----------------
+
+# Try to load from .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    # Load .env from project root
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        load_dotenv()  # Try current directory
+except ImportError:
+    pass
+
 # ---------------- OpenAI client ----------------
 
-# Assumes OPENAI_API_KEY is set in your environment
+# Loads OPENAI_API_KEY from environment or .env file
 client = OpenAI()
 
 OPENAI_MODEL = "gpt-5-mini"  # use the model name you want to call
+
+# ---------------- Local ML Studio client for parsing ----------------
+
+# ML Studio typically runs on localhost:1234/v1
+# Can be overridden via ML_STUDIO_BASE_URL environment variable
+ML_STUDIO_BASE_URL = os.environ.get("ML_STUDIO_BASE_URL", "http://localhost:1234/v1")
+LOCAL_MODEL = "openai/gpt-oss-20b"  # ML Studio model name
+
+# Initialize local model client (no API key needed for local models)
+local_client = OpenAI(
+    base_url=ML_STUDIO_BASE_URL,
+    api_key="not-needed"  # ML Studio doesn't require a real API key
+)
 
 
 # ---------------- HTTP / scraping helpers ----------------
@@ -57,10 +85,25 @@ def fetch_url(url: str) -> Optional[requests.Response]:
 
 
 def best_base_url(domain: str) -> Optional[str]:
+    """
+    Normalize a domain (which may already include scheme/path) and
+    return the first reachable base URL (https or http).
+    """
     domain = domain.strip()
     if not domain:
         return None
 
+    # If domain already includes a scheme, strip it
+    if domain.startswith("http://"):
+        domain = domain[len("http://") :]
+    elif domain.startswith("https://"):
+        domain = domain[len("https://") :]
+
+    # Strip everything after the host (paths, query, etc.)
+    # e.g. "www.example.com/impressum/" -> "www.example.com"
+    domain = domain.split("/")[0].rstrip("/")
+
+    # Try https first, then http
     for scheme in ("https://", "http://"):
         url = scheme + domain
         resp = fetch_url(url)
@@ -101,6 +144,8 @@ def find_imprint_url(base_html: str, base_url: str) -> Optional[str]:
         "/imprint.html",
         "/kontakt",
         "/kontakt/",
+        "/kontakt/impressum/",
+        "/kontakt/impressum"
     ]
     for path in common_paths:
         url = urljoin(base_url, path)
@@ -263,6 +308,267 @@ Remember: respond with a single JSON object only, using the exact schema describ
     return data
 
 
+# ---------------- GPT parsing for existing data ----------------
+
+PARSE_ADDRESS_SYSTEM_PROMPT = """
+You are an assistant that parses German address strings into structured components.
+
+Your job:
+- Take a German address string (which may be incomplete or in various formats)
+- Extract and return structured components: street name, house number, postal code, and city
+- Handle common German address formats and variations
+
+Output rules:
+- Always respond with a single valid JSON object only, no explanation text.
+- Use this exact JSON structure:
+
+{
+  "street": "string or null",
+  "house_number": "string or null",
+  "postcode": "string or null",
+  "city": "string or null"
+}
+
+Notes:
+- "street" should contain only the street name (e.g., "Beethovenstr.", "Lange Gasse", "Maaßenstraße")
+- "house_number" should contain only the house number (e.g., "4", "19", "13a", "19-21")
+- "postcode" should contain only the 5-digit postal code (e.g., "86368", "85139", "10777")
+- "city" should contain only the city name (e.g., "Gersthofen", "Wettstetten", "Berlin")
+- If a component cannot be determined, set it to null
+- Do not include country names in the city field
+- Handle addresses with or without commas, with various separators
+""".strip()
+
+
+PARSE_NAME_SYSTEM_PROMPT = """
+You are an assistant that parses German person names into structured components.
+
+Your job:
+- Take a German person name string (which may include titles, salutations, or be in various formats)
+- Extract and return: first name (Vorname), last name (Nachname), and salutation (Herr/Frau)
+- Handle common German name formats and variations
+
+Output rules:
+- Always respond with a single valid JSON object only, no explanation text.
+- Use this exact JSON structure:
+
+{
+  "vorname": "string or null",
+  "nachname": "string or null",
+  "salutation": "Herr" or "Frau" or null
+}
+
+Notes:
+- "vorname" (first name): Extract the person's given/first name
+- "nachname" (last name): Extract the person's family name/surname
+- "salutation": Determine if it's "Herr" (male) or "Frau" (female) based on:
+  * Explicit salutation in the text ("Herr", "Frau")
+  * First name gender patterns (if no explicit salutation)
+  * Set to null if gender cannot be determined
+- Handle formats like:
+  * "Herr Max Mustermann" → vorname: "Max", nachname: "Mustermann", salutation: "Herr"
+  * "Frau Anna Schmidt" → vorname: "Anna", nachname: "Schmidt", salutation: "Frau"
+  * "Dr. Marcus Bysikiewicz" → vorname: "Marcus", nachname: "Bysikiewicz", salutation: null
+  * "Antje Seidel" → vorname: "Antje", nachname: "Seidel", salutation: null (or "Frau" if name suggests female)
+  * "Haselhorst, Kathola" → vorname: "Kathola", nachname: "Haselhorst", salutation: null
+- Remove titles like "Dr.", "Prof.", "Prof. Dr." before parsing
+- If only one name part is available, prefer it as the last name
+""".strip()
+
+
+def call_local_model_for_address_parsing(full_address: str) -> Dict[str, Optional[str]]:
+    """
+    Use local ML Studio model to parse a full address string into structured components.
+    This is a lightweight call that only parses the provided string.
+    """
+    user_prompt = f"""
+Parse this German address string into structured components:
+
+Address: "{full_address}"
+
+Remember: respond with a single JSON object only, using the exact schema described in the system prompt.
+""".strip()
+
+    # Enforce GPT concurrency limit via semaphore
+    content = None
+    with GPT_SEMAPHORE:
+        try:
+            response = local_client.chat.completions.create(
+                model=LOCAL_MODEL,
+                temperature=0.3,  # Lower temperature for more consistent parsing
+                messages=[
+                    {"role": "system", "content": PARSE_ADDRESS_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            content = response.choices[0].message.content
+            print(f"  [DEBUG] Local model address parsing response: {content[:200]}...")  # Print first 200 chars
+            
+            # Try to extract JSON from the response (might be wrapped in markdown code blocks)
+            content_clean = content.strip()
+            
+            # Remove markdown code blocks if present
+            if content_clean.startswith("```json"):
+                content_clean = content_clean[7:]  # Remove ```json
+            elif content_clean.startswith("```"):
+                content_clean = content_clean[3:]  # Remove ```
+            
+            if content_clean.endswith("```"):
+                content_clean = content_clean[:-3]  # Remove closing ```
+            
+            content_clean = content_clean.strip()
+            
+            # Try to find JSON object in the response (handle nested objects)
+            # Look for opening brace followed by content including "street" field
+            brace_count = 0
+            start_idx = content_clean.find('{')
+            if start_idx != -1:
+                for i in range(start_idx, len(content_clean)):
+                    if content_clean[i] == '{':
+                        brace_count += 1
+                    elif content_clean[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            # Found complete JSON object
+                            content_clean = content_clean[start_idx:i+1]
+                            break
+            
+            data = json.loads(content_clean)
+            return {
+                "street": data.get("street"),
+                "house_number": data.get("house_number"),
+                "postcode": data.get("postcode"),
+                "city": data.get("city")
+            }
+        except json.JSONDecodeError as e:
+            print(f"  ⚠ Local model address parsing failed (JSON decode error): {e}")
+            if content:
+                print(f"  [DEBUG] Raw response was: {content[:500]}")
+            return {
+                "street": None,
+                "house_number": None,
+                "postcode": None,
+                "city": None
+            }
+        except Exception as e:
+            print(f"  ⚠ Local model address parsing failed: {e}")
+            print(f"  [DEBUG] Error type: {type(e).__name__}")
+            if content:
+                print(f"  [DEBUG] Response content: {content[:500]}")
+            if hasattr(e, 'response'):
+                print(f"  [DEBUG] Error response: {e.response}")
+            return {
+                "street": None,
+                "house_number": None,
+                "postcode": None,
+                "city": None
+            }
+
+
+def call_gpt_for_address_parsing(full_address: str) -> Dict[str, Optional[str]]:
+    """
+    Legacy function name - now uses local model.
+    Use local ML Studio model to parse a full address string into structured components.
+    """
+    return call_local_model_for_address_parsing(full_address)
+
+
+def call_local_model_for_name_parsing(md_string: str) -> Dict[str, Optional[str]]:
+    """
+    Use local ML Studio model to parse a managing director name string into structured components.
+    This is a lightweight call that only parses the provided string.
+    """
+    user_prompt = f"""
+Parse this German person name into structured components:
+
+Name: "{md_string}"
+
+Remember: respond with a single JSON object only, using the exact schema described in the system prompt.
+""".strip()
+
+    # Enforce GPT concurrency limit via semaphore
+    content = None
+    with GPT_SEMAPHORE:
+        try:
+            response = local_client.chat.completions.create(
+                model=LOCAL_MODEL,
+                temperature=0.3,  # Lower temperature for more consistent parsing
+                messages=[
+                    {"role": "system", "content": PARSE_NAME_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            content = response.choices[0].message.content
+            print(f"  [DEBUG] Local model name parsing response: {content[:200]}...")  # Print first 200 chars
+            
+            # Try to extract JSON from the response (might be wrapped in markdown code blocks)
+            content_clean = content.strip()
+            
+            # Remove markdown code blocks if present
+            if content_clean.startswith("```json"):
+                content_clean = content_clean[7:]  # Remove ```json
+            elif content_clean.startswith("```"):
+                content_clean = content_clean[3:]  # Remove ```
+            
+            if content_clean.endswith("```"):
+                content_clean = content_clean[:-3]  # Remove closing ```
+            
+            content_clean = content_clean.strip()
+            
+            # Try to find JSON object in the response (handle nested objects)
+            # Look for opening brace followed by content including "vorname" field
+            brace_count = 0
+            start_idx = content_clean.find('{')
+            if start_idx != -1:
+                for i in range(start_idx, len(content_clean)):
+                    if content_clean[i] == '{':
+                        brace_count += 1
+                    elif content_clean[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            # Found complete JSON object
+                            content_clean = content_clean[start_idx:i+1]
+                            break
+            
+            data = json.loads(content_clean)
+            return {
+                "vorname": data.get("vorname"),
+                "nachname": data.get("nachname"),
+                "salutation": data.get("salutation")
+            }
+        except json.JSONDecodeError as e:
+            print(f"  ⚠ Local model name parsing failed (JSON decode error): {e}")
+            if content:
+                print(f"  [DEBUG] Raw response was: {content[:500]}")
+            return {
+                "vorname": None,
+                "nachname": None,
+                "salutation": None
+            }
+        except Exception as e:
+            print(f"  ⚠ Local model name parsing failed: {e}")
+            print(f"  [DEBUG] Error type: {type(e).__name__}")
+            if content:
+                print(f"  [DEBUG] Response content: {content[:500]}")
+            if hasattr(e, 'response'):
+                print(f"  [DEBUG] Error response: {e.response}")
+            return {
+                "vorname": None,
+                "nachname": None,
+                "salutation": None
+            }
+
+
+def call_gpt_for_name_parsing(md_string: str) -> Dict[str, Optional[str]]:
+    """
+    Legacy function name - now uses local model.
+    Use local ML Studio model to parse a managing director name string into structured components.
+    """
+    return call_local_model_for_name_parsing(md_string)
+
+
 # ---------------- CSV enrichment logic ----------------
 
 COL_COMPANY = "Company"
@@ -294,6 +600,39 @@ def address_incomplete(addr: str) -> bool:
     if not any(ch.isdigit() for ch in addr):
         return True
     return False
+
+
+def parse_address_into_components(full_address: str) -> Dict[str, Optional[str]]:
+    """
+    Parse a full address string into structured components using local ML Studio model.
+    Returns dict with keys: street, house_number, postcode, city
+    """
+    if not full_address or len(full_address.strip()) < 10:
+        return {
+            "street": None,
+            "house_number": None,
+            "postcode": None,
+            "city": None
+        }
+    
+    # Use local model for parsing
+    return call_local_model_for_address_parsing(full_address)
+
+
+def parse_managing_director_name(md_string: str) -> Dict[str, Optional[str]]:
+    """
+    Parse managing director name string into Vorname, Nachname, Salutation using local ML Studio model.
+    Returns dict with keys: vorname, nachname, salutation
+    """
+    if not md_string or not md_string.strip():
+        return {
+            "vorname": None,
+            "nachname": None,
+            "salutation": None
+        }
+    
+    # Use local model for parsing
+    return call_local_model_for_name_parsing(md_string)
 
 
 def process_row(
@@ -334,6 +673,65 @@ def process_row(
     phone = (row.get(COL_PHONE) or "").strip()
     email = (row.get(COL_EMAIL) or "").strip()
 
+    # NEW: Try to parse existing full address into structured components
+    row = row.copy()  # Work on a copy
+    updated = False
+    
+    if addr and (not addr_street or not addr_house or not addr_postcode or not addr_city):
+        print(f"  [{row_idx}] Parsing existing full address using local ML Studio model...")
+        # Use local model for parsing
+        parsed_addr = parse_address_into_components(addr)
+        
+        # Apply parsed results
+        if parsed_addr["street"] and not addr_street:
+            row[COL_ADDRESS_STREET] = parsed_addr["street"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted street → {parsed_addr['street']}")
+        if parsed_addr["house_number"] and not addr_house:
+            row[COL_ADDRESS_HOUSE_NUMBER] = parsed_addr["house_number"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted house number → {parsed_addr['house_number']}")
+        if parsed_addr["postcode"] and not addr_postcode:
+            row[COL_ADDRESS_POSTCODE] = parsed_addr["postcode"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted postcode → {parsed_addr['postcode']}")
+        if parsed_addr["city"] and not addr_city:
+            row[COL_ADDRESS_CITY] = parsed_addr["city"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted city → {parsed_addr['city']}")
+        
+        # Update local variables after parsing
+        addr_street = row.get(COL_ADDRESS_STREET, "").strip()
+        addr_house = row.get(COL_ADDRESS_HOUSE_NUMBER, "").strip()
+        addr_postcode = row.get(COL_ADDRESS_POSTCODE, "").strip()
+        addr_city = row.get(COL_ADDRESS_CITY, "").strip()
+    
+    # NEW: Try to parse existing managing director name into structured fields
+    if md and (not md_vorname or not md_nachname or not md_salutation):
+        print(f"  [{row_idx}] Parsing existing managing director name using local ML Studio model...")
+        # Use local model for parsing
+        parsed_name = parse_managing_director_name(md)
+        
+        # Apply parsed results
+        if parsed_name["vorname"] and not md_vorname:
+            row[COL_MD_VORNAME] = parsed_name["vorname"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted Vorname → {parsed_name['vorname']}")
+        if parsed_name["nachname"] and not md_nachname:
+            row[COL_MD_NACHNAME] = parsed_name["nachname"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted Nachname → {parsed_name['nachname']}")
+        if parsed_name["salutation"] and not md_salutation:
+            row[COL_MD_SALUTATION] = parsed_name["salutation"]
+            updated = True
+            print(f"  [{row_idx}] ✔ Extracted Salutation → {parsed_name['salutation']}")
+        
+        # Update local variables after parsing
+        md_vorname = row.get(COL_MD_VORNAME, "").strip()
+        md_nachname = row.get(COL_MD_NACHNAME, "").strip()
+        md_salutation = row.get(COL_MD_SALUTATION, "").strip()
+
+    # Continue with existing logic...
     need_addr = address_incomplete(addr)
     need_addr_street = not addr_street
     need_addr_house = not addr_house
@@ -348,8 +746,12 @@ def process_row(
     need_email = not email
 
     if not any([need_addr, need_addr_street, need_addr_house, need_addr_postcode, need_addr_city, need_md, need_md_vorname, need_md_nachname, need_md_salutation, need_legal, need_phone, need_email]):
-        print(f"  [{row_idx}] Nothing relevant missing → skipping GPT call.")
-        return (row_idx, row, False)
+        if updated:
+            print(f"  [{row_idx}] Local parsing completed, no GPT imprint call needed.")
+            return (row_idx, row, True)
+        else:
+            print(f"  [{row_idx}] Nothing relevant missing → skipping GPT call.")
+            return (row_idx, row, False)
 
     # Get imprint text (cached per domain, thread-safe)
     imprint_text = None

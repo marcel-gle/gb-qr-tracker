@@ -81,6 +81,12 @@ export default {
     // 4) Build the upstream request to your Google Cloud Function
     const upstream = new URL(env.BACKEND_FUNCTION_URL);  // ← Changed: now reads from env
     upstream.searchParams.set("id", id);
+    
+    // Forward utm_test parameter if present (for test request detection)
+    const utmTest = url.searchParams.get("utm_test");
+    if (utmTest) {
+      upstream.searchParams.set("utm_test", utmTest);
+    }
 
     // Pass context headers that may help backend logging/analytics
     const headers = new Headers(request.headers);

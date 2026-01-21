@@ -76,8 +76,8 @@ def _json(req: Request) -> Dict:
     except Exception:
         return {}
 
-def _verify_firebase_token(req: Request) -> str:
-    """Returns caller uid or raises."""
+def _verify_firebase_token(req: Request):
+    """Returns (caller uid, decoded token) or raises."""
     if fb_auth is None:
         raise PermissionError("Auth not configured on server (firebase_admin missing).")
     authz = req.headers.get("Authorization", "")
@@ -85,7 +85,7 @@ def _verify_firebase_token(req: Request) -> str:
         raise PermissionError("Missing bearer token.")
     id_token = authz.split(" ", 1)[1].strip()
     decoded = fb_auth.verify_id_token(id_token, check_revoked=True)
-    return decoded["uid"]
+    return decoded["uid"], decoded
 
 def _delete_in_batches(doc_refs: List[firestore.DocumentReference]):
     batch = db.batch()
@@ -231,7 +231,7 @@ def delete_campaign(request: Request):
 
     # 1) Auth
     try:
-        uid = _verify_firebase_token(request)
+        uid, decoded_token = _verify_firebase_token(request)
     except Exception as e:
         return (f"Unauthorized: {e}", 401)
 
@@ -253,7 +253,8 @@ def delete_campaign(request: Request):
     if not camp_snap.exists:
         return (json.dumps({"ok": True, "message": "Campaign not found (already deleted?)"}), 200)
     owner_id = camp_snap.get("owner_id")
-    if owner_id and owner_id != uid:
+    is_admin = bool(decoded_token.get("isAdmin", False))
+    if owner_id and owner_id != uid and not is_admin:
         return ("Forbidden: not your campaign", 403)
 
     # 3) Plan

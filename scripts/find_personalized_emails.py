@@ -21,27 +21,70 @@ import os
 import sys
 import time
 import json
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
-def get_access_token(client_id: str, client_secret: str) -> str:
+# Request timeout in seconds
+REQUEST_TIMEOUT = 30  # 30 seconds timeout for each request
+
+
+# Configure requests session with retry strategy
+def create_session() -> requests.Session:
+    """Create a requests session with retry strategy and timeouts."""
+    session = requests.Session()
+    
+    # Retry strategy: retry on connection errors, 5xx errors, etc.
+    retry_strategy = Retry(
+        total=3,  # Total number of retries
+        backoff_factor=1,  # Wait 1s, 2s, 4s between retries
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these status codes
+        allowed_methods=["GET", "POST"]  # Only retry GET and POST
+    )
+    
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    return session
+
+
+# Global session
+session = create_session()
+
+
+def get_access_token(client_id: str, client_secret: str, max_retries: int = 3) -> str:
     """
-    Get OAuth access token for Snov.io.
+    Get OAuth access token for Snov.io with retry logic.
     """
-    params = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }
-    res = requests.post("https://api.snov.io/v1/oauth/access_token", data=params)
-    res.raise_for_status()
-    data = res.json()
-    return data["access_token"]
+    for attempt in range(max_retries):
+        try:
+            params = {
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }
+            res = session.post(
+                "https://api.snov.io/v1/oauth/access_token",
+                data=params,
+                timeout=REQUEST_TIMEOUT
+            )
+            res.raise_for_status()
+            data = res.json()
+            return data["access_token"]
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                print(f"  ⚠️  Token request failed (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise RuntimeError(f"Failed to get access token after {max_retries} attempts: {e}")
 
 
 def extract_domain_from_string(value: str) -> str:
@@ -84,7 +127,8 @@ def infer_domain_for_row(row, domain_col: Optional[str], website_col: Optional[s
 def start_email_search(
     rows: List[Dict[str, str]],
     token: str,
-    webhook_url: Optional[str] = None
+    webhook_url: Optional[str] = None,
+    max_retries: int = 3
 ) -> str:
     """
     Start an email search task using Snov.io emails-by-domain-by-name endpoint.
@@ -93,6 +137,7 @@ def start_email_search(
         rows: List of dicts with 'first_name', 'last_name', 'domain'
         token: Snov.io access token
         webhook_url: Optional webhook URL for instant results
+        max_retries: Maximum number of retry attempts
     
     Returns:
         task_hash: Unique ID for the search task
@@ -111,21 +156,48 @@ def start_email_search(
     if webhook_url:
         payload["webhook_url"] = webhook_url
     
-    res = requests.post(url, data=json.dumps(payload), headers=headers)
-    res.raise_for_status()
-    data = res.json()
-    
-    task_hash = data["data"]["task_hash"]
-    return task_hash
+    for attempt in range(max_retries):
+        try:
+            res = session.post(
+                url,
+                data=json.dumps(payload),
+                headers=headers,
+                timeout=REQUEST_TIMEOUT
+            )
+            
+            # Handle 401 Unauthorized (token expired)
+            if res.status_code == 401:
+                raise requests.exceptions.HTTPError("Token expired or invalid (401)")
+            
+            res.raise_for_status()
+            data = res.json()
+            
+            task_hash = data["data"]["task_hash"]
+            return task_hash
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"  ⚠️  Request timeout (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"  ⚠️  Request failed (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise
 
 
-def get_email_search_result(task_hash: str, token: str) -> Dict:
+def get_email_search_result(task_hash: str, token: str, max_retries: int = 3) -> Dict:
     """
     Get the result of an email search task.
     
     Args:
         task_hash: Unique ID for the search task
         token: Snov.io access token
+        max_retries: Maximum number of retry attempts
     
     Returns:
         Response data with status and results
@@ -140,12 +212,44 @@ def get_email_search_result(task_hash: str, token: str) -> Dict:
         "task_hash": task_hash
     }
     
-    res = requests.get(url, params=params, headers=headers)
-    res.raise_for_status()
-    return res.json()
+    for attempt in range(max_retries):
+        try:
+            res = session.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT
+            )
+            
+            # Handle 401 Unauthorized (token expired)
+            if res.status_code == 401:
+                raise requests.exceptions.HTTPError("Token expired or invalid (401)")
+            
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"  ⚠️  Request timeout (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"  ⚠️  Request failed (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise
 
 
-def wait_for_results(task_hash: str, token: str, max_wait_time: int = 600, poll_interval: int = 1) -> Dict:
+def wait_for_results(
+    task_hash: str,
+    token: str,
+    max_wait_time: int = 600,
+    poll_interval: int = 1,
+    token_refresh_func: Optional[Callable[[], str]] = None
+) -> Dict:
     """
     Poll the result endpoint until the task is completed.
     
@@ -154,34 +258,51 @@ def wait_for_results(task_hash: str, token: str, max_wait_time: int = 600, poll_
         token: Snov.io access token
         max_wait_time: Maximum time to wait in seconds (default: 10 minutes)
         poll_interval: Time between polls in seconds (default: 1 second)
+        token_refresh_func: Optional function to refresh token if it expires
     
     Returns:
         Final result data
     """
     start_time = time.time()
     last_status_print = 0
+    current_token = token
     
     while True:
-        result = get_email_search_result(task_hash, token)
-        status = result.get("status", "unknown")
-        
-        if status == "completed":
-            return result
-        elif status == "not_enough_credits":
-            raise RuntimeError("Not enough credits in Snov.io account")
-        elif status == "in_progress":
+        try:
+            result = get_email_search_result(task_hash, current_token)
+            status = result.get("status", "unknown")
+            
+            if status == "completed":
+                return result
+            elif status == "not_enough_credits":
+                raise RuntimeError("Not enough credits in Snov.io account")
+            elif status == "in_progress":
+                elapsed = time.time() - start_time
+                if elapsed > max_wait_time:
+                    raise TimeoutError(f"Task {task_hash} did not complete within {max_wait_time} seconds")
+                
+                # Only print status every 5 seconds to reduce verbosity
+                if elapsed - last_status_print >= 5:
+                    print(f"  ⏳ Waiting... ({int(elapsed)}s elapsed)")
+                    last_status_print = elapsed
+                
+                time.sleep(poll_interval)
+            else:
+                raise RuntimeError(f"Unknown status: {status}")
+        except requests.exceptions.HTTPError as e:
+            if "401" in str(e) and token_refresh_func:
+                print(f"  🔄 Token expired, refreshing...")
+                current_token = token_refresh_func()
+                print(f"  ✅ Token refreshed, continuing...")
+                continue
+            raise
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
+            # Retry the poll request
             elapsed = time.time() - start_time
             if elapsed > max_wait_time:
-                raise TimeoutError(f"Task {task_hash} did not complete within {max_wait_time} seconds")
-            
-            # Only print status every 5 seconds to reduce verbosity
-            if elapsed - last_status_print >= 5:
-                print(f"  ⏳ Waiting... ({int(elapsed)}s elapsed)")
-                last_status_print = elapsed
-            
+                raise TimeoutError(f"Task {task_hash} did not complete within {max_wait_time} seconds due to network errors")
+            print(f"  ⚠️  Network error during poll, retrying in {poll_interval}s...")
             time.sleep(poll_interval)
-        else:
-            raise RuntimeError(f"Unknown status: {status}")
 
 
 def extract_email_from_result(result_data: Dict, first_name: str, last_name: str) -> Optional[str]:
@@ -306,9 +427,15 @@ def process_csv_with_personalized_emails(
     token = get_access_token(client_id, client_secret)
     print("✅ Token obtained\n")
     
+    # Create token refresh function
+    def refresh_token():
+        return get_access_token(client_id, client_secret)
+    
     # Process one row at a time
     processed = 0
     total_credits_used = 0
+    consecutive_errors = 0
+    max_consecutive_errors = 5
     
     for row_num, row_info in enumerate(rows_to_process, 1):
         first_name = row_info["first_name"]
@@ -329,11 +456,16 @@ def process_csv_with_personalized_emails(
         total_credits_used += 1
         
         try:
+            # Refresh token if we've processed many rows (tokens typically expire after 1 hour)
+            if processed > 0 and processed % 100 == 0:
+                print("  🔄 Refreshing token (preventive)...")
+                token = refresh_token()
+            
             # Start the search
             task_hash = start_email_search(api_rows, token, webhook_url)
             
-            # Wait for results
-            result = wait_for_results(task_hash, token)
+            # Wait for results (with token refresh capability)
+            result = wait_for_results(task_hash, token, token_refresh_func=refresh_token)
             
             # Extract email and update dataframe
             result_data = result.get("data", [])
@@ -346,15 +478,41 @@ def process_csv_with_personalized_emails(
                 print(f"  ⚠️  No email found")
             
             processed += 1
+            consecutive_errors = 0  # Reset error counter on success
             
             # Save progress periodically
             if row_num % save_interval == 0 or row_num == len(rows_to_process):
                 df.to_csv(csv_path, index=False, encoding=encoding, sep=delimiter)
                 print(f"  💾 Progress saved ({processed}/{len(rows_to_process)} rows processed, {total_credits_used} credits used)")
         
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            consecutive_errors += 1
+            print(f"  ❌ Network error: {e}")
+            
+            if consecutive_errors >= max_consecutive_errors:
+                print(f"  🛑 Too many consecutive errors ({consecutive_errors}), saving progress and exiting...")
+                df.to_csv(csv_path, index=False, encoding=encoding, sep=delimiter)
+                print(f"  💾 Progress saved. You can restart the script to continue from where it left off.")
+                sys.exit(1)
+            
+            print(f"  ⚠️  Continuing with next row... (error count: {consecutive_errors}/{max_consecutive_errors})")
+            # Don't count this as a processed row since it failed
+            total_credits_used -= 1
+            continue
+        
         except Exception as e:
+            consecutive_errors += 1
             print(f"  ❌ Error: {e}")
-            print(f"  ⚠️  Continuing with next row...")
+            
+            if consecutive_errors >= max_consecutive_errors:
+                print(f"  🛑 Too many consecutive errors ({consecutive_errors}), saving progress and exiting...")
+                df.to_csv(csv_path, index=False, encoding=encoding, sep=delimiter)
+                print(f"  💾 Progress saved. You can restart the script to continue from where it left off.")
+                sys.exit(1)
+            
+            print(f"  ⚠️  Continuing with next row... (error count: {consecutive_errors}/{max_consecutive_errors})")
+            # Don't count this as a processed row since it failed
+            total_credits_used -= 1
             continue
         
         # Wait 1 second before next API call (except for the last row)

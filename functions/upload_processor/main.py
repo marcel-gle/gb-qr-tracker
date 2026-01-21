@@ -11,6 +11,7 @@ import os
 import json
 import csv
 import re
+import urllib.parse
 from typing import Optional, Tuple, List, Set, Dict, Iterable
 from datetime import datetime, timezone
 
@@ -125,6 +126,72 @@ def remove_tld_suffix(domain_id: str) -> str:
             return result if result else domain_id  # Don't return empty string
     
     return domain_id
+
+
+def _normalize_domain_for_id(value: Optional[str]) -> str:
+    """
+    Normalize a Domain/URL-like value into a short, clean slug for use as base_id.
+
+    Examples:
+    - "https://bildungundberuf.com/kursliste?utm_source=kursnet" -> "bildungundberuf"
+    - "https://www.hz-bb.de" -> "hz-bb"
+    - "http://alfatraining.de/" -> "alfatraining"
+    - "www.weiterbildungsinstitut.de/path" -> "weiterbildungsinstitut"
+
+    Strategy:
+    - Try to parse as URL, extract hostname, strip leading "www.".
+    - Use tldextract to get the registrable domain core when possible.
+    - Fall back to sanitizing the raw value.
+    - In all cases, run through remove_tld_suffix to strip trailing TLD parts like "-de", "-com".
+    """
+    if not value:
+        return ""
+
+    raw = str(value).strip().lower()
+    if not raw:
+        return ""
+
+    host_candidate = None
+    text = raw
+
+    # Heuristic: if there is no scheme, prepend http:// so urlparse can extract netloc
+    if "://" not in text:
+        # Handle typical "www.example.de/..." or "example.de/path"
+        if text.startswith("www.") or "." in text or "/" in text:
+            text = f"http://{text}"
+
+    try:
+        parsed = urllib.parse.urlparse(text)
+    except Exception:
+        parsed = None
+
+    if parsed:
+        netloc = parsed.netloc or ""
+        path = parsed.path or ""
+
+        # Prefer netloc; if missing (e.g. "example.de/path" without scheme), fall back to path
+        if netloc:
+            host_candidate = netloc
+        elif path:
+            # Take first path segment as host-like component
+            host_candidate = path.split("/", 1)[0]
+
+    if host_candidate:
+        # Strip port if any
+        host_candidate = host_candidate.split(":", 1)[0]
+        # Strip leading www.
+        if host_candidate.startswith("www."):
+            host_candidate = host_candidate[4:]
+
+        # Use tldextract to get the registrable domain core when possible
+        ext = tldextract.extract(host_candidate)
+        core = ext.domain or host_candidate
+        slug = sanitize_id(core)
+        return remove_tld_suffix(slug)
+
+    # Fallback: sanitize the raw string and strip common TLD suffixes
+    slug = sanitize_id(raw)
+    return remove_tld_suffix(slug)
 
 
 def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
@@ -760,8 +827,8 @@ def assign_links_from_business_file(path: str, base_url: str,
         
         using_domain_column = False
         if domain_from_row and domain_from_row.strip():
-            # Use Domain column as base_id if present
-            base_id = domain_from_row
+            # Use Domain column as base_id if present, but normalize URL/domain first
+            base_id = _normalize_domain_for_id(domain_from_row)
             using_domain_column = True
             print("DEBUG using Domain column as base_id:", base_id)
         elif campaign_code_from_business:
@@ -882,16 +949,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                 biz_ref = COL_BUSINESSES.document(biz_id)
                 current_biz_id = biz_id  # Store for error tracking
 
-                # Upsert canonical business document
+                # Upsert canonical business document (always, for address data)
                 batch.set(biz_ref, {**canonical_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
-                batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
-
-                # Upsert customer-specific overlay
-                customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
-                batch.set(customer_business_ref, {
-                    "business_ref": biz_ref,
-                    **customer_payload
-                }, merge=True); ops += 1
 
                 # target
                 target_ref = campaign_ref.collection('targets').document()
@@ -922,7 +981,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                 print("DEBUG target_payload:", target_payload)
                 print("DEBUG dest:", dest)
 
-                if dest:
+                # Only create links, update ownerIds, and create customer overlay if destination exists
+                # This prevents creating overlays for businesses without tracking links
+                if dest and final_id and final_id.strip():
                     # Try to create link with final_id. If a rare race hits, retry once with the next suffix.
                     try:
                         print(f"Creating link with ID: {final_id}")
@@ -943,6 +1004,17 @@ def assign_links_from_business_file(path: str, base_url: str,
                         })
                         ops += 1
                         created_links += 1
+                        
+                        # Only add ownerId to ownerIds array and create customer overlay if link was created
+                        # This ensures data consistency: owners in ownerIds always have links
+                        batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
+                        
+                        # Upsert customer-specific overlay (only when link exists)
+                        customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
+                        batch.set(customer_business_ref, {
+                            "business_ref": biz_ref,
+                            **customer_payload
+                        }, merge=True); ops += 1
                     except AlreadyExists:
                         # Recompute suffix (another worker probably grabbed our final_id)
                         print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
@@ -976,6 +1048,17 @@ def assign_links_from_business_file(path: str, base_url: str,
                         ops += 1
                         created_links += 1
                         final_id = retry_id             # make sure output uses the actual created ID
+                        
+                        # Only add ownerId to ownerIds array and create customer overlay if link was created
+                        # This ensures data consistency: owners in ownerIds always have links
+                        batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
+                        
+                        # Upsert customer-specific overlay (only when link exists)
+                        customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
+                        batch.set(customer_business_ref, {
+                            "business_ref": biz_ref,
+                            **customer_payload
+                        }, merge=True); ops += 1
 
                 # write back tracking info + template into the row
                 if dest and final_id:
@@ -1284,6 +1367,22 @@ def _extract_clean_business_name(business_name: Optional[str]) -> Optional[str]:
     result = re.sub(r'-{2,}', '-', result).strip('-')
 
     return result if result else None
+
+
+if __name__ == "__main__":
+    # Simple local sanity checks for _normalize_domain_for_id
+    samples = [
+        "https://bildungundberuf.com/kursliste?utm_source=kursnet&utm_campaign=kursnet",
+        "https://www.hz-bb.de",
+        "http://alfatraining.de/",
+        "https://www.weiterbildungsinstitut.de/path",
+        "https-bildungundberuf-com-kursliste-utm-source-kursnet-utm-campaign-kursnet-utm-medium-link-kurs-utm-term-e-4244-kurs-fuer-arbeitssuchende-e-4244",
+        "https-www-hz-bb",
+        "http-www-weiterbildungsinstitut",
+    ]
+    print("Sanity check for _normalize_domain_for_id:")
+    for s in samples:
+        print(f"  {s!r} -> {_normalize_domain_for_id(s)!r}")
 
 
 

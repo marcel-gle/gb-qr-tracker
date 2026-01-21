@@ -283,13 +283,19 @@ def redirector(request: Request):
     owner_id     = data.get('owner_id')
     campaign_name = data.get("campaign_name")
 
-    # Detect if this is a health monitor test request
+    # Detect if this is a test request (health monitor or manual test)
     # Primary check: link_id pattern (most reliable - test links use "monitor-test-*" pattern)
     # Secondary check: User-Agent header (backup, may not always be preserved through proxies)
+    # Tertiary check: utm_test query parameter (for manual browser-based testing)
     is_test_data = (
         link_id.startswith('monitor-test') or  # Primary: test link ID pattern
-        request.headers.get('User-Agent', '').startswith('HealthMonitor/')  # Secondary: health monitor user agent
+        request.headers.get('User-Agent', '').startswith('HealthMonitor/') or  # Secondary: health monitor user agent
+        request.args.get('utm_test') == 'true'  # Tertiary: manual test via UTM parameter
     )
+    
+    # Log test requests for debugging
+    if is_test_data:
+        print(f"[TEST REQUEST] link_id={link_id}, utm_test={request.args.get('utm_test')}, user_agent={request.headers.get('User-Agent', '')[:50]}")
 
     # --- Batch: update link (+ business, + campaign totals.hits) ---
     # Skip counter updates for test requests to prevent polluting production metrics
@@ -329,64 +335,58 @@ def redirector(request: Request):
             # Never block redirect on aggregates
             pass
 
-    # --- Build hit doc ---
-    ua_str = request.headers.get('User-Agent', '') or ''
-    ua = parse_ua(ua_str)
-    dev = _device_type(ua)
-    browser = f"{ua.browser.family} {ua.browser.version_string}".strip()
-    os_str = f"{ua.os.family} {ua.os.version_string}".strip()
-    referer = request.headers.get('Referer')
-
-    xff = request.headers.get('X-Forwarded-For', '')
-    client_ip = _first_ip_from_xff(xff)
-
-    hit = {
-        'link_id': link_id,
-        'campaign_ref': campaign_ref,
-        'business_ref': business_ref,
-        'target_ref': target_ref,
-        'owner_id': owner_id,
-        'template_id': template_id,
-        'ts': SERVER_TIMESTAMP,
-        'user_agent': ua_str[:1024],
-        'device_type': dev,
-        'ua_browser': browser[:128],
-        'ua_os': os_str[:128],
-        "campaign_name": campaign_name,
-        "hit_origin": source, #shows if it is from link or qr code
-    }
-    
-    # Mark test data from health monitor
-    if is_test_data:
-        hit['is_test_data'] = True
-    if referer:
-        hit['referer'] = referer[:512]
-
-    # Optional geo + ip hash (no raw IP stored)
-    try:
-        if client_ip and not _is_private_ip(client_ip):
-            geo = _lookup_geo(client_ip)
-            if geo:
-                hit.update({k: v for k, v in geo.items() if v is not None})
-            ip_hash = _hash_ip(client_ip)
-            if ip_hash:
-                hit['ip_hash'] = ip_hash
-    except Exception:
-        ip_hash = None  # ensure defined if used later
-    # write hit (never block)
-    # For test data, write to separate test_hits collection to avoid polluting production data
-    try:
-        if is_test_data:
-            _db.collection('test_hits').add(hit)
-        else:
-            _db.collection('hits').add(hit)
-    except Exception:
-        if LOG_HIT_ERRORS:
-            import logging; logging.exception("Hit write failed")
-
-    # Optional: first-seen unique IP per campaign (write-time aggregation)
-    # Skip for test data to prevent polluting production metrics
+    # --- Build hit doc (skip for test requests) ---
+    # Test requests redirect but don't create hit documents
     if not is_test_data:
+        ua_str = request.headers.get('User-Agent', '') or ''
+        ua = parse_ua(ua_str)
+        dev = _device_type(ua)
+        browser = f"{ua.browser.family} {ua.browser.version_string}".strip()
+        os_str = f"{ua.os.family} {ua.os.version_string}".strip()
+        referer = request.headers.get('Referer')
+
+        xff = request.headers.get('X-Forwarded-For', '')
+        client_ip = _first_ip_from_xff(xff)
+
+        hit = {
+            'link_id': link_id,
+            'campaign_ref': campaign_ref,
+            'business_ref': business_ref,
+            'target_ref': target_ref,
+            'owner_id': owner_id,
+            'template_id': template_id,
+            'ts': SERVER_TIMESTAMP,
+            'user_agent': ua_str[:1024],
+            'device_type': dev,
+            'ua_browser': browser[:128],
+            'ua_os': os_str[:128],
+            "campaign_name": campaign_name,
+            "hit_origin": source, #shows if it is from link or qr code
+        }
+        
+        if referer:
+            hit['referer'] = referer[:512]
+
+        # Optional geo + ip hash (no raw IP stored)
+        try:
+            if client_ip and not _is_private_ip(client_ip):
+                geo = _lookup_geo(client_ip)
+                if geo:
+                    hit.update({k: v for k, v in geo.items() if v is not None})
+                ip_hash = _hash_ip(client_ip)
+                if ip_hash:
+                    hit['ip_hash'] = ip_hash
+        except Exception:
+            ip_hash = None  # ensure defined if used later
+        
+        # Write hit (never block)
+        try:
+            _db.collection('hits').add(hit)
+        except Exception:
+            if LOG_HIT_ERRORS:
+                import logging; logging.exception("Hit write failed")
+
+        # Optional: first-seen unique IP per campaign (write-time aggregation)
         try:
             if ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
                 uniq_ref = campaign_ref.collection('unique_ips').document(ip_hash)
