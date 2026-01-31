@@ -1,8 +1,9 @@
 FUNCTION_NAME="upload_processor"
 ENTRY_POINT="process_business_upload"
 RUNTIME="python311"
-MEMORY="1GiB"
-TIMEOUT="540s"
+# Increased resources for large CSVs / heavy Firestore usage
+MEMORY="2Gi"
+TIMEOUT="1800s"  # 30 minutes
 
 TRIGGER_KIND="bucket"
 BUCKET_NAME="gb-qr-tracker.firebasestorage.app"   # <- adjust if different

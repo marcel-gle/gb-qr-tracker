@@ -1,8 +1,8 @@
 FUNCTION_NAME="delete_campaign"
 ENTRY_POINT="delete_campaign"
 RUNTIME="python311"
-MEMORY="1GiB"
-TIMEOUT="900s"
+MEMORY="2Gi"
+TIMEOUT="1800s"  # 30 minutes
 
 TRIGGER_KIND="http"
 TRIGGER_ARGS=( )   # add --allow-unauthenticated if needed

@@ -1,0 +1,19 @@
+## Google Docs → Canva migration function dependencies
+
+# Cloud Functions HTTP framework
+functions-framework==3.5.0
+Flask==3.0.3
+
+# Google APIs / auth
+google-api-python-client==2.154.0
+google-auth==2.37.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+
+# HTTP client
+requests==2.32.3
+
+# Local env loading (for local_server.py only)
+python-dotenv==1.0.1
+
+

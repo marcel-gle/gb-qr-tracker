@@ -21,6 +21,30 @@ from google.cloud.firestore_v1 import ArrayUnion
 from google.api_core.exceptions import AlreadyExists
 import functions_framework  # <- add this import
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# #region agent log helper
+def _agent_log(hypothesis_id: str, location: str, message: str, data: Dict):
+    """
+    Lightweight debug logger for agent-driven debugging.
+    Writes NDJSON lines to .cursor/debug.log inside the workspace.
+    """
+    payload = {
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data or {},
+        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+    }
+    try:
+        log_path = "/Users/marcelgleich/Desktop/Software/gb-qr-tracker/.cursor/debug.log"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        # Never let logging break the function
+        pass
+# #endregion agent log helper
 try:
     # Preferred public path in recent releases
     from google.cloud.firestore_v1.field_path import FieldPath
@@ -46,6 +70,12 @@ DEFAULT_MAPBOX_TOKEN = os.environ.get("MAPBOX_TOKEN")          # optional fallba
 
 # Instantiate Firestore client once (outside handler)
 db = firestore.Client(project=PROJECT_ID, database=DATABASE_ID)
+_agent_log(
+    hypothesis_id="H1",
+    location="upload_processor:firestore_client",
+    message="Firestore client initialized",
+    data={"project_id": PROJECT_ID, "database_id": DATABASE_ID},
+)
 COL_LINKS = db.collection('links')
 COL_BUSINESSES = db.collection('businesses')
 COL_CAMPAIGNS = db.collection('campaigns')
@@ -204,6 +234,7 @@ def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
     """
     base_id = (base_id or "").strip()
     if not base_id:
+        print("[DEBUG existing_variants_for_base] empty base_id received, returning empty set")
         return set()
 
     # Build DocumentReference bounds
@@ -213,6 +244,8 @@ def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
     # Field path for document id
     fp = FieldPath.document_id() if FieldPath else "__name__"
 
+    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - building query")
+
     # Query only IDs (tiny payload)
     q = (
         COL_LINKS
@@ -221,7 +254,13 @@ def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
         .select([])                 # no fields, just names
     )
 
-    return {doc.id for doc in q.stream()}
+    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - starting stream()")
+    taken_ids: set[str] = set()
+    for doc in q.stream():
+        taken_ids.add(doc.id)
+    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - finished stream(), count={len(taken_ids)}")
+
+    return taken_ids
 
 
 def next_id_from_cache(base_id: str, taken: set[str]) -> str:
@@ -484,6 +523,13 @@ def get_or_create_campaign(owner_id: str,
     if not campaign_id:
         raise RuntimeError("campaignId is required but missing")
 
+    _agent_log(
+        hypothesis_id="H2",
+        location="upload_processor:get_or_create_campaign:entry",
+        message="Entering get_or_create_campaign",
+        data={"owner_id": owner_id, "campaign_id": campaign_id, "code": code},
+    )
+
     code_norm = sanitize_id(code).upper() if code else None
 
     # Check if any other campaign already has this code
@@ -511,6 +557,12 @@ def get_or_create_campaign(owner_id: str,
         }
         ref.set(payload)
         print(f"[campaign] Created campaign with ID {campaign_id}")
+        _agent_log(
+            hypothesis_id="H2",
+            location="upload_processor:get_or_create_campaign",
+            message="Created new campaign document",
+            data={"campaign_id": campaign_id, "owner_id": owner_id, "code_norm": code_norm},
+        )
     else:
         data = snap.to_dict() or {}
         existing_code = data.get("code")
@@ -521,6 +573,12 @@ def get_or_create_campaign(owner_id: str,
         if not existing_code and code_norm:
             ref.set({"code": code_norm, "updated_at": firestore.SERVER_TIMESTAMP}, merge=True)
         print(f"[campaign] Using existing campaign with ID {campaign_id}")
+        _agent_log(
+            hypothesis_id="H2",
+            location="upload_processor:get_or_create_campaign",
+            message="Using existing campaign document",
+            data={"campaign_id": campaign_id, "owner_id": owner_id, "existing_code": existing_code},
+        )
 
     return ref
 
@@ -652,32 +710,34 @@ from collections import defaultdict
 
 def assign_final_ids(precomputed: List[Dict]) -> None:
     """
-    For each unique base_id in precomputed, load existing Firestore variants once
-    and assign a collision-free final_id (base or base-<n>) to each item.
-    Mutates items in-place: item['final_id'] = ...
-    """
-    # Group rows by base
-    groups = defaultdict(list)
-    for item in precomputed:
-        if item.get("in_limit") and item.get("dest"):
-            base = item.get("base_id") or ""
-            groups[base].append(item)
+    Assign a provisional final_id for each item based on its base_id.
 
-    # For each base, query existing variants once, then allocate final IDs
-    for base_id, items in groups.items():
+    We no longer pre-scan Firestore for existing variants here, to avoid
+    long-running range queries. Instead we:
+    - Use base_id (or a 'link' fallback) as the initial final_id.
+    - Rely on Firestore's AlreadyExists error in the link-creation path
+      to detect and resolve rare collisions by allocating a new suffix.
+    This keeps the function responsive even when Firestore scans are slow.
+    """
+    total_items = len(precomputed)
+    print(f"[DEBUG assign_final_ids] total_items={total_items}")
+
+    for idx, item in enumerate(precomputed):
+        if not (item.get("in_limit") and item.get("dest")):
+            # Nothing to assign for skipped/blacklisted/out-of-limit rows
+            continue
+
+        base_id = (item.get("base_id") or "").strip()
         if not base_id:
-            # Ensure empty base_id gets a fallback
             base_id = "link"
-            print(f"[warn] Empty base_id in assign_final_ids, using fallback: 'link'")
-        taken = existing_variants_for_base(COL_LINKS, base_id)
-        for item in items:
-            item["final_id"] = next_id_from_cache(base_id, taken)
-            # Double-check: ensure final_id is never empty
-            if not item["final_id"] or not item["final_id"].strip():
-                fallback_id = f"link-{len(taken) + 1}"
-                print(f"[warn] final_id was empty for base_id '{base_id}', using fallback: '{fallback_id}'")
-                item["final_id"] = fallback_id
-                taken.add(fallback_id)
+            print(f"[warn] Empty base_id in assign_final_ids at index={idx}, using fallback: 'link'")
+
+        # Use the base_id directly as the initial final_id.
+        # If this collides with an existing link, the link-creation code
+        # will catch AlreadyExists and allocate a new suffix.
+        item["final_id"] = base_id
+
+    print("[DEBUG assign_final_ids] finished assigning provisional final_ids")
 
 
 
@@ -757,6 +817,12 @@ def assign_links_from_business_file(path: str, base_url: str,
     # How will I handle this if I use business ids from email?
     campaign_ref = get_or_create_campaign(ownerId, campaign_id, campaign_name, campaign_code)
     print("Using campaign ref id:", campaign_ref.id)
+    _agent_log(
+        hypothesis_id="H3",
+        location="upload_processor:assign_links_from_business_file:campaign_ref",
+        message="Campaign reference resolved",
+        data={"campaign_ref_id": campaign_ref.id, "owner_id": ownerId, "campaign_code": campaign_code},
+    )
 
     geo_cache: Dict[str, Dict] = {}
 
@@ -880,7 +946,9 @@ def assign_links_from_business_file(path: str, base_url: str,
             "blacklisted": False
         })
 
+    print(f"[DEBUG assign_links_from_business_file] built precomputed list, len={len(precomputed)} - BEFORE assign_final_ids")
     assign_final_ids(precomputed)
+    print("[DEBUG assign_links_from_business_file] assign_final_ids finished")
 
     print("Precomputed", precomputed[:3])
     print("Len precomputed:", len(precomputed))
@@ -952,15 +1020,78 @@ def assign_links_from_business_file(path: str, base_url: str,
                 # Upsert canonical business document (always, for address data)
                 batch.set(biz_ref, {**canonical_payload, "created_at": firestore.SERVER_TIMESTAMP}, merge=True); ops += 1
 
-                # target
+                # target + link handling
                 target_ref = campaign_ref.collection('targets').document()
                 status = "validated" if dest else "excluded"
                 snapshot = snapshot_mailing_from_row(row, business_name)
 
-                # reference to link doc (by final_id)
-                # FIX: Only create link_ref if dest exists AND final_id is valid (not empty)
-                link_ref = COL_LINKS.document(final_id) if (dest and final_id and final_id.strip()) else None
+                # Link reference will be filled after successful link creation (if any)
+                link_ref = None
 
+                # Only create links, update ownerIds, and create customer overlay if destination exists.
+                # This prevents creating overlays for businesses without tracking links.
+                if dest and final_id and final_id.strip():
+                    # Common payload shared between base ID and any retry suffix.
+                    base_link_payload = {
+                        "campaign_ref": campaign_ref,
+                        "business_ref": biz_ref,
+                        "target_ref": target_ref,
+                        "destination": dest,
+                        "template_id": template_with_qr_suffix(template_raw),
+                        "active": True,
+                        "hit_count": 0,
+                        "created_at": firestore.SERVER_TIMESTAMP,
+                        "last_hit_at": None,
+                        "owner_id": ownerId,
+                        "snapshot_mailing": snapshot,
+                        "campaign_name": campaign_name,
+                    }
+
+                    # Try to create link with final_id via a direct create() so that
+                    # AlreadyExists is raised here (not deferred to batch.commit()).
+                    try:
+                        print(f"Creating link with ID: {final_id}")
+                        link_ref = COL_LINKS.document(final_id)
+                        link_ref.create({
+                            **base_link_payload,
+                            "short_code": final_id,   # mirror the human-readable ID
+                        })
+                        created_links += 1
+                    except AlreadyExists:
+                        # Link with this ID already exists -> allocate a new suffix-based ID.
+                        print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
+                        base = item.get("base_id") or final_id or "link"
+                        if not base or not base.strip():
+                            base = "link"
+                            print(f"[warn] Empty base in retry logic, using fallback: 'link'")
+                        taken = existing_variants_for_base(COL_LINKS, base)
+                        retry_id = next_id_from_cache(base, taken)
+
+                        # Double-check retry_id is not empty
+                        if not retry_id or not retry_id.strip():
+                            retry_id = f"link-{len(taken) + 1}"
+                            print(f"[warn] retry_id was empty, using fallback: '{retry_id}'")
+
+                        print(f"Creating link with retry ID: {retry_id}")
+                        link_ref = COL_LINKS.document(retry_id)
+                        link_ref.create({
+                            **base_link_payload,
+                            "short_code": retry_id,
+                        })
+                        created_links += 1
+                        final_id = retry_id             # make sure output and targets use the actual created ID
+
+                    # At this point, a link doc definitely exists (either base_id or suffixed),
+                    # so grant the user access to the business and upsert the customer overlay.
+                    batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
+
+                    customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
+                    batch.set(customer_business_ref, {
+                        "business_ref": biz_ref,
+                        **customer_payload
+                    }, merge=True); ops += 1
+
+                # Build and persist the target document, now that link_ref/final_id are settled.
                 target_payload = {
                     "business_ref": biz_ref,
                     "status": "linked" if dest else status,
@@ -973,92 +1104,13 @@ def assign_links_from_business_file(path: str, base_url: str,
                 }
                 batch.set(target_ref, target_payload); ops += 1
                 created_targets += 1
-                
+
                 # Track excluded rows (no destination)
                 if not dest:
                     excluded_no_destination += 1
 
                 print("DEBUG target_payload:", target_payload)
                 print("DEBUG dest:", dest)
-
-                # Only create links, update ownerIds, and create customer overlay if destination exists
-                # This prevents creating overlays for businesses without tracking links
-                if dest and final_id and final_id.strip():
-                    # Try to create link with final_id. If a rare race hits, retry once with the next suffix.
-                    try:
-                        print(f"Creating link with ID: {final_id}")
-                        batch.create(COL_LINKS.document(final_id), {
-                            "campaign_ref": campaign_ref,
-                            "business_ref": biz_ref,
-                            "target_ref": target_ref,
-                            "destination": dest,
-                            "template_id": template_with_qr_suffix(template_raw),
-                            "short_code": final_id,   # mirror the human-readable ID
-                            "active": True,
-                            "hit_count": 0,
-                            "created_at": firestore.SERVER_TIMESTAMP,
-                            "last_hit_at": None,
-                            "owner_id": ownerId,
-                            "snapshot_mailing": snapshot,
-                            "campaign_name": campaign_name,
-                        })
-                        ops += 1
-                        created_links += 1
-                        
-                        # Only add ownerId to ownerIds array and create customer overlay if link was created
-                        # This ensures data consistency: owners in ownerIds always have links
-                        batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
-                        
-                        # Upsert customer-specific overlay (only when link exists)
-                        customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
-                        batch.set(customer_business_ref, {
-                            "business_ref": biz_ref,
-                            **customer_payload
-                        }, merge=True); ops += 1
-                    except AlreadyExists:
-                        # Recompute suffix (another worker probably grabbed our final_id)
-                        print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
-                        base = item.get("base_id") or final_id or "link"
-                        if not base or not base.strip():
-                            base = "link"
-                            print(f"[warn] Empty base in retry logic, using fallback: 'link'")
-                        taken = existing_variants_for_base(COL_LINKS, base)
-                        retry_id = next_id_from_cache(base, taken)
-                        
-                        # Double-check retry_id is not empty
-                        if not retry_id or not retry_id.strip():
-                            retry_id = f"link-{len(taken) + 1}"
-                            print(f"[warn] retry_id was empty, using fallback: '{retry_id}'")
-
-                        batch.create(COL_LINKS.document(retry_id), {
-                            "campaign_ref": campaign_ref,
-                            "business_ref": biz_ref,
-                            "target_ref": target_ref,
-                            "destination": dest,
-                            "template_id": template_with_qr_suffix(template_raw),
-                            "short_code": retry_id,
-                            "active": True,
-                            "hit_count": 0,
-                            "created_at": firestore.SERVER_TIMESTAMP,
-                            "last_hit_at": None,
-                            "owner_id": ownerId,
-                            "snapshot_mailing": snapshot,
-                            "campaign_name": campaign_name,
-                        })
-                        ops += 1
-                        created_links += 1
-                        final_id = retry_id             # make sure output uses the actual created ID
-                        
-                        # Only add ownerId to ownerIds array and create customer overlay if link was created
-                        # This ensures data consistency: owners in ownerIds always have links
-                        batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
-                        
-                        # Upsert customer-specific overlay (only when link exists)
-                        customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
-                        batch.set(customer_business_ref, {
-                            "business_ref": biz_ref,
-                            **customer_payload
-                        }, merge=True); ops += 1
 
                 # write back tracking info + template into the row
                 if dest and final_id:
@@ -1150,6 +1202,19 @@ def assign_links_from_business_file(path: str, base_url: str,
     }
 
     print(f"Done. created_links={created_links} created_targets={created_targets} skipped={skipped} errors={errors} blacklisted={blacklisted_count}")
+    _agent_log(
+        hypothesis_id="H4",
+        location="upload_processor:assign_links_from_business_file:summary",
+        message="Finished assign_links_from_business_file",
+        data={
+            "created_links": created_links,
+            "created_targets": created_targets,
+            "skipped": skipped,
+            "errors": errors,
+            "blacklisted": blacklisted_count,
+            "total_rows": total_rows,
+        },
+    )
     
     return {
         "output_path": out_path,
@@ -1529,6 +1594,22 @@ def process_business_upload(cloud_event):
         out_path = result["output_path"]
         statistics = result["statistics"]
         processing_end = result.get("processing_end", datetime.now(timezone.utc))
+
+        _agent_log(
+            hypothesis_id="H5",
+            location="upload_processor:process_business_upload:after_assign",
+            message="assign_links_from_business_file completed",
+            data={
+                "campaign_id": params.get("campaign_id"),
+                "ownerId": ownerId,
+                "stats": {
+                    "created_links": statistics.get("created_links"),
+                    "created_targets": statistics.get("created_targets"),
+                    "errors": statistics.get("errors"),
+                },
+                "out_path": out_path,
+            },
+        )
 
         # Upload output next to input (same folder), with suffix
         out_name = os.path.basename(out_path)

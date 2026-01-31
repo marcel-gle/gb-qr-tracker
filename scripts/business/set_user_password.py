@@ -1,5 +1,6 @@
 # pip install firebase-admin
 
+import argparse
 from typing import Optional
 import firebase_admin
 from firebase_admin import credentials, auth, initialize_app
@@ -81,24 +82,40 @@ def set_user_password(
 
 
 if __name__ == "__main__":
-    # Example usage - modify these values as needed
-    USER_UID = "fte5unf7g4S3IJb0kgZAbhUxYm02"  # Replace with actual UID
-    NEW_PASSWORD = "98a4verw4fAREF3k29a2sr4"  # Replace with desired password
-    ENVIRONMENT = "prod"  # Use "dev" or "prod"
+    parser = argparse.ArgumentParser(
+        description="Set or overwrite the password for a Firebase user."
+    )
+    parser.add_argument(
+        "--uid",
+        required=True,
+        help="Firebase Auth UID of the user.",
+    )
+    parser.add_argument(
+        "--password",
+        required=True,
+        help="New password to set for the user.",
+    )
+    parser.add_argument(
+        "--env",
+        choices=["dev", "prod"],
+        default="dev",
+        help="Environment: dev or prod (default: dev).",
+    )
+    args = parser.parse_args()
 
     print("=" * 60)
     print("SET USER PASSWORD")
     print("=" * 60)
-    print(f"User UID: {USER_UID}")
-    print(f"Environment: {ENVIRONMENT.upper()}")
+    print(f"User UID: {args.uid}")
+    print(f"Environment: {args.env.upper()}")
     print("=" * 60)
     print()
 
     try:
         updated_user = set_user_password(
-            uid=USER_UID,
-            new_password=NEW_PASSWORD,
-            environment=ENVIRONMENT
+            uid=args.uid,
+            new_password=args.password,
+            environment=args.env,
         )
         print()
         print("=" * 60)
@@ -107,6 +124,10 @@ if __name__ == "__main__":
         print(f"User email: {updated_user.email}")
         print(f"User UID: {updated_user.uid}")
         print("Password has been updated.")
+        print()
+        print("Credentials set:")
+        print(f"  User ID: {updated_user.uid}")
+        print(f"  Password: {args.password}")
         print("=" * 60)
     except Exception as e:
         print()
