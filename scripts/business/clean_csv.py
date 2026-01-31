@@ -70,14 +70,22 @@ def process_csv(input_path: Path, output_path: Path) -> dict:
     
     stats = {
         "total_rows": 0,
+        # Total duplicates removed (for backwards compatibility / pipeline summary)
         "duplicates_removed": 0,
+        # More detailed breakdown
+        "duplicates_removed_exact_name": 0,
+        "duplicates_removed_address_name_prefix": 0,
         "plz_fixed": 0,
         "plz_removed_letters": 0,
         "plz_added_leading_zero": 0,
         "rows_written": 0,
     }
     
+    # Track seen names globally (backwards-compatible behavior)
     seen_nameszeile = set()
+    # Track names per composite address key for simple fuzzy-ish dedup
+    # address_key -> set of normalized names seen at this address
+    seen_by_address: dict[str, set[str]] = {}
     rows_to_write = []
     
     with input_path.open("r", encoding="utf-8-sig", newline="") as infile:
@@ -95,17 +103,56 @@ def process_csv(input_path: Path, output_path: Path) -> dict:
             raise ValueError("Column 'Namenszeile' not found in CSV header.")
         if "PLZ" not in fieldnames:
             raise ValueError("Column 'PLZ' not found in CSV header.")
+        if "Straße" not in fieldnames and "Strasse" not in fieldnames:
+            raise ValueError("Column 'Straße' (or 'Strasse') not found in CSV header.")
+        if "Hausnummer" not in fieldnames:
+            raise ValueError("Column 'Hausnummer' not found in CSV header.")
         
         for row in reader:
             stats["total_rows"] += 1
             
-            # Check for duplicate Namenszeile
-            nameszeile = (row.get(nameszeile_col) or "").strip()
-            if nameszeile in seen_nameszeile:
+            # Normalize name for deduplication
+            raw_name = (row.get(nameszeile_col) or "").strip()
+            normalized_name = raw_name.lower()
+            
+            # Global exact duplicate check by name (previous behavior)
+            if raw_name in seen_nameszeile:
                 stats["duplicates_removed"] += 1
+                stats["duplicates_removed_exact_name"] += 1
                 continue  # Skip duplicate
             
-            seen_nameszeile.add(nameszeile)
+            # Build simple composite address key for fast, local deduplication
+            plz_raw = row.get("PLZ") or ""
+            street_raw = row.get("Straße") or row.get("Strasse") or ""
+            hausnummer_raw = row.get("Hausnummer") or ""
+
+            # Use normalized PLZ in the key so "01234" and "1234" match
+            normalized_plz_for_key, _ = normalize_plz(plz_raw)
+            street_for_key = re.sub(r"\s+", " ", street_raw.strip()).upper()
+            hausnummer_for_key = hausnummer_raw.strip().replace(" ", "").upper()
+
+            address_key = f"{normalized_plz_for_key}|{street_for_key}|{hausnummer_for_key}"
+
+            # Simple, fast "fuzzy" dedup within the same address:
+            # treat as duplicate if the shorter name is a prefix of the longer one
+            is_address_duplicate = False
+            address_names = seen_by_address.get(address_key)
+            if address_names:
+                for existing_name in address_names:
+                    if existing_name.startswith(normalized_name) or normalized_name.startswith(existing_name):
+                        is_address_duplicate = True
+                        break
+            
+            if is_address_duplicate:
+                stats["duplicates_removed"] += 1
+                stats["duplicates_removed_address_name_prefix"] += 1
+                continue  # Skip duplicate at same address
+
+            # Mark this name as seen globally and for this specific address
+            seen_nameszeile.add(raw_name)
+            if address_key not in seen_by_address:
+                seen_by_address[address_key] = set()
+            seen_by_address[address_key].add(normalized_name)
             
             # Fix PLZ
             plz_value = row.get("PLZ") or ""
@@ -139,14 +186,21 @@ def print_statistics(stats: dict) -> None:
     print("\n" + "=" * 60)
     print("PROCESSING STATISTICS")
     print("=" * 60)
-    print(f"Total rows read:           {stats['total_rows']}")
-    print(f"Duplicate rows removed:   {stats['duplicates_removed']}")
-    print(f"Rows written:             {stats['rows_written']}")
+    print(f"Total rows read:                    {stats['total_rows']}")
+    print(f"Duplicate rows removed (total):     {stats['duplicates_removed']}")
+    # Only print detailed breakdown if keys are present (for forwards compatibility)
+    exact = stats.get("duplicates_removed_exact_name", 0)
+    addr_prefix = stats.get("duplicates_removed_address_name_prefix", 0)
+    if exact or addr_prefix:
+        print("  Breakdown:")
+        print(f"    Exact name duplicates:          {exact}")
+        print(f"    Same-address name-prefix dupes: {addr_prefix}")
+    print(f"Rows written:                        {stats['rows_written']}")
     print()
     print("PLZ Column Fixes:")
-    print(f"  Total PLZ values fixed:      {stats['plz_fixed']}")
-    print(f"  Leading zeros added:         {stats['plz_added_leading_zero']}")
-    print(f"  Letters removed:             {stats['plz_removed_letters']}")
+    print(f"  Total PLZ values fixed:           {stats['plz_fixed']}")
+    print(f"  Leading zeros added:              {stats['plz_added_leading_zero']}")
+    print(f"  Letters removed:                  {stats['plz_removed_letters']}")
     print("=" * 60)
 
 

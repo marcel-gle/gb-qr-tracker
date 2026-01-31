@@ -82,9 +82,9 @@ def set_user_password(
 
 if __name__ == "__main__":
     # Example usage - modify these values as needed
-    USER_UID = "Panugay5HYQ6WzyiBvUB5E3FSRB3"  # Replace with actual UID
-    NEW_PASSWORD = "98w4fAREF3k29a2sr4"  # Replace with desired password
-    ENVIRONMENT = "dev"  # Use "dev" or "prod"
+    USER_UID = "fte5unf7g4S3IJb0kgZAbhUxYm02"  # Replace with actual UID
+    NEW_PASSWORD = "98a4verw4fAREF3k29a2sr4"  # Replace with desired password
+    ENVIRONMENT = "prod"  # Use "dev" or "prod"
 
     print("=" * 60)
     print("SET USER PASSWORD")
