@@ -1,0 +1,6 @@
+# Google Cloud Functions
+functions-framework>=3.5.0
+Flask>=3.0.0
+
+# Firebase Admin (includes Firestore)
+firebase-admin>=6.2.0

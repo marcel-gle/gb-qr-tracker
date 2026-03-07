@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rocket Letter – Neue Scans</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'DM Sans', Arial, sans-serif; background: #e8ecf0; margin: 0; padding: 30px 20px; }
+  .email-shell {
+    max-width: 600px; margin: 0 auto;
+    background: #f0f2f5; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+  .email-header {
+    background: linear-gradient(135deg, #0a4d3d 0%, #0e7a5f 60%, #1aab85 100%);
+    padding: 32px 40px 28px;
+    position: relative; overflow: hidden;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .brand-icon {
+    width: 36px; height: 36px; background: rgba(255,255,255,0.15);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; backdrop-filter: blur(4px);
+  }
+  .brand-name { color: white; font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
+  .brand-sub { color: rgba(255,255,255,0.6); font-size: 11px; display: block; }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 4px 12px; color: rgba(255,255,255,0.9);
+    font-size: 11.5px; font-weight: 500; margin-bottom: 12px;
+    backdrop-filter: blur(4px);
+  }
+  .header-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .email-title {
+    color: white; font-size: 22px; font-weight: 700;
+    line-height: 1.25; letter-spacing: -0.4px; margin: 0;
+  }
+  .email-subtitle {
+    color: rgba(255,255,255,0.75); font-size: 13.5px; margin-top: 6px;
+  }
+  .email-body { background: white; padding: 32px 40px; }
+  .greeting { font-size: 15px; color: #1a2332; margin-bottom: 16px; line-height: 1.5; }
+  .body-text { font-size: 13.5px; color: #4a5a6a; line-height: 1.65; margin-bottom: 14px; }
+  .highlight-box {
+    border-radius: 10px; padding: 18px 20px; margin: 20px 0;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .highlight-box.green { background: #eef9f4; border: 1px solid #a8dfc4; }
+  .hl-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .hl-icon.green { background: #c0edda; }
+  .hl-text strong { display: block; font-size: 14px; font-weight: 600; color: #1a2332; margin-bottom: 3px; }
+  .hl-text span { font-size: 13px; color: #5a6a7a; line-height: 1.5; }
+  .scan-list { margin: 20px 0; }
+  .scan-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-radius: 9px;
+    border: 1px solid #e8ecf0; margin-bottom: 8px; background: #fafbfc;
+  }
+  .scan-item:last-child { margin-bottom: 0; }
+  .scan-left { display: flex; align-items: center; gap: 10px; }
+  .scan-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+  }
+  .scan-name { font-size: 13.5px; font-weight: 600; color: #1a2332; }
+  .scan-url { font-size: 11.5px; color: #8a96a3; }
+  .scan-time {
+    font-size: 11.5px; color: #8a96a3;
+    background: #f0f2f5; padding: 3px 9px; border-radius: 20px;
+  }
+  .stat-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; margin: 20px 0;
+  }
+  .stat-card {
+    background: #f8f9fb; border: 1px solid #e4e8ef;
+    border-radius: 10px; padding: 14px 16px; text-align: center;
+  }
+  .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; color: #1a2332; }
+  .stat-value.green { color: #22a06b; }
+  .stat-value.teal { color: #1a7fa8; }
+  .stat-label { font-size: 11.5px; color: #8a96a3; margin-top: 3px; }
+  .divider { border: none; border-top: 1px solid #e8ecf0; margin: 24px 0; }
+  .cta-wrap { text-align: center; margin: 28px 0 20px; }
+  .cta-btn {
+    display: inline-block; background: #0e7a5f; color: white;
+    text-decoration: none; padding: 13px 32px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; letter-spacing: -0.2px;
+    box-shadow: 0 4px 12px rgba(14,122,95,0.35);
+  }
+  .email-footer {
+    background: #f8f9fb; border-top: 1px solid #e8ecf0;
+    padding: 20px 40px; text-align: center;
+  }
+  .footer-links { margin-bottom: 10px; }
+  .footer-links a {
+    color: #8a96a3; font-size: 12px; text-decoration: none; margin: 0 8px;
+  }
+  .footer-text { font-size: 11.5px; color: #aab4be; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="email-shell">
+  <div class="email-header">
+    <div class="brand" style="display: flex; align-items: center; gap: 14px;">
+      <div class="brand-icon" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #f0f2f5; font-size: 22px;">
+        🚀
+      </div>
+      <div>
+        <div class="brand-name">Rocket Letter</div>
+        <span class="brand-sub">Campaign Insights Center</span>
+      </div>
+    </div>
+    <div class="header-badge">
+      <div class="dot" style="background:#4eedc4;"></div>
+      Echtzeit-Alert
+    </div>
+    <h1 class="email-title">{{count}} neue Scans in den<br>letzten {{hours}} Stunden</h1>
+    <div class="email-subtitle">{{date_time}}</div>
+  </div>
+
+  <div class="email-body">
+    <p class="greeting">{{greeting}}</p>
+    <p class="body-text">
+      In deinen Kampagnen gab es in den letzten <strong>{{hours}} Stunden</strong> neue Aufrufe.
+      Hier ist eine Übersicht der aktuellen Aktivität:
+    </p>
+
+    <div class="highlight-box green" style="display: flex; align-items: center; gap: 18px;">
+      <div class="hl-icon green" style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #22a06b22;">
+        <span style="font-size: 18px; line-height: 1;">📈</span>
+      </div>
+      <div class="hl-text">
+        <strong>Aktivität erkannt</strong>
+        <span>{{count}} Scans in den letzten {{hours}} Stunden.{{percent_change}}</span>
+      </div>
+    </div>
+
+    <div class="scan-list">
+      {{scan_list}}
+    </div>
+
+    <div class="stat-grid" style="display: flex; flex-direction: column; gap: 18px;">
+      <div class="stat-card">
+        <div class="stat-value green">{{count}}</div>
+        <div class="stat-label">Neue Scans</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value teal">{{campaigns_count}}</div>
+        <div class="stat-label">Kampagnen aktiv</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#9333ea;">{{hours}} Std.</div>
+        <div class="stat-label">Zeitfenster</div>
+      </div>
+    </div>
+
+    <div class="cta-wrap">
+      <a class="cta-btn" textcolor="#ffffff" href="https://app.rocket-letter.de/">Scans jetzt kontaktieren →</a>
+    </div>
+
+    <hr class="divider">
+    <p class="body-text" style="font-size:12.5px; color:#8a96a3; text-align:center; margin:0;">
+      Du erhältst diese Benachrichtigung, wenn innerhalb von {{hours}} Stunden neue Scans eingehen.<br>
+    </p>
+  </div>
+
+  <div class="email-footer">
+    <div class="footer-links">
+      <a href="https://www.rocket-letter.de/">Webseite</a>
+      <a href="https://app.rocket-letter.de/">Login</a>
+      <a href="https://www.rocket-letter.de/impressum">Impressum</a>
+    </div>
+    <div class="footer-text">
+      © 2026 Rocket Letter · Diese E-Mail wurde automatisch generiert.<br>
+      Du hast diese E-Mail erhalten, weil du Zeitfenster-Benachrichtigungen aktiviert hast.
+    </div>
+  </div>
+</div>
+</body>
+</html>

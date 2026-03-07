@@ -63,6 +63,14 @@ COMMON_EMAIL_PROVIDERS = {
     "gmail", "gmx", "aol", "yahoo", "hotmail", "outlook",
     "icloud", "t-online", "web", "live", "msn", "mail"
 }
+
+# Link IDs that must not be used (common scanner/vulnerability probe targets)
+DISALLOWED_LINK_IDS = frozenset({
+    "wordpress", "wp-admin", "wp-login", "wp-content", "wp-includes", "xmlrpc",
+    "stripe", "admin", "administrator", "login", "signin", "config", "env", "phpmyadmin",
+    "api", "git",
+})
+
 PROJECT_ID  = os.environ.get("PROJECT_ID") or os.environ.get("GCP_PROJECT") or "gb-qr-tracker-dev"
 DATABASE_ID = os.environ.get("DATABASE_ID", "(default)")
 DEFAULT_BASE_URL = os.environ.get("BASE_URL")                   # optional fallback
@@ -288,10 +296,12 @@ def next_id_from_cache(base_id: str, taken: set[str]) -> str:
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
     if not template:
         return None
-    base, _ext = os.path.splitext(str(template))
-    if base.endswith('_qr_track'):
-        return f"{base}.pdf"
-    return f"{base}_qr_track.pdf"
+    s = str(template).strip()
+    if not s:
+        return None
+    if s.lower().endswith(".pdf"):
+        return s
+    return f"{s}.pdf"
 
 def get_ci(row: dict, *names: str) -> Optional[str]:
     lower_map = {}
@@ -355,9 +365,9 @@ def compose_full_address(street: Optional[str], house_no: Optional[str],
     return ", ".join(parts)
 
 def snapshot_mailing_from_row(row: dict, fallback_business_name: Optional[str]) -> Dict:
-    street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
-    house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
-    plz = get_ci(row, 'PLZ', 'Postleitzahl')
+    street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.', 'street', 'Street')
+    house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr', 'house_number', 'House number', 'house number')
+    plz = get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode')
     city = get_ci(row, 'Ort', 'Stadt', 'City')
     country = get_ci(row, 'Country', 'Land') or "DE"
     address_lines = []
@@ -366,7 +376,11 @@ def snapshot_mailing_from_row(row: dict, fallback_business_name: Optional[str]) 
         if line1:
             address_lines.append(line1)
     mailing = {
-        "business_name": get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company') or fallback_business_name,
+        "business_name": (
+            get_ci(row, 'Namenszeile')
+            or get_ci(row, 'business_name', 'company', 'company_name')
+            or fallback_business_name
+        ),
         "recipient_name": None,
         "address_lines": address_lines,
         "postcode": plz or None,
@@ -383,10 +397,14 @@ def make_business_id(business_name: Optional[str], plz: Optional[str]) -> str:
     return base
 
 def dedupe_key_for_row(row: dict) -> str:
-    name = (get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company') or '').lower().strip()
-    street = (get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.') or '').lower().strip().replace('ß', 'ss')
-    house = (get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr') or '').lower().strip()
-    plz = (get_ci(row, 'PLZ', 'Postleitzahl') or '').lower().strip()
+    name = (
+        get_ci(row, 'Namenszeile')
+        or get_ci(row, 'business_name', 'company', 'company_name')
+        or ''
+    ).lower().strip()
+    street = (get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.', 'street', 'Street') or '').lower().strip().replace('ß', 'ss')
+    house = (get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr', 'house_number', 'House number', 'house number') or '').lower().strip()
+    plz = (get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode') or '').lower().strip()
     city = (get_ci(row, 'Ort', 'Stadt', 'City') or '').lower().strip()
     return f"{re.sub(r'[^a-z0-9]+','-',name)}|{re.sub(r'[^a-z0-9]+','-',street)}-{re.sub(r'[^a-z0-9]+','-',house)}|{plz}|{re.sub(r'[^a-z0-9]+','-',city)}"
 
@@ -584,7 +602,7 @@ def get_or_create_campaign(owner_id: str,
 
 
 
-def get_or_create_campaign_old(owner_id: str,
+def get_or_create_campaign_old(owner_id: str, #DEPRECATED, can beremoved
                            campaign_id: str,
                            name: Optional[str],
                            code: Optional[str] = None) -> firestore.DocumentReference:
@@ -622,15 +640,15 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     Split business data into canonical and customer-specific payloads.
     Returns: (biz_id, canonical_payload, customer_payload)
     """
-    business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
-    street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
-    house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
-    plz = get_ci(row, 'PLZ', 'Postleitzahl')
+    business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company', 'company_name')
+    street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.', 'street', 'Street')
+    house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr', 'house_number', 'House number', 'house number')
+    plz = get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode')
     city = get_ci(row, 'Ort', 'Stadt', 'City')
-    fname = get_ci(row, 'Entscheider 1 Vorname', 'Vorname', 'Anrede Vorname')
-    lname = get_ci(row, 'Entscheider 1 Nachname', 'Nachname')
+    fname = get_ci(row, 'Entscheider 1 Vorname', 'Vorname', 'Anrede Vorname', 'first_name', 'First name', 'first name')
+    lname = get_ci(row, 'Entscheider 1 Nachname', 'Nachname', 'last_name', 'Last name', 'last name')
     prefix_tel = get_ci(row, 'Vorwahl Telefon', 'Vorwahl', 'Telefon Vorwahl')
-    tel = get_ci(row, 'Telefonnummer', 'Telefon', 'Phone')
+    tel = get_ci(row, 'Telefonnummer', 'Telefon', 'Phone', 'Tel.', 'Tel')
     email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
     salutation = get_ci(row, 'Entscheider 1 Anrede', 'Salutation')
 
@@ -638,7 +656,17 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     phone = " ".join(p for p in [prefix_tel, tel] if p)
     full_addr = compose_full_address(street, house_no, plz, city, "Germany")
 
+    # Additional business attributes from new list format
+    business_description = get_ci(row, 'Gegenstand', 'business_description')
+    revenue_eur = get_ci(row, 'Umsatz EUR', 'revenue_eur', 'umsatz')
+    business_code = get_ci(row, 'Branche (NACE)', 'business_code', 'branchencode', 'Branchencode')
+
     biz_id = make_business_id(business_name, plz)
+    # Guard against empty business IDs which would lead to invalid Firestore paths.
+    if not biz_id:
+        fallback = sanitize_id(business_name or "") or sanitize_id(plz or "") or "unknown-business"
+        print(f"[warn] Empty biz_id computed, using fallback: '{fallback}'")
+        biz_id = fallback
     
     # Canonical payload (shared across customers)
     canonical_payload = {
@@ -648,6 +676,9 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
         "postcode": plz,
         "city": city,
         "address": full_addr or None,
+        "business_description": business_description or None,
+        "revenue_eur": revenue_eur or None,
+        "business_code": business_code or None,
         "business_id": biz_id,  # Store normalized business_id in document
     }
     if coordinate:
@@ -784,19 +815,38 @@ def assign_links_from_business_file(path: str, base_url: str,
         df.columns = [str(c) for c in df.columns]
         rows = df.to_dict(orient='records')
     else:
-        #CSV Helpers
+        # CSV Helpers
         def _open_text(path: str):
             # Handle BOM + normalize newlines
             return open(path, "r", encoding="utf-8-sig", newline="")
 
         def _detect_delimiter(sample: str) -> str:
-            try:
-                dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
-                return dialect.delimiter
-            except Exception:
-                # Fallback: detect by counts
-                counts = {d: sample.count(d) for d in [",", ";", "\t", "|"]}
-                return max(counts, key=counts.get) if max(counts.values()) > 0 else ","
+            """
+            Detect CSV delimiter by choosing the character that yields the most
+            columns on the first non-empty line. This is robust for semicolon-
+            separated exports where fields may contain many commas (e.g. JSON).
+            """
+            if not sample:
+                return ","
+
+            first_line = ""
+            for line in sample.splitlines():
+                if line.strip():
+                    first_line = line
+                    break
+
+            if not first_line:
+                return ","
+
+            best_delimiter = ","
+            best_count = 1
+            for delim in (";", "\t", ",", "|"):
+                count = len(first_line.split(delim))
+                if count > best_count:
+                    best_count = count
+                    best_delimiter = delim
+
+            return best_delimiter
 
         with _open_text(path) as f:
             sample = f.read(4096)
@@ -829,9 +879,9 @@ def assign_links_from_business_file(path: str, base_url: str,
     def maybe_geocode(row: dict) -> Optional[Dict]:
         if not geocode or not mapbox_token:
             return None
-        street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.')
-        house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr')
-        plz = get_ci(row, 'PLZ', 'Postleitzahl')
+        street = get_ci(row, 'Straße', 'Strasse', 'Str', 'Str.', 'street', 'Street')
+        house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr', 'house_number', 'House number', 'house number')
+        plz = get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode')
         city = get_ci(row, 'Ort', 'Stadt', 'City')
         addr = compose_full_address(street, house_no, plz, city, "Germany")
         if not addr:
@@ -847,8 +897,8 @@ def assign_links_from_business_file(path: str, base_url: str,
         in_limit = (limit <= 0) or (i < limit)
         
         # Check if business is blacklisted BEFORE other processing
-        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company')
-        plz = get_ci(row, 'PLZ', 'Postleitzahl')
+        business_name = get_ci(row, 'Namenszeile') or get_ci(row, 'business_name', 'company', 'company_name')
+        plz = get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode')
         biz_id = make_business_id(business_name, plz)
         print("DEBUG biz_id:", biz_id)
         
@@ -887,7 +937,7 @@ def assign_links_from_business_file(path: str, base_url: str,
         print("DEBUG template_key:", template_key)
         print("DEBUG template_raw:", template_raw)
 
-        # Check for "Domain" column first - this takes priority
+        # Check for explicit "Domain" column first - this takes priority
         domain_from_row = get_ci(row, 'Domain', 'domain')
         print("DEBUG domain_from_row:", domain_from_row)
         
@@ -900,17 +950,26 @@ def assign_links_from_business_file(path: str, base_url: str,
         elif campaign_code_from_business:
             email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
             print("DEBUG email:", email)
-            if not email:
-                # No email provided - use clean business name from "Namenszeile"
-                print("DEBUG business_name:", business_name)
-                base_id = _extract_clean_business_name(business_name)
-            elif _is_common_provider(email):
-                base_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
-            else:
+            if email and not _is_common_provider(email):
                 # Business email - use domain
-                print("DEBUG email:", email)
+                print("DEBUG email (business):", email)
                 base_id = _extract_registrable_domain(email)
                 using_domain_column = True  # Also remove TLD from email-extracted domains
+            else:
+                # No usable business email → fallback to website/domain field if available
+                website_val = get_ci(row, 'website', 'Website')
+                print("DEBUG website_val:", website_val)
+                if website_val and website_val.strip():
+                    base_id = _normalize_domain_for_id(website_val)
+                    using_domain_column = True
+                    print("DEBUG using website as base_id:", base_id)
+                elif not email:
+                    # No email and no website/domain → clean business name
+                    print("DEBUG business_name (no email/website):", business_name)
+                    base_id = _extract_clean_business_name(business_name)
+                else:
+                    # Email is common provider and no website → fall back to sequential/campaign-based ID
+                    base_id = doc_id_from_row or f"{(campaign_code or 'L').upper()}-{i+1}"
         else:
             base_id = doc_id_from_row or business_name or f"{(campaign_code or 'L').upper()}-{i+1}"
 
@@ -924,6 +983,11 @@ def assign_links_from_business_file(path: str, base_url: str,
                 print(f"DEBUG removed TLD suffix: '{base_id_before}' -> '{base_id}'")
 
         print("DEBUG base_id:", base_id)
+
+        # Replace disallowed link IDs (scanner-favorite names) with a unique fallback
+        if base_id and base_id.lower() in DISALLOWED_LINK_IDS:
+            base_id = sanitize_id(f"{(campaign_code or 'L').upper()}-{i+1}")
+            print(f"[disallowed] Replaced disallowed link ID for row {i+1}: {base_id}")
 
         if not base_id:
             print("⚠️ [DEBUG EMPTY BASE_ID] row:", i+1)

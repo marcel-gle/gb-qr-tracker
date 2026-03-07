@@ -36,7 +36,7 @@ def count_links_for_multiple_campaigns(service_account_path: str, campaign_ids: 
 
 # Example usage:
 if __name__ == "__main__":
-    #service_account_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service//gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json" #prod
-    service_account_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #dev
-    campaign_ids = ["395b3070-5f35-485f-bf01-a734e041e37b", "7d106cd6-6953-47c2-b50e-03ae3afb12eb", "JowSxxqUb2Slc4wXsspT"]
+    service_account_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service//gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json" #prod
+    #service_account_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #dev
+    campaign_ids = ["fc7b4541-0eef-4bd8-958e-52bf4c122da7"]
     count_links_for_multiple_campaigns(service_account_path, campaign_ids)

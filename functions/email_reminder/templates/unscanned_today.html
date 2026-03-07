@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rocket Letter – Scans ohne Kontakt</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'DM Sans', Arial, sans-serif; background: #e8ecf0; margin: 0; padding: 30px 20px; }
+  .email-shell {
+    max-width: 600px; margin: 0 auto;
+    background: #f0f2f5; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+  .email-header {
+    background: linear-gradient(135deg, #0d5c7a 0%, #1a7fa8 60%, #2196b6 100%);
+    padding: 32px 40px 28px;
+    position: relative; overflow: hidden;
+  }
+  .email-header::before {
+    content: ''; position: absolute; top: -40px; right: -40px;
+    width: 160px; height: 160px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .email-header::after {
+    content: ''; position: absolute; bottom: -20px; right: 60px;
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .brand-icon {
+    width: 36px; height: 36px; background: rgba(255,255,255,0.15);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; backdrop-filter: blur(4px);
+  }
+  .brand-name { color: white; font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
+  .brand-sub { color: rgba(255,255,255,0.6); font-size: 11px; display: block; }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 4px 12px; color: rgba(255,255,255,0.9);
+    font-size: 11.5px; font-weight: 500; margin-bottom: 12px;
+    backdrop-filter: blur(4px);
+  }
+  .header-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .email-title {
+    color: white; font-size: 22px; font-weight: 700;
+    line-height: 1.25; letter-spacing: -0.4px; margin: 0;
+  }
+  .email-subtitle {
+    color: rgba(255,255,255,0.75); font-size: 13.5px; margin-top: 6px;
+  }
+  .email-body { background: white; padding: 32px 40px; }
+  .greeting { font-size: 15px; color: #1a2332; margin-bottom: 16px; line-height: 1.5; }
+  .body-text { font-size: 13.5px; color: #4a5a6a; line-height: 1.65; margin-bottom: 14px; }
+  .scan-list { margin: 20px 0; }
+  .scan-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-radius: 9px;
+    border: 1px solid #e8ecf0; margin-bottom: 8px; background: #fafbfc;
+  }
+  .scan-item:last-child { margin-bottom: 0; }
+  .scan-left { display: flex; align-items: center; gap: 10px; }
+  .scan-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+  }
+  .scan-name { font-size: 13.5px; font-weight: 600; color: #1a2332; }
+  .scan-url { font-size: 11.5px; color: #8a96a3; }
+  .scan-time {
+    font-size: 11.5px; color: #8a96a3;
+    background: #f0f2f5; padding: 3px 9px; border-radius: 20px;
+  }
+  .alert-strip {
+    background: #fff4e6; border: 1px solid #fddcb5; border-radius: 10px;
+    padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+    margin: 20px 0;
+  }
+  .alert-strip span { font-size: 13px; color: #7a4a10; line-height: 1.5; }
+  .divider { border: none; border-top: 1px solid #e8ecf0; margin: 24px 0; }
+  .cta-wrap { text-align: center; margin: 28px 0 20px; }
+  .cta-btn {
+    display: inline-block; background: #1a7fa8; color: white;
+    text-decoration: none; padding: 13px 32px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; letter-spacing: -0.2px;
+    box-shadow: 0 4px 12px rgba(26,127,168,0.35);
+  }
+  .email-footer {
+    background: #f8f9fb; border-top: 1px solid #e8ecf0;
+    padding: 20px 40px; text-align: center;
+  }
+  .footer-links { margin-bottom: 10px; }
+  .footer-links a {
+    color: #8a96a3; font-size: 12px; text-decoration: none; margin: 0 8px;
+  }
+  .footer-text { font-size: 11.5px; color: #aab4be; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="email-shell">
+  <div class="email-header">
+    <div class="brand">
+      <div class="brand-icon">🚀</div>
+      <div>
+        <div class="brand-name">Rocket Letter</div>
+        <span class="brand-sub">Campaign Insights Center</span>
+      </div>
+    </div>
+    <div class="header-badge">
+      <div class="dot" style="background:#f59e0b;"></div>
+      Tägliche Erinnerung
+    </div>
+    <h1 class="email-title">{{count}} Scans warten noch<br>auf einen Kontakt</h1>
+    <div class="email-subtitle">{{date_time}}</div>
+  </div>
+
+  <div class="email-body">
+    <p class="greeting">{{greeting}}</p>
+    <p class="body-text">
+      Heute wurden <strong>{{count}} Aufrufe</strong> registriert, für die noch kein Kontakt hinterlegt wurde.
+      Damit keine Leads verloren gehen, lohnt es sich, diese noch heute nachzuverfolgen.
+    </p>
+
+    <div class="alert-strip">
+      <span style="font-size:20px;">⏰</span>
+      <span><strong>Tipp:</strong> Kontakte die am selben Tag nachgefasst werden, konvertieren im Schnitt 3× häufiger.</span>
+    </div>
+
+    <div class="scan-list">
+      {{business_list}}
+    </div>
+
+    <div class="cta-wrap">
+      <a class="cta-btn" href="{{dashboard_url}}">Alle Scans ansehen →</a>
+    </div>
+
+    <hr class="divider">
+    <p class="body-text" style="font-size:12.5px; color:#8a96a3; text-align:center; margin:0;">
+      Du erhältst diese E-Mail, weil du tägliche Scan-Erinnerungen aktiviert hast.<br>
+      <a href="{{settings_url}}" style="color:#1a7fa8;">Einstellungen ändern</a> · <a href="{{unsubscribe_url}}" style="color:#1a7fa8;">Abmelden</a>
+    </p>
+  </div>
+
+  <div class="email-footer">
+    <div class="footer-links">
+      <a href="{{dashboard_url}}">Dashboard</a>
+      <a href="{{dashboard_url}}">Kontakte</a>
+      <a href="{{dashboard_url}}">Kampagnen</a>
+      <a href="{{dashboard_url}}">Hilfe</a>
+    </div>
+    <div class="footer-text">
+      © 2026 Rocket Letter · Diese E-Mail wurde automatisch generiert.<br>
+      Du hast diese E-Mail erhalten, weil du Benachrichtigungen aktiviert hast.
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -33,12 +33,32 @@ from google.cloud import storage
 
 
 def _detect_delimiter(sample: str) -> str:
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
-        return dialect.delimiter
-    except Exception:
-        counts = {d: sample.count(d) for d in [",", ";", "\t", "|"]}
-        return max(counts, key=counts.get) if max(counts.values()) > 0 else ","
+    """
+    Detect CSV delimiter by choosing the character that yields the most
+    columns on the first non-empty line. This is robust for semicolon-
+    separated exports where fields may contain many commas (e.g. JSON).
+    """
+    if not sample:
+        return ","
+
+    first_line = ""
+    for line in sample.splitlines():
+        if line.strip():
+            first_line = line
+            break
+
+    if not first_line:
+        return ","
+
+    best_delimiter = ","
+    best_count = 1
+    for delim in (";", "\t", ",", "|"):
+        count = len(first_line.split(delim))
+        if count > best_count:
+            best_count = count
+            best_delimiter = delim
+
+    return best_delimiter
 
 
 def _read_rows(path: Path) -> Tuple[List[Dict[str, str]], List[str]]:
@@ -81,6 +101,56 @@ def _validate_headers(headers: List[str]) -> None:
     Uses case-insensitive matching and alias sets instead of requiring a single
     exact header name.
     """
+    # Detect new list format via presence of `company_name` header
+    is_new_format = _find_header(headers, "company_name") is not None
+
+    if is_new_format:
+        # Relaxed validation for new list format while still ensuring
+        # core fields needed by upload_processor are present.
+        required_groups = [
+            ("company_name", ["company_name"]),
+            ("Straße", ["Straße", "Strasse", "Str", "Str.", "street", "Street"]),
+            ("PLZ", ["PLZ", "Postleitzahl", "postcode", "Postcode"]),
+            ("Ort", ["Ort", "Stadt", "City"]),
+            ("E-Mail", ["E-Mail", "E-Mail-Adresse", "Email", "Mail", "e-mail-adresse"]),
+            ("Template", ["Template", "template"]),
+        ]
+
+        missing_logical: List[str] = []
+        for logical_name, variants in required_groups:
+            # If any variant is present (case-insensitive), we're good
+            if _find_header(headers, *variants) is None:
+                missing_logical.append(
+                    f"{logical_name} (expected one of: {', '.join(variants)})"
+                )
+
+        if missing_logical:
+            msg = (
+                "❌ Input CSV (new list format) is missing required headers (by logical field):\n  - "
+                + "\n  - ".join(missing_logical)
+                + "\n\nPresent headers:\n  - "
+                + "\n  - ".join(headers)
+            )
+            raise SystemExit(msg)
+
+        # Optional analytics/business fields – warn if missing but do not fail.
+        optional_new_cols = [
+            "Gegenstand",
+            "Umsatz EUR",
+            "Branche (NACE)",
+        ]
+        missing_optional = [
+            col for col in optional_new_cols if _find_header(headers, col) is None
+        ]
+        if missing_optional:
+            print(
+                "WARNING: Optional columns missing for new list format (no hard error): "
+                + ", ".join(missing_optional)
+            )
+
+        return
+
+    # Legacy format validation (existing behavior)
     # Each tuple: (logical name for error messages, list of accepted header variants)
     required_groups = [
         ("Anrede", ["Anrede"]),
@@ -215,7 +285,7 @@ def prepare_file(
     _validate_headers(headers)
 
     # Template header must exist (exact name, but allow case-insensitive alias)
-    template_header = _find_header(headers, "Template")
+    template_header = _find_header(headers, "template", "Template")
     if template_header is None:
         raise SystemExit("❌ Required header 'Template' is missing.")
 
@@ -232,19 +302,41 @@ def prepare_file(
     unique_existing = sorted({t for t in existing_templates if t})
 
     # Enforce that every row already has a template value in the input
-    if any(t == "" for t in existing_templates):
-        raise SystemExit("❌ Template column contains empty values; every row must have a template before upload.")
+    empty_row_indices = [i for i, t in enumerate(existing_templates, start=1) if t == ""]
+    if empty_row_indices:
+        max_show = 50
+        if len(empty_row_indices) <= max_show:
+            rows_msg = ", ".join(str(i) for i in empty_row_indices)
+        else:
+            rows_msg = ", ".join(str(i) for i in empty_row_indices[:max_show]) + f" ... and {len(empty_row_indices) - max_show} more"
+        raise SystemExit(
+            f"❌ Template column contains empty values; every row must have a template before upload.\n"
+            f"   Rows missing a template (data row number): {rows_msg}\n"
+            f"   Total: {len(empty_row_indices)} of {len(rows)} rows."
+        )
 
     # Validate that all template values in the CSV exist as PDFs in the templates folder
     folder_set = set(template_files)
     csv_set = set(unique_existing)
 
+    # 1) Every template used in the CSV must have a corresponding PDF file
     missing_in_folder = sorted(csv_set - folder_set)
     if missing_in_folder:
         raise SystemExit(
             "❌ Template values in CSV do not match templates in the folder.\n"
             "   Missing in folder (no matching .pdf):\n  - "
             + "\n  - ".join(missing_in_folder)
+        )
+
+    # 2) Every template PDF in the folder must be referenced at least once in the CSV.
+    #    This ensures that the set of templates in the CSV matches exactly the set
+    #    of templates that will be uploaded.
+    unused_in_csv = sorted(folder_set - csv_set)
+    if unused_in_csv:
+        raise SystemExit(
+            "❌ Some template PDF files in the templates directory are not referenced in the CSV.\n"
+            "   Unused template files:\n  - "
+            + "\n  - ".join(unused_in_csv)
         )
 
     # After assignment / validation, enforce non-empty templates
@@ -485,7 +577,7 @@ def main(argv: List[str] | None = None) -> int:
         print("2) You can inspect the objects in the bucket at the URIs shown above.")
     else:
         print("1) Upload the prepared file to your bucket, e.g.:")
-        print(f"   gsutil cp {upload_path} gs://<YOUR_BUCKET>/{suggested_object}")
+        print(f"   gsutil cp {upload_path} gs://{bucket_name}/{suggested_object}")
         print("2) Ensure a matching manifest.json exists next to the file or set metadata:")
         print("   - ownerId       ->", owner_id)
         print("   - campaignId    ->", campaign_id)

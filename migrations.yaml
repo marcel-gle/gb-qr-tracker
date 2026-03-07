@@ -63,3 +63,15 @@ migrations:
     dependencies: []
     reversible: false
 
+  - id: "20260206_001"
+    name: "Fix Template Filenames to Match links.template_id"
+    script: "scripts/migrations/migrate_fix_template_filenames.py"
+    description: "Scans Firestore links and renames Cloud Storage template PDFs under uploads/{env}/{uid}/{campaignId}/templates so that filenames match links.template_id, using Firestore as the source of truth."
+    created_date: "2026-02-06"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+

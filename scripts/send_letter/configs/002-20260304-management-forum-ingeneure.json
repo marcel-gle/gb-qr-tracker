@@ -1,0 +1,105 @@
+{
+  "_comment": "Example template configuration for send_letters_onlinebrief24.py. Adjust PDF filenames and coordinates to match your real templates. Coordinates are in PostScript points (1/72 inch), origin is bottom-left of the page.",
+  "management-forum-ingeneure-A.pdf": {
+    "pdf_filename": "management-forum-ingeneure-A.pdf",
+    "qr_positions": [
+      {
+        "page": 1,
+        "x": 462,
+        "y": 505,
+        "size": 90
+      }
+    ],
+    "tracking_text_positions": [
+      {
+        "page": 1,
+        "x": 542,
+        "y": 490,
+        "font_size": 10,
+        "align": "right"
+      },
+      {
+        "page": 7,
+        "x": 292,
+        "y": 540,
+        "font_size": 20,
+        "align": "center"
+      }
+    ],
+    
+    "date_positions": [
+      { "page": 1, "x": 495, "y": 635, "font_size": 10 }
+    ],
+
+    "business_name_positions": [
+      { "page": 1, "x":  62, "y": 658, "font_size": 11, "max_width": 200 }
+    ],
+
+    "full_name_positions": [
+      { "page": 1, "x": 62, "y": 643, "font_size": 11 }
+    ],
+
+    "street_positions": [
+      { "page": 1, "x": 62, "y": 628, "font_size": 11 }
+    ],
+
+    "city_positions": [
+      { "page": 1, "x": 62, "y": 613, "font_size": 11 }
+    ],
+
+    "salutation_positions": [
+      { "page": 1, "x": 85, "y": 320, "font_size": 10 }
+    ]
+  },
+  "management-forum-ingeneure-B.pdf": {
+    "pdf_filename": "management-forum-ingeneure-B.pdf",
+    "qr_positions": [
+      {
+        "page": 1,
+        "x": 462,
+        "y": 505,
+        "size": 90
+      }
+    ],
+    "tracking_text_positions": [
+      {
+        "page": 1,
+        "x": 542,
+        "y": 490,
+        "font_size": 10,
+        "align": "right"
+      },
+      {
+        "page": 7,
+        "x": 292,
+        "y": 540,
+        "font_size": 20,
+        "align": "center"
+      }
+    ],
+    
+    "date_positions": [
+      { "page": 1, "x": 495, "y": 635, "font_size": 10 }
+    ],
+
+    "business_name_positions": [
+      { "page": 1, "x":  62, "y": 658, "font_size": 11, "max_width": 200 }
+    ],
+
+    "full_name_positions": [
+      { "page": 1, "x": 62, "y": 643, "font_size": 11 }
+    ],
+
+    "street_positions": [
+      { "page": 1, "x": 62, "y": 628, "font_size": 11 }
+    ],
+
+    "city_positions": [
+      { "page": 1, "x": 62, "y": 613, "font_size": 11 }
+    ],
+
+    "salutation_positions": [
+      { "page": 1, "x": 85, "y": 320, "font_size": 10 }
+    ]
+  }
+}

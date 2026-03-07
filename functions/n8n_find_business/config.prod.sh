@@ -1,0 +1,15 @@
+FUNCTION_NAME="n8n_find_business"
+ENTRY_POINT="find_business"
+RUNTIME="python311"
+MEMORY="256Mi"
+TIMEOUT="60s"
+
+TRIGGER_KIND="http"
+TRIGGER_ARGS=( )
+
+ENV_VARS=(
+  "PROJECT_ID=$PROJECT_ID"
+  'DATABASE_ID=(default)'
+)
+
+SECRETS=( )

@@ -27,18 +27,18 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-# Add functions directory to path to import from main.py
-sys.path.insert(0, str(Path(__file__).parent.parent / "functions" / "prospect_enrichment"))
+# Add prospect_enrichment function to path (script is in scripts/general/, so go up to project root)
+_project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_project_root / "functions" / "prospect_enrichment"))
 
 # Try to load from .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
-    # Load .env from project root
-    env_path = Path(__file__).parent.parent / ".env"
+    env_path = _project_root / ".env"
     if env_path.exists():
         load_dotenv(env_path)
     else:
-        load_dotenv()  # Try current directory
+        load_dotenv()
 except ImportError:
     pass
 

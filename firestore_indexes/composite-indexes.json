@@ -278,5 +278,25 @@
     "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/businesses/indexes/CICAgNjp5ZMK",
     "queryScope": "COLLECTION",
     "state": "READY"
+  },
+  {
+    "density": "SPARSE_ALL",
+    "fields": [
+      {
+        "fieldPath": "customer_ref",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "dedupe_key",
+        "order": "ASCENDING"
+      },
+      {
+        "fieldPath": "__name__",
+        "order": "ASCENDING"
+      }
+    ],
+    "name": "projects/gb-qr-tracker-dev/databases/(default)/collectionGroups/inbound_leads/indexes/CICAgSW5ib3VuZExlYWQ",
+    "queryScope": "COLLECTION",
+    "state": "READY"
   }
 ]

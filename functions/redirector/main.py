@@ -49,7 +49,7 @@ GEOIP_API_URL = os.getenv('GEOIP_API_URL') or None
 STORE_IP_HASH = os.getenv('STORE_IP_HASH') == '1'
 IP_HASH_SALT = os.getenv('IP_HASH_SALT', '')
 LOG_HIT_ERRORS = os.getenv('LOG_HIT_ERRORS') == '1'
-
+HITS_BOTS_COLLECTION = 'hits_bots'
 
 Increment = firestore.Increment
 SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
@@ -107,6 +107,30 @@ def _device_type(ua) -> str:
         return 'other'
     except Exception:
         return 'other'
+
+# UA substrings that indicate bot/scanner (case-insensitive)
+_BOT_UA_SUBSTRINGS = (
+    'bot', 'crawler', 'spider', 'scanner', 'curl', 'python-requests', 'httpie',
+    'wget', 'go-http-client', 'java/', 'okhttp',
+)
+
+def _is_bot_request(request: Request) -> bool:
+    """Return True if the request appears to be from a bot (UA + headers)."""
+    ua_str = (request.headers.get('User-Agent') or '').strip()
+    try:
+        ua = parse_ua(ua_str)
+        if getattr(ua, 'is_bot', False):
+            return True
+    except Exception:
+        pass
+    ua_lower = ua_str.lower()
+    if any(s in ua_lower for s in _BOT_UA_SUBSTRINGS):
+        return True
+    accept = (request.headers.get('Accept') or '').strip()
+    if not accept or accept == '*/*':
+        if not (request.headers.get('Accept-Language') or '').strip():
+            return True
+    return False
 
 def _hash_ip(ip: str) -> str | None:
     if not STORE_IP_HASH or not IP_HASH_SALT or not ip:
@@ -297,9 +321,11 @@ def redirector(request: Request):
     if is_test_data:
         print(f"[TEST REQUEST] link_id={link_id}, utm_test={request.args.get('utm_test')}, user_agent={request.headers.get('User-Agent', '')[:50]}")
 
+    is_bot = _is_bot_request(request)
+
     # --- Batch: update link (+ business, + campaign totals.hits) ---
-    # Skip counter updates for test requests to prevent polluting production metrics
-    if not is_test_data:
+    # Skip counter updates for test requests and bot requests
+    if not is_test_data and not is_bot:
         try:
             batch = _db.batch()
 
@@ -331,7 +357,10 @@ def redirector(request: Request):
                 }, merge=True)
 
             batch.commit()
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Exception during aggregate update: {e}")
+            # Never block redirect on aggregates
+            pass
             # Never block redirect on aggregates
             pass
 
@@ -363,7 +392,10 @@ def redirector(request: Request):
             "campaign_name": campaign_name,
             "hit_origin": source, #shows if it is from link or qr code
         }
-        
+        if is_bot:
+            hit['suspected_bot'] = True
+        hit['ip-address'] = client_ip
+
         if referer:
             hit['referer'] = referer[:512]
 
@@ -379,16 +411,19 @@ def redirector(request: Request):
         except Exception:
             ip_hash = None  # ensure defined if used later
         
-        # Write hit (never block)
+        # Write hit (never block): bots -> hits_bots, others -> hits
         try:
-            _db.collection('hits').add(hit)
+            if is_bot:
+                _db.collection(HITS_BOTS_COLLECTION).add(hit)
+            else:
+                _db.collection('hits').add(hit)
         except Exception:
             if LOG_HIT_ERRORS:
                 import logging; logging.exception("Hit write failed")
 
-        # Optional: first-seen unique IP per campaign (write-time aggregation)
+        # Optional: first-seen unique IP per campaign (write-time aggregation); skip for bots
         try:
-            if ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
+            if not is_bot and ip_hash and isinstance(campaign_ref, firestore.DocumentReference):
                 uniq_ref = campaign_ref.collection('unique_ips').document(ip_hash)
                 # create if not exists; increment totals.unique_ips only on first seen
                 unique_ip_data = {'first_seen': SERVER_TIMESTAMP}

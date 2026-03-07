@@ -156,7 +156,7 @@ def extract_homepage_text(domain: str) -> Optional[str]:
     text = "\n".join(chunk for chunk in chunks if chunk)
     
     # Limit text length to avoid token limits
-    max_chars = 15000
+    max_chars = 14000
     original_len = len(text)
     if len(text) > max_chars:
         text = text[:max_chars]
@@ -207,7 +207,8 @@ def analyze_domain_with_llm(domain: str, homepage_text: str, prompt: Prompt) -> 
     # Format user prompt with domain and homepage text
     user_prompt = prompt.format_user_prompt(
         domain=domain,
-        homepage_text=homepage_text
+        homepage_text=homepage_text,
+        gegenstand="(nicht angegeben)",
     )
 
     # Enforce LLM concurrency limit
