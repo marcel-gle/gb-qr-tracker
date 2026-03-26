@@ -555,27 +555,26 @@ def generate_hits(
     total_hits = 0
     
     for link_ref, business_ref, target_ref, campaign_ref in links:
-        # Realistic distribution: most links have 0-5 hits, with 5 being the absolute max
-        # Distribution:
-        # - 50% chance of 0 hits
-        # - 25% chance of 1 hit
-        # - 12% chance of 2 hits
-        # - 7% chance of 3 hits
-        # - 4% chance of 4 hits
-        # - 2% chance of 5 hits (absolute maximum, very rare)
+        # Realistic low conversion distribution: only ~2% of links receive any hits.
+        # Approximate distribution (per link):
+        # - 98.0% chance of 0 hits
+        # - 1.5% chance of 1 hit
+        # - 0.3% chance of 2 hits
+        # - 0.15% chance of 3 hits
+        # - 0.05% chance of 4 hits (absolute maximum, extremely rare)
+        # This yields ~2% of links with ≥1 hit and an average of ~0.02–0.03 hits/link,
+        # i.e. a 1.6–2.4% conversion range when interpreted as hits per mailed link.
         rand = random.random()
-        if rand < 0.50:
+        if rand < 0.98:
             num_hits = 0
-        elif rand < 0.75:
+        elif rand < 0.995:
             num_hits = 1
-        elif rand < 0.87:
+        elif rand < 0.998:
             num_hits = 2
-        elif rand < 0.94:
+        elif rand < 0.9995:
             num_hits = 3
-        elif rand < 0.98:
-            num_hits = 4
         else:
-            num_hits = 5  # Absolute maximum, very rare (2% chance)
+            num_hits = 4  # Absolute maximum, extremely rare
         
         # Explicitly cap at 5 to prevent any edge cases or bugs
         num_hits = min(num_hits, 5)

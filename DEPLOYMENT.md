@@ -248,12 +248,69 @@ gcloud scheduler jobs create http health-monitor-dev \
 ./deploy.sh dev list_campaign_files
 ```
 
-#### 6. Delete Campaign Function
+#### 6. List User Files Function
+
+**Deploy**:
+```bash
+./deploy.sh dev list_user_files
+```
+
+#### 7. Delete Campaign Function
 
 **Deploy**:
 ```bash
 ./deploy.sh dev delete_campaign
 ```
+
+#### 8. n8n Find Business Function
+
+HTTP endpoint for n8n to match a lead (email) to a business by domain. POST body: `{ "cID": "...", "email": "..." }`.
+
+**Deploy**:
+```bash
+./deploy.sh dev n8n_find_business
+```
+
+#### 9. Email Reminder Function
+
+Scheduled reminder emails: new scans in last N hours, unscanned today (scans not contacted), and weekly digest. Runs on HTTP trigger; invoke via Cloud Scheduler (e.g. every 15–30 minutes). Each run streams customers, evaluates `notifications.newScansWithinHours`, `notifications.unscannedToday`, and `notifications.weeklyDigest`, queries Firestore, and sends HTML emails via Google SMTP relay (smtp-relay.gmail.com, port 587, STARTTLS).
+
+**Config**: `functions/email_reminder/config.dev.sh` or `config.prod.sh`
+
+**Secrets** (create in Secret Manager before deploy):
+
+- `REMINDER_SECRET`: Shared secret for request auth (header `X-Reminder-Secret` or query `?secret=...`). Required if not using Cloud Scheduler OIDC.
+- `SMTP_APP_PASSWORD`: Google account App Password for SMTP relay (same as SMTP login user, e.g. no-reply@yourdomain.de).
+- Set `SMTP_USER` and `FROM_EMAIL` in config to your sending address (e.g. no-reply@yourdomain.de); optionally override `FROM_NAME`.
+
+**Test mode**: Call the function with `test_email=your@email.com` and optionally `test_type=newScans|unscannedToday|weeklyDigest|all` to send only to that customer without schedule checks and without updating lastSentAt. Example: `GET /email_reminder?secret=...&test_email=you@example.com&test_type=weeklyDigest`. Requires REMINDER_SECRET or Cloud Scheduler.
+
+**Deploy**:
+```bash
+./deploy.sh dev email_reminder
+```
+
+**Setup Cloud Scheduler** (after deployment):
+```bash
+# Get function URL
+FUNCTION_URL=$(gcloud functions describe email_reminder \
+  --gen2 \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --format="value(serviceConfig.uri)")
+
+# Create scheduler job (e.g. every 15 minutes)
+gcloud scheduler jobs create http email-reminder-dev \
+  --project=$PROJECT_ID \
+  --location=$REGION \
+  --schedule="*/15 * * * *" \
+  --uri="$FUNCTION_URL" \
+  --http-method=GET \
+  --oidc-service-account-email=$SA \
+  --time-zone="Europe/Berlin"
+```
+
+To call with shared secret instead of OIDC, add e.g. `--headers="X-Reminder-Secret=YOUR_SECRET"` to the scheduler job.
 
 ## Deploying Cloudflare Worker
 

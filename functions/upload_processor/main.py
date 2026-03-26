@@ -1152,7 +1152,10 @@ def assign_links_from_business_file(path: str, base_url: str,
                     customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
                     batch.set(customer_business_ref, {
                         "business_ref": biz_ref,
-                        **customer_payload
+                        **customer_payload,
+                        # Keep overlay campaign membership in sync on upload writes.
+                        "campaign_ids": ArrayUnion([campaign_ref.id]),
+                        "campaign_updated_at": firestore.SERVER_TIMESTAMP,
                     }, merge=True); ops += 1
 
                 # Build and persist the target document, now that link_ref/final_id are settled.

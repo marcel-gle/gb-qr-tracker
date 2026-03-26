@@ -1,0 +1,1001 @@
+LEVEL  NAME              EXECUTION_ID  TIME_UTC                 LOG
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501  [skip] not CSV/XLSX: uploads/dev/panugay5hyq6wzyibvub5e3fsrb3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501  metadata
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.501
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  application/json
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  content_type
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  object_name
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  gb-qr-tracker-dev.firebasestorage.app
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  bucket_name
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  {'kind': 'storage#object', 'id': 'gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json/1769597403350487', 'selfLink': 'https://www.googleapis.com/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2Fupload_report.json', 'name': 'uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app', 'generation': '1769597403350487', 'metageneration': '1', 'contentType': 'application/json', 'timeCreated': '2026-01-28T10:50:03.374Z', 'updated': '2026-01-28T10:50:03.374Z', 'storageClass': 'MULTI_REGIONAL', 'timeStorageClassUpdated': '2026-01-28T10:50:03.374Z', 'size': '1484', 'md5Hash': '7pltx/UgIKgmiT/txpjFsg==', 'mediaLink': 'https://storage.googleapis.com/download/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2Fupload_report.json?generation=1769597403350487&alt=media', 'crc32c': 'yVFNFQ==', 'etag': 'CNeL/YSIrpIDEAE='}
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  data
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.500  {'attributes': {'specversion': '1.0', 'id': '17480544819100155', 'source': '//storage.googleapis.com/projects/_/buckets/gb-qr-tracker-dev.firebasestorage.app', 'type': 'google.cloud.storage.object.v1.finalized', 'datacontenttype': 'application/json', 'subject': 'objects/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json', 'time': '2026-01-28T10:50:03.374143Z', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app'}, 'data': {'kind': 'storage#object', 'id': 'gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json/1769597403350487', 'selfLink': 'https://www.googleapis.com/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2Fupload_report.json', 'name': 'uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app', 'generation': '1769597403350487', 'metageneration': '1', 'contentType': 'application/json', 'timeCreated': '2026-01-28T10:50:03.374Z', 'updated': '2026-01-28T10:50:03.374Z', 'storageClass': 'MULTI_REGIONAL', 'timeStorageClassUpdated': '2026-01-28T10:50:03.374Z', 'size': '1484', 'md5Hash': '7pltx/UgIKgmiT/txpjFsg==', 'mediaLink': 'https://storage.googleapis.com/download/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2Fupload_report.json?generation=1769597403350487&alt=media', 'crc32c': 'yVFNFQ==', 'etag': 'CNeL/YSIrpIDEAE='}}
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.499
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.499  cloud_event
+       upload-processor  SoWetYY51GaO  2026-01-28 10:50:03.499  ⚡ trigger
+I      upload-processor                2026-01-28 10:50:03.494
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:03.413
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:03.412  [report] Uploaded report: gs://gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/upload_report.json
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  [skip] artifact filename: uploads/dev/panugay5hyq6wzyibvub5e3fsrb3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/jennrich-it_leads_01-2026_enriched_test_with_links.csv
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  metadata
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  text/csv
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  content_type
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.384  object_name
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  gb-qr-tracker-dev.firebasestorage.app
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  bucket_name
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  {'kind': 'storage#object', 'id': 'gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv/1769597403194423', 'selfLink': 'https://www.googleapis.com/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2FJennrich-it_Leads_01-2026_enriched_test_with_links.csv', 'name': 'uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app', 'generation': '1769597403194423', 'metageneration': '1', 'contentType': 'text/csv', 'timeCreated': '2026-01-28T10:50:03.221Z', 'updated': '2026-01-28T10:50:03.221Z', 'storageClass': 'MULTI_REGIONAL', 'timeStorageClassUpdated': '2026-01-28T10:50:03.221Z', 'size': '595605', 'md5Hash': 'RphBxds5CjmvDIV5EZaPNw==', 'mediaLink': 'https://storage.googleapis.com/download/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2FJennrich-it_Leads_01-2026_enriched_test_with_links.csv?generation=1769597403194423&alt=media', 'crc32c': 'jEJPVQ==', 'etag': 'CLfI84SIrpIDEAE='}
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  data
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  {'attributes': {'specversion': '1.0', 'id': '17480554719796705', 'source': '//storage.googleapis.com/projects/_/buckets/gb-qr-tracker-dev.firebasestorage.app', 'type': 'google.cloud.storage.object.v1.finalized', 'datacontenttype': 'application/json', 'subject': 'objects/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv', 'time': '2026-01-28T10:50:03.221727Z', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app'}, 'data': {'kind': 'storage#object', 'id': 'gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv/1769597403194423', 'selfLink': 'https://www.googleapis.com/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2FJennrich-it_Leads_01-2026_enriched_test_with_links.csv', 'name': 'uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv', 'bucket': 'gb-qr-tracker-dev.firebasestorage.app', 'generation': '1769597403194423', 'metageneration': '1', 'contentType': 'text/csv', 'timeCreated': '2026-01-28T10:50:03.221Z', 'updated': '2026-01-28T10:50:03.221Z', 'storageClass': 'MULTI_REGIONAL', 'timeStorageClassUpdated': '2026-01-28T10:50:03.221Z', 'size': '595605', 'md5Hash': 'RphBxds5CjmvDIV5EZaPNw==', 'mediaLink': 'https://storage.googleapis.com/download/storage/v1/b/gb-qr-tracker-dev.firebasestorage.app/o/uploads%2Fdev%2FPanugay5HYQ6WzyiBvUB5E3FSRB3%2Fb847830c-6b39-4e53-b4ab-a1fd5e714062%2Fsource%2FJennrich-it_Leads_01-2026_enriched_test_with_links.csv?generation=1769597403194423&alt=media', 'crc32c': 'jEJPVQ==', 'etag': 'CLfI84SIrpIDEAE='}}
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  cloud_event
+       upload-processor  oUToHlgGwnYk  2026-01-28 10:50:03.383  ⚡ trigger
+I      upload-processor                2026-01-28 10:50:03.359
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:03.265  [done] Wrote: gs://gb-qr-tracker-dev.firebasestorage.app/uploads/dev/Panugay5HYQ6WzyiBvUB5E3FSRB3/b847830c-6b39-4e53-b4ab-a1fd5e714062/source/Jennrich-it_Leads_01-2026_enriched_test_with_links.csv
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:03.095  Done. created_links=1567 created_targets=1567 skipped=0 errors=0 blacklisted=0
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:02.848  [batch] Committed 235 operations successfully
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.801  Processing rows: 100%|██████████| 1567/1567 [00:36<00:00, 42.83row/s]
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.801
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.801  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=krahl-roehnisch-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.800
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.800  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.800  Creating link with ID: krahl-roehnisch-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.800  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.799
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.799  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.799  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8bc50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b88790>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Rechtsanwältin Krahl-Röhnisch', 'Namenszeile 1': 'Rechtsanwältin Krahl-Röhnisch', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '13595', 'Ort': 'Berlin', 'Ortsteil': '', 'Straße': 'Pichelsdorfer Str.', 'Hausnummer': '97', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Manuela', 'Entscheider 1 Nachname': 'Krahl-Röhnisch', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 30 35136992', 'e-mail-adresse': 'info@krahl-roehnisch.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'krahl-roehnisch.de'}, 'dedupe_key': 'rechtsanw-ltin-krahl-r-hnisch|pichelsdorfer-str--97|13595|berlin', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.799
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.799  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798  krahl-roehnisch-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwaelte-dup-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.798  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796  Creating link with ID: rechtsanwaelte-dup-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4b650>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b59650>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Diehl & Pape – Rechtsanwälte', 'Namenszeile 1': 'Diehl & Pape – Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '8412', 'Ort': 'Werdau', 'Ortsteil': '', 'Straße': 'August-Bebel-Str.', 'Hausnummer': '41', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Alexander', 'Entscheider 1 Nachname': 'Diehl', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3761 5491', 'e-mail-adresse': 'bewerbung@rechtsanwaelte-dup.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwaelte-dup.de'}, 'dedupe_key': 'diehl-pape-rechtsanw-lte|august-bebel-str--41|8412|werdau', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.796  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795  rechtsanwaelte-dup-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=fuchs-seybold-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.795  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.794  Creating link with ID: fuchs-seybold-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.794  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.794
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.794  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.793  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a53d50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4bc90>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Fuchs und Seybold', 'Namenszeile 1': 'Fuchs und Seybold', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '91555', 'Ort': 'Feuchtwangen', 'Ortsteil': '', 'Straße': 'Dinkelsbühler Str.', 'Hausnummer': '9', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Franz', 'Entscheider 1 Nachname': 'Seybold', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9852 2000', 'e-mail-adresse': 'kanzlei@fuchs-seybold.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'fuchs-seybold.de'}, 'dedupe_key': 'fuchs-und-seybold|dinkelsb-hler-str--9|91555|feuchtwangen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.793
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.793  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792  fuchs-seybold-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=martinsplatz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.792  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.791  Creating link with ID: martinsplatz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.791  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.791
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.791  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.790  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49a10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a48b10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Franken • Grillo • Steinweg', 'Namenszeile 1': 'Franken • Grillo • Steinweg', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '53113', 'Ort': 'Bonn', 'Ortsteil': '', 'Straße': 'Martinsplatz', 'Hausnummer': '2a', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Markus', 'Entscheider 1 Nachname': 'Franken Grillo Steinweg', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 228 969990', 'e-mail-adresse': 'hollmann@martinsplatz.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'martinsplatz.de'}, 'dedupe_key': 'franken-grillo-steinweg|martinsplatz-2a|53113|bonn', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.790
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.790  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.789  martinsplatz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.789
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.789  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.789  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-wm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.788
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.788  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.787  Creating link with ID: rae-wm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.787  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.787
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.787  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.787  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4bb50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49a50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Münzberg & Werkmeister', 'Namenszeile 1': 'Rechtsanwälte Münzberg & Werkmeister', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '82362', 'Ort': 'Weilheim', 'Ortsteil': '', 'Straße': 'Obere Stadt', 'Hausnummer': '9', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Georg', 'Entscheider 1 Nachname': 'Werkmeister', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 89 5329440', 'e-mail-adresse': 'rae-wm@t-online.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-wm.de'}, 'dedupe_key': 'rechtsanw-lte-m-nzberg-werkmeister|obere-stadt-9|82362|weilheim', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.734
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.734  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733  rae-wm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=ra-lepper-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.733  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732  Creating link with ID: ra-lepper-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4be50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49c90>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Christina J. Lepper Rechtsanwältin', 'Namenszeile 1': 'Christina J. Lepper Rechtsanwältin', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '91083', 'Ort': 'Baiersdorf', 'Ortsteil': '', 'Straße': 'Hauptstraße', 'Hausnummer': '10', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Christina', 'Entscheider 1 Nachname': 'Lepper', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9133 9660', 'e-mail-adresse': 'info@ra-lepper.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'ra-lepper.de'}, 'dedupe_key': 'christina-j-lepper-rechtsanw-ltin|hauptstrasse-10|91083|baiersdorf', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.732  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730  ra-lepper-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=die-rechtsanwaeltinnen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.730  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.729  Creating link with ID: die-rechtsanwaeltinnen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.729  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.729
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.729  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.729  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4aa50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4b290>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Quahl-Rux & Pelzer', 'Namenszeile 1': 'Quahl-Rux & Pelzer', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '16225', 'Ort': 'Eberswalde', 'Ortsteil': '', 'Straße': 'Salomon-Goldschmidt-Straße', 'Hausnummer': '10', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Claudia', 'Entscheider 1 Nachname': 'Quahl-Rux', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3334 278505', 'e-mail-adresse': 'info@die-rechtsanwaeltinnen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'die-rechtsanwaeltinnen.de'}, 'dedupe_key': 'quahl-rux-pelzer|salomon-goldschmidt-strasse-10|16225|eberswalde', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.728
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.728  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727  die-rechtsanwaeltinnen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=limberg-kohlmeier-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.727  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.726  Creating link with ID: limberg-kohlmeier-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.726  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.726
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.726  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.726  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4ab10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a490d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Limberg & Kohlmeier Rechtsanwälte Fachanwälte GbR', 'Namenszeile 1': 'Kanzlei Limberg & Kohlmeier Rechtsanwälte Fachanwälte GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '21244', 'Ort': 'Buchholz in der Nordheide', 'Ortsteil': '', 'Straße': 'Innungsstraße', 'Hausnummer': '7', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Oliver', 'Entscheider 1 Nachname': 'Limberg', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 4181 21880', 'e-mail-adresse': 'info@limberg-kohlmeier.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'limberg-kohlmeier.de'}, 'dedupe_key': 'kanzlei-limberg-kohlmeier-rechtsanw-lte-fachanw-lte-gbr|innungsstrasse-7|21244|buchholz-in-der-nordheide', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.725
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.725  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724  limberg-kohlmeier-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwaelte-warken-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.724  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723  Creating link with ID: rechtsanwaelte-warken-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49e10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51bd0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Warken und Kollegen', 'Namenszeile 1': 'Rechtsanwälte Warken und Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '66346', 'Ort': 'Püttlingen', 'Ortsteil': '', 'Straße': 'Völklinger Straße', 'Hausnummer': '1', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Hans-Georg', 'Entscheider 1 Nachname': 'Warken', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 6898 6044', 'e-mail-adresse': 'post@rae-warken.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwaelte-warken.de'}, 'dedupe_key': 'rechtsanw-lte-warken-und-kollegen|v-lklinger-strasse-1|66346|p-ttlingen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.723  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721  rechtsanwaelte-warken-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=anwalt-badneustadt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.721  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720  Creating link with ID: anwalt-badneustadt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49fd0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4a310>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Tur, Dr. Bambach & Kollegen Rechtsanwälte GbR', 'Namenszeile 1': 'Tur, Dr. Bambach & Kollegen Rechtsanwälte GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '97616', 'Ort': 'Bad Neustadt', 'Ortsteil': '', 'Straße': 'Bauerngasse', 'Hausnummer': '26a', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Bambach', 'Entscheider 1 Nachname': 'Tur', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9771 636360', 'e-mail-adresse': 'datenschutz@anwalt-badneustadt.com', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'anwalt-badneustadt.com'}, 'dedupe_key': 'tur-dr-bambach-kollegen-rechtsanw-lte-gbr|bauerngasse-26a|97616|bad-neustadt', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.720  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718  anwalt-badneustadt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=banff-egloffstein-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.718  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717  Creating link with ID: banff-egloffstein-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a495d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4b290>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Banff & Graf Egloffstein PartmbB', 'Namenszeile 1': 'Rechtsanwälte Banff & Graf Egloffstein PartmbB', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '35510', 'Ort': 'Butzbach', 'Ortsteil': '', 'Straße': 'Färbgasse', 'Hausnummer': '6', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Timo', 'Entscheider 1 Nachname': 'Banff', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 6033 97320', 'e-mail-adresse': 'kanzlei@banff-egloffstein.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'banff-egloffstein.de'}, 'dedupe_key': 'rechtsanw-lte-banff-graf-egloffstein-partmbb|f-rbgasse-6|35510|butzbach', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.717  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715  banff-egloffstein-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=hamburglaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.715  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.714  Creating link with ID: hamburglaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.714  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.714
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.713  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.713  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a48c10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21090>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': '22041 Hamburg', 'Namenszeile 1': '22041 Hamburg', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '22041', 'Ort': 'Hamburg', 'Ortsteil': '', 'Straße': 'Wandsbeker Allee', 'Hausnummer': '68', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Jean-Pierre', 'Entscheider 1 Nachname': 'El Sayed', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 40 6704880', 'e-mail-adresse': 'info@hamburglaw.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'hamburglaw.de'}, 'dedupe_key': '22041-hamburg|wandsbeker-allee-68|22041|hamburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.713
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.713  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712  hamburglaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=wolf-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.712  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.711  Creating link with ID: wolf-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.711  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.711
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.711  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.711  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a49e90>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a498d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Rechtsanwaltskanzlei Wolf Obermann', 'Namenszeile 1': 'Rechtsanwaltskanzlei Wolf Obermann', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '66111', 'Ort': 'Saarbrücken', 'Ortsteil': '', 'Straße': 'Kaiserstr.', 'Hausnummer': '10', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Andrea Julia', 'Entscheider 1 Nachname': 'Wolf', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 681 859150', 'e-mail-adresse': 'ra@wolf-kollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'wolf-kollegen.de'}, 'dedupe_key': 'rechtsanwaltskanzlei-wolf-obermann|kaiserstr--10|66111|saarbr-cken', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.710
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.710  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709  wolf-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=sf-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.709  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.708  Creating link with ID: sf-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.708  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.708
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.708  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.707  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23a90>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21090>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Friedrich Rechtsanwälte Fachanwälte', 'Namenszeile 1': 'Friedrich Rechtsanwälte Fachanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '76530', 'Ort': 'Baden-Baden', 'Ortsteil': '', 'Straße': 'Lange Straße', 'Hausnummer': '126', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Stefan', 'Entscheider 1 Nachname': 'Friedrich Rechtsanwälte', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7221 50630', 'e-mail-adresse': 'info@sf-kanzlei.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'sf-kanzlei.de'}, 'dedupe_key': 'friedrich-rechtsanw-lte-fachanw-lte|lange-strasse-126|76530|baden-baden', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.707
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.707  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.706  sf-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.705
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.705  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.705  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-jurgutat-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.705
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.705  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704  Creating link with ID: rae-jurgutat-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20590>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4b550>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Jurgutat & Jurgutat', 'Namenszeile 1': 'Jurgutat & Jurgutat', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '46045', 'Ort': 'Oberhausen', 'Ortsteil': '', 'Straße': 'Helmholzstraße', 'Hausnummer': '29', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Jan', 'Entscheider 1 Nachname': 'Jurgutat', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 208 25933', 'e-mail-adresse': 'info@rae-jurgutat.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-jurgutat.de'}, 'dedupe_key': 'jurgutat-jurgutat|helmholzstrasse-29|46045|oberhausen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.704  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.703  rae-jurgutat-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.703
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.703  Processing rows:  99%|█████████▉| 1552/1567 [00:36<00:00, 37.77row/s]
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.703  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.702  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=david-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.702
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.702  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701  Creating link with ID: david-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a481d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20290>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Anwaltsgemeinschaft David & Kollegen GbR', 'Namenszeile 1': 'Anwaltsgemeinschaft David & Kollegen GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '32427', 'Ort': 'Minden', 'Ortsteil': '', 'Straße': 'Hahler Straße', 'Hausnummer': '16', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Ulrich', 'Entscheider 1 Nachname': 'Hartmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 571 886010', 'e-mail-adresse': 'heuer@david-kollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'david-kollegen.de'}, 'dedupe_key': 'anwaltsgemeinschaft-david-kollegen-gbr|hahler-strasse-16|32427|minden', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.701  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.700  david-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.700
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.700  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.700  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=pruewer-proff-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.699
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.699  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.699  Creating link with ID: pruewer-proff-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22e10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a527d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Anwaltskanzlei Prüwer Proff Streller Schajor', 'Namenszeile 1': 'Anwaltskanzlei Prüwer Proff Streller Schajor', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '40547', 'Ort': 'Dorsten', 'Ortsteil': '', 'Straße': 'Hansaallee', 'Hausnummer': '4', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Christoph', 'Entscheider 1 Nachname': 'Prüwer', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 211 596851', 'e-mail-adresse': 'datenschutz-ds@pruewer-proff.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'pruewer-proff.de'}, 'dedupe_key': 'anwaltskanzlei-pr-wer-proff-streller-schajor|hansaallee-4|40547|dorsten', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.698  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697  pruewer-proff-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-lotz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.697  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.696  Creating link with ID: rae-lotz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.696  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.696
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.696  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.696  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20bd0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21750>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Lotz & Schmidt', 'Namenszeile 1': 'Lotz & Schmidt', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '22846', 'Ort': 'Norderstedt', 'Ortsteil': '', 'Straße': 'Rathausallee', 'Hausnummer': '31', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Wolfgang', 'Entscheider 1 Nachname': 'Sohst', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 40 5353420', 'e-mail-adresse': 'info@rae-lotz.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-lotz.de'}, 'dedupe_key': 'lotz-schmidt|rathausallee-31|22846|norderstedt', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.695
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.695  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694  rae-lotz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=familienrecht-mietrecht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.694  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.693  Creating link with ID: familienrecht-mietrecht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.693  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.693
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.692  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.692  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22550>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20c50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Rechtsanwälte Pickert | Hoffmann', 'Namenszeile 1': 'Rechtsanwälte Pickert | Hoffmann', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '53173', 'Ort': 'Bonn-Bad Godesberg', 'Ortsteil': '', 'Straße': 'Moltkestraße', 'Hausnummer': '74', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Karoline', 'Entscheider 1 Nachname': 'Hoffmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 228 329190', 'e-mail-adresse': 'kanzlei@familienrecht-mietrecht.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'familienrecht-mietrecht.de'}, 'dedupe_key': 'rechtsanw-lte-pickert-hoffmann|moltkestrasse-74|53173|bonn-bad-godesberg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.692
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.692  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691  familienrecht-mietrecht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=unsere-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.691  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.690  Creating link with ID: unsere-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.690  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.690
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.690  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.690  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21990>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23490>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Wagner + Gräf', 'Namenszeile 1': 'Rechtsanwälte Wagner + Gräf', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '97070', 'Ort': 'Würzburg', 'Ortsteil': '', 'Straße': 'Theaterstraße', 'Hausnummer': '1', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Gerhard', 'Entscheider 1 Nachname': 'Wagner', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 931 321010', 'e-mail-adresse': 'info@unsere-kanzlei.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'unsere-kanzlei.de'}, 'dedupe_key': 'rechtsanw-lte-wagner-gr-f|theaterstrasse-1|97070|w-rzburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.689
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.689  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688  unsere-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rsw-recht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.688  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.638  Creating link with ID: rsw-recht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.638  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.638
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.638  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.637  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21150>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22bd0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'RSW Rechtsanwälte – Impressum', 'Namenszeile 1': 'RSW Rechtsanwälte – Impressum', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '53721', 'Ort': 'Siegburg', 'Ortsteil': '', 'Straße': 'Markt', 'Hausnummer': '1', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Michael', 'Entscheider 1 Nachname': 'Geilen', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 2241 96690', 'e-mail-adresse': 'rajic@rsw-recht.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rsw-recht.de'}, 'dedupe_key': 'rsw-rechtsanw-lte-impressum|markt-1|53721|siegburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.637
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.637  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636  rsw-recht-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rudel-stiess-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.636  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635  Creating link with ID: rudel-stiess-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20850>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23d10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Bürogemeinschaft Rudel & Stieß Rechtsanwalt Maik Rudel Rechtsanwalt Philipp Stieß', 'Namenszeile 1': 'Bürogemeinschaft Rudel & Stieß Rechtsanwalt Maik Rudel Rechtsanwalt Philipp Stieß', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '94081', 'Ort': 'Fürstenzell', 'Ortsteil': '', 'Straße': 'Griesbacher Straße', 'Hausnummer': '5', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Maik', 'Entscheider 1 Nachname': 'Rudel', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 8502 3543', 'e-mail-adresse': 'anwalt@rudel-stiess.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rudel-stiess.de'}, 'dedupe_key': 'b-rogemeinschaft-rudel-stie-rechtsanwalt-maik-rudel-rechtsanwalt-philipp-stie-|griesbacher-strasse-5|94081|f-rstenzell', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.635  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633  rudel-stiess-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=recht-relevant-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.633  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632  Creating link with ID: recht-relevant-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20e90>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23310>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Recht Relevant', 'Namenszeile 1': 'Recht Relevant', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '44625', 'Ort': 'Herne', 'Ortsteil': '', 'Straße': 'Holsterhauser Straße', 'Hausnummer': '364', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Ingrid', 'Entscheider 1 Nachname': 'Schaal', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 231 61056912', 'e-mail-adresse': 'kanzlei@recht-relevant.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'recht-relevant.de'}, 'dedupe_key': 'recht-relevant|holsterhauser-strasse-364|44625|herne', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.632  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.631  recht-relevant-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.631
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.631  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.630  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=wk-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.630
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.630  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629  Creating link with ID: wk-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20710>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22050>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Weißmann + Kilzer', 'Namenszeile 1': 'Weißmann + Kilzer', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '55543', 'Ort': 'Bad Kreuznach', 'Ortsteil': '', 'Straße': 'Bosenheimer Str.', 'Hausnummer': '8', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Daniel', 'Entscheider 1 Nachname': 'Weißmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 176 64177285', 'e-mail-adresse': 'info@wk-kanzlei.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'wk-kanzlei.de'}, 'dedupe_key': 'wei-mann-kilzer|bosenheimer-str--8|55543|bad-kreuznach', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.629  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628  wk-kanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=lohsin-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.628  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.627  Creating link with ID: lohsin-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.627  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.627
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.627  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.627  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a209d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20e10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Lohsin & Partner', 'Namenszeile 1': 'Lohsin & Partner', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '28757', 'Ort': 'Bremen', 'Ortsteil': '', 'Straße': 'Am Sedanplatz', 'Hausnummer': '2', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Jürgen', 'Entscheider 1 Nachname': 'Riepshoff', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 421 660060', 'e-mail-adresse': 'info@lohsin-partner.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'lohsin-partner.de'}, 'dedupe_key': 'lohsin-partner|am-sedanplatz-2|28757|bremen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.626
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.626  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625  lohsin-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=donaukanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.625  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624  Creating link with ID: donaukanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a52b50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20c50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Schima | Rechtsanwälte', 'Namenszeile 1': 'Schima | Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '94032', 'Ort': 'Passau', 'Ortsteil': '', 'Straße': 'Wittgasse', 'Hausnummer': '9', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Christoph', 'Entscheider 1 Nachname': 'Schima', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 851 490630', 'e-mail-adresse': 'info@donaukanzlei.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'donaukanzlei.de'}, 'dedupe_key': 'schima-rechtsanw-lte|wittgasse-9|94032|passau', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.624  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622  donaukanzlei-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=anwaltskanzlei-ludwigsburg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.622  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621  Creating link with ID: anwaltskanzlei-ludwigsburg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a514d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21bd0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Zager, Spatz & Schmidt', 'Namenszeile 1': 'Rechtsanwälte Zager, Spatz & Schmidt', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '71636', 'Ort': 'Ludwigsburg', 'Ortsteil': '', 'Straße': 'Oscar-Walcker-Str.', 'Hausnummer': '36', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Thomas', 'Entscheider 1 Nachname': 'Spatz', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7141 44270', 'e-mail-adresse': 'info@anwaltskanzlei-ludwigsburg.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'anwaltskanzlei-ludwigsburg.de'}, 'dedupe_key': 'rechtsanw-lte-zager-spatz-schmidt|oscar-walcker-str--36|71636|ludwigsburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.621  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619  anwaltskanzlei-ludwigsburg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-petereit-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.619  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618  Creating link with ID: kanzlei-petereit-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b593d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b58c10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwalt Dominik Petereit', 'Namenszeile 1': 'Rechtsanwalt Dominik Petereit', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '58511', 'Ort': 'Lüdenscheid', 'Ortsteil': '', 'Straße': 'Wilhelmstraße', 'Hausnummer': '24', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Dominik', 'Entscheider 1 Nachname': 'Petereit', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 2351 3796977', 'e-mail-adresse': 'info@kanzlei-petereit.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-petereit.de'}, 'dedupe_key': 'rechtsanwalt-dominik-petereit|wilhelmstrasse-24|58511|l-denscheid', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.618  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.617  kanzlei-petereit-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.617
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.617  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.616  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=loewe-herford-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.616
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.616  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.616  Creating link with ID: loewe-herford-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b59150>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a514d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Dr. Löwe', 'Namenszeile 1': 'Kanzlei Dr. Löwe', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '32052', 'Ort': 'Herford-Innenstadt', 'Ortsteil': '', 'Straße': 'Schillerstr.', 'Hausnummer': '3', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Matthias', 'Entscheider 1 Nachname': 'Schneider', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 5221 16680', 'e-mail-adresse': 'info@loewe-herford.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'loewe-herford.de'}, 'dedupe_key': 'kanzlei-dr-l-we|schillerstr--3|32052|herford-innenstadt', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.615  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614  loewe-herford-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=hupach-otto-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.614  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.613  Creating link with ID: hupach-otto-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.613  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.613
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.613  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.613  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b589d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a53f10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Hupach Otto Anwaltskanzlei in Bürogemeinschaft', 'Namenszeile 1': 'Hupach Otto Anwaltskanzlei in Bürogemeinschaft', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '44135', 'Ort': 'Dortmund', 'Ortsteil': '', 'Straße': 'Kaiserstraße', 'Hausnummer': '78', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Andrea', 'Entscheider 1 Nachname': 'Hupach', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 231 5450180', 'e-mail-adresse': 'info@hupach-otto.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'hupach-otto.de'}, 'dedupe_key': 'hupach-otto-anwaltskanzlei-in-b-rogemeinschaft|kaiserstrasse-78|44135|dortmund', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.612
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.612  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611  hupach-otto-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=anwaltskanzlei-chemnitz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.611  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.610  Creating link with ID: anwaltskanzlei-chemnitz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.610  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.609
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.609  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.609  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b58690>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b59850>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Pfeifer und Kollegen', 'Namenszeile 1': 'Rechtsanwälte Pfeifer und Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '9111', 'Ort': 'Chemnitz', 'Ortsteil': '', 'Straße': 'Bahnhofstraße', 'Hausnummer': '51', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Franz', 'Entscheider 1 Nachname': 'Pfeifer', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 371 382350', 'e-mail-adresse': 'info@pfeifer-und-kollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'anwaltskanzlei-chemnitz.de'}, 'dedupe_key': 'rechtsanw-lte-pfeifer-und-kollegen|bahnhofstrasse-51|9111|chemnitz', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.609
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.609  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606  anwaltskanzlei-chemnitz-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=heinke-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.606  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605  Creating link with ID: heinke-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51090>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b58850>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Nicole A. Heinke', 'Namenszeile 1': 'Nicole A. Heinke', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '20129', 'Ort': 'Hamburg', 'Ortsteil': '', 'Straße': 'Reetwerder', 'Hausnummer': '10', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Nicole', 'Entscheider 1 Nachname': 'Heinke', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 40 72960580', 'e-mail-adresse': 'kanzlei@heinke-rechtsanwaelte.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'heinke-rechtsanwaelte.de'}, 'dedupe_key': 'nicole-a-heinke|reetwerder-10|20129|hamburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.605  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.604  heinke-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.604
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.603  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.603  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=vogl-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.603
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.603  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602  Creating link with ID: vogl-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a52150>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b59050>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Vogl Rechtsanwälte', 'Namenszeile 1': 'Vogl Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '73033', 'Ort': 'Göppingen', 'Ortsteil': '', 'Straße': 'Poststraße', 'Hausnummer': '41', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Werner', 'Entscheider 1 Nachname': 'Vogl', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7161 1568940', 'e-mail-adresse': 'info@vogl-rechtsanwaelte.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'vogl-rechtsanwaelte.de'}, 'dedupe_key': 'vogl-rechtsanw-lte|poststrasse-41|73033|g-ppingen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.602  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600  vogl-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600  Processing rows:  98%|█████████▊| 1534/1567 [00:36<00:01, 27.40row/s]
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=schmidt-guenther-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.600  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599  Creating link with ID: schmidt-guenther-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b59010>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b58b10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwalt Prof. Dr. Torsten Schmidt', 'Namenszeile 1': 'Rechtsanwalt Prof. Dr. Torsten Schmidt', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '4703', 'Ort': 'Leisnig', 'Ortsteil': '', 'Straße': 'Ringstraße', 'Hausnummer': '18-20', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Torsten', 'Entscheider 1 Nachname': 'Schmidt', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 34321 23332', 'e-mail-adresse': 'schmidt@schmidt-guenther.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'schmidt-guenther.de'}, 'dedupe_key': 'rechtsanwalt-prof-dr-torsten-schmidt|ringstrasse-18-20|4703|leisnig', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.599  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597  schmidt-guenther-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-lahr-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.597  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596  Creating link with ID: rae-lahr-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51ad0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b5ae50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Anwaltskanzlei Manuel Singler, Wolfgang Heitz, Herbert Kutschera, Isabel Benz, Sarah Gietz', 'Namenszeile 1': 'Anwaltskanzlei Manuel Singler, Wolfgang Heitz, Herbert Kutschera, Isabel Benz, Sarah Gietz', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '77933', 'Ort': 'Lahr', 'Ortsteil': '', 'Straße': 'Schloßplatz', 'Hausnummer': '16', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Manuel', 'Entscheider 1 Nachname': 'Singler', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7821 509570', 'e-mail-adresse': 'kanzlei@rae-lahr.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-lahr.de'}, 'dedupe_key': 'anwaltskanzlei-manuel-singler-wolfgang-heitz-herbert-kutschera-isabel-benz-sarah-gietz|schlossplatz-16|77933|lahr', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.596  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594  rae-lahr-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=k3s-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.594  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593  Creating link with ID: k3s-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b598d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a53650>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'K3S Rechtsanwälte Straub, Staufer, Schwemmle, Weller, Bauer PartGmbB', 'Namenszeile 1': 'K3S Rechtsanwälte Straub, Staufer, Schwemmle, Weller, Bauer PartGmbB', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '70794', 'Ort': 'Filderstadt-Bonlanden', 'Ortsteil': '', 'Straße': 'Bonländer Hauptstraße', 'Hausnummer': '72', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Dietmar', 'Entscheider 1 Nachname': 'Straub', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 711 773930', 'e-mail-adresse': 'info@k3s-rechtsanwaelte.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'k3s-rechtsanwaelte.de'}, 'dedupe_key': 'k3s-rechtsanw-lte-straub-staufer-schwemmle-weller-bauer-partgmbb|bonl-nder-hauptstrasse-72|70794|filderstadt-bonlanden', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.593  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.592  k3s-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.592
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.592  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.591  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwaelte-woldering-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.591
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.591  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.591  Creating link with ID: rechtsanwaelte-woldering-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a50950>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51b10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Woldering Rechtsanwälte & Notar', 'Namenszeile 1': 'Woldering Rechtsanwälte & Notar', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '46399', 'Ort': 'Bocholt', 'Ortsteil': '', 'Straße': 'Crispinusplatz', 'Hausnummer': '4', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Hans-Ludger', 'Entscheider 1 Nachname': 'Woldering', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 2871 13268', 'e-mail-adresse': 'ra-hlw@rechtsanwaelte-woldering.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwaelte-woldering.de'}, 'dedupe_key': 'woldering-rechtsanw-lte-notar|crispinusplatz-4|46399|bocholt', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.590  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589  rechtsanwaelte-woldering-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=hemateam-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.589  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.588  Creating link with ID: hemateam-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.588  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.588
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.588  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.587  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a50e10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a50d90>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Heuser & Mannel Rechtsanwälte GbR', 'Namenszeile 1': 'Heuser & Mannel Rechtsanwälte GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '60594', 'Ort': 'Frankfurt am Main', 'Ortsteil': '', 'Straße': 'Gartenstraße', 'Hausnummer': '6', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Jörg', 'Entscheider 1 Nachname': 'Heuser', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 69 6637870', 'e-mail-adresse': 'kanzlei@hemateam.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'hemateam.de'}, 'dedupe_key': 'heuser-mannel-rechtsanw-lte-gbr|gartenstrasse-6|60594|frankfurt-am-main', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.587
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.587  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586  hemateam-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=anwalt-lodde-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.586  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.585  Creating link with ID: anwalt-lodde-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.585  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.585
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.585  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.584  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a53250>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a53390>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Lodde, Langefeld & Kollegen', 'Namenszeile 1': 'Rechtsanwälte Lodde, Langefeld & Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '44135', 'Ort': 'Dortmund', 'Ortsteil': '', 'Straße': 'Arndtstr.', 'Hausnummer': '30', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Langefeld', 'Entscheider 1 Nachname': 'Lodde', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 231 9678870', 'e-mail-adresse': 'info@anwalt-lodde.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'anwalt-lodde.de'}, 'dedupe_key': 'rechtsanw-lte-lodde-langefeld-kollegen|arndtstr--30|44135|dortmund', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.584
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.584  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583  anwalt-lodde-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=heberling-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.583  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582  Creating link with ID: heberling-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51910>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51590>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Heberling & Kollegen Rechtsanwälte in Bürogemeinschaft', 'Namenszeile 1': 'Heberling & Kollegen Rechtsanwälte in Bürogemeinschaft', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '28195', 'Ort': 'Bremen', 'Ortsteil': '', 'Straße': 'Obernstrasse', 'Hausnummer': '38-42', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Christoph', 'Entscheider 1 Nachname': 'Heberling', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 421 33003941', 'e-mail-adresse': 'info@heberling-kollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'heberling-kollegen.de'}, 'dedupe_key': 'heberling-kollegen-rechtsanw-lte-in-b-rogemeinschaft|obernstrasse-38-42|28195|bremen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.582  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.581  heberling-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.581
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.581  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.580  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=jehle-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.580
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.580  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579  Creating link with ID: jehle-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b79650>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b7a710>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Jehle und Kollegen', 'Namenszeile 1': 'Kanzlei Jehle und Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '84524', 'Ort': 'Neuötting', 'Ortsteil': '', 'Straße': 'Ludwigstraße', 'Hausnummer': '73', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Norbert', 'Entscheider 1 Nachname': 'Jehle', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 8671 885590', 'e-mail-adresse': 'ra.jehle@jehle-kollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'jehle-kollegen.com'}, 'dedupe_key': 'kanzlei-jehle-und-kollegen|ludwigstrasse-73|84524|neu-tting', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.579  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578  jehle-kollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=altmann-jahl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.578  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.577  Creating link with ID: altmann-jahl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.577  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.577
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.577  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.577  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcf890>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcd0d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Alois Altmann, Jutta Jahl', 'Namenszeile 1': 'Rechtsanwälte Alois Altmann, Jutta Jahl', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '93309', 'Ort': 'Kelheim', 'Ortsteil': '', 'Straße': 'Donaustr.', 'Hausnummer': '14', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Alois', 'Entscheider 1 Nachname': 'Altmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9441 4066', 'e-mail-adresse': 'info@altmann-jahl.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'altmann-jahl.de'}, 'dedupe_key': 'rechtsanw-lte-alois-altmann-jutta-jahl|donaustr--14|93309|kelheim', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.576
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.576  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575  altmann-jahl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=tondorfboehm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.575  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574  Creating link with ID: tondorfboehm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcc2d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcd110>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Anwaltssozietät Prof. Dr. Tondorf, Böhm und Leber GbR', 'Namenszeile 1': 'Anwaltssozietät Prof. Dr. Tondorf, Böhm und Leber GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '40213', 'Ort': 'Düsseldorf', 'Ortsteil': '', 'Straße': 'Ritterstraße', 'Hausnummer': '9', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Gregor', 'Entscheider 1 Nachname': 'Leber', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 211 864630', 'e-mail-adresse': 'kanzlei@tondorfboehm.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'tondorfboehm.de'}, 'dedupe_key': 'anwaltssoziet-t-prof-dr-tondorf-b-hm-und-leber-gbr|ritterstrasse-9|40213|d-sseldorf', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.574  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.573  tondorfboehm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.573
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.573  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.572  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=elblaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.572
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.572  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571  Creating link with ID: elblaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b7bc10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff613cfffd0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'elblaw Rechtsanwälte', 'Namenszeile 1': 'elblaw Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '20355', 'Ort': 'Hamburg', 'Ortsteil': '', 'Straße': 'Kaiser-Wilhelm-Straße', 'Hausnummer': '93', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Matthias', 'Entscheider 1 Nachname': 'Möller', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 40 41189380', 'e-mail-adresse': 'berchter@elblaw.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'elblaw.de'}, 'dedupe_key': 'elblaw-rechtsanw-lte|kaiser-wilhelm-strasse-93|20355|hamburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.571  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568  elblaw-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=schoeneburg-beckmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.568  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567  Creating link with ID: schoeneburg-beckmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcff90>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bced10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Schöneburg & Beckmann (Sozietät von Rechtsanwälten, GbR)', 'Namenszeile 1': 'Rechtsanwälte Schöneburg & Beckmann (Sozietät von Rechtsanwälten, GbR)', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '14470', 'Ort': 'Potsdam', 'Ortsteil': '', 'Straße': 'Berliner Str.', 'Hausnummer': '109', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Matthias', 'Entscheider 1 Nachname': 'Schöneburg', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 331 292386', 'e-mail-adresse': 'kanzlei@schoeneburg-beckmann.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'schoeneburg-beckmann.de'}, 'dedupe_key': 'rechtsanw-lte-sch-neburg-beckmann-soziet-t-von-rechtsanw-lten-gbr-|berliner-str--109|14470|potsdam', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.567  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.566  schoeneburg-beckmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.566
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.566  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.566  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=ra-schroeder-schroeder-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.566
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.565  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.565  Creating link with ID: ra-schroeder-schroeder-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.565  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.565
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.564  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.564  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcd410>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcced0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Schroeder & Schroeder', 'Namenszeile 1': 'Schroeder & Schroeder', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '50931', 'Ort': 'Köln', 'Ortsteil': '', 'Straße': 'Aachener Straße', 'Hausnummer': '75', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Michael', 'Entscheider 1 Nachname': 'Schroeder', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 221 525005', 'e-mail-adresse': 'info@ra-schroeder-schroeder.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'ra-schroeder-schroeder.de'}, 'dedupe_key': 'schroeder-schroeder|aachener-strasse-75|50931|k-ln', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.564
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.564  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563  ra-schroeder-schroeder-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=schuelzchen-berg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.563  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562  Creating link with ID: schuelzchen-berg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bce050>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bcc910>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Schülzchen und Berg', 'Namenszeile 1': 'Kanzlei Schülzchen und Berg', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '53111', 'Ort': 'Bonn', 'Ortsteil': '', 'Straße': 'Oxfordstraße', 'Hausnummer': '21', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Axel', 'Entscheider 1 Nachname': 'Schülzchen', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 228 184370', 'e-mail-adresse': 'info@schuelzchen-berg.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'schuelzchen-berg.de'}, 'dedupe_key': 'kanzlei-sch-lzchen-und-berg|oxfordstrasse-21|53111|bonn', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.562  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.560  schuelzchen-berg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.560
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.560  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:01.560  [batch] Committed 400 operations successfully
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.197  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=gkh-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.197
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.197  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196  Creating link with ID: gkh-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8f3d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8da10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'PR AG Hannover Nr. 200646', 'Namenszeile 1': 'PR AG Hannover Nr. 200646', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '27283', 'Ort': 'Verden', 'Ortsteil': '', 'Straße': 'Johanniswall', 'Hausnummer': '2', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Klaus', 'Entscheider 1 Nachname': 'Grantz', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 4231 92420', 'e-mail-adresse': 'recht@dr-grantz.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'gkh-anwalt.de'}, 'dedupe_key': 'pr-ag-hannover-nr-200646|johanniswall-2|27283|verden', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.196  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194  gkh-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194  Processing rows:  97%|█████████▋| 1519/1567 [00:34<00:00, 70.76row/s]
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=fachanwaelte-nippes-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.194  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.193  Creating link with ID: fachanwaelte-nippes-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.193  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.193
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.193  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.192  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8e650>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8e050>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Wilke & Pieplow Rechtsanwälte und Fachanwälte GbR', 'Namenszeile 1': 'Wilke & Pieplow Rechtsanwälte und Fachanwälte GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '50733', 'Ort': 'Köln-Nippes', 'Ortsteil': '', 'Straße': 'Neusser Straße', 'Hausnummer': '224', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Lukas', 'Entscheider 1 Nachname': 'Pieplow', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 221 9731770', 'e-mail-adresse': 'info@fachanwaelte-nippes.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'fachanwaelte-nippes.de'}, 'dedupe_key': 'wilke-pieplow-rechtsanw-lte-und-fachanw-lte-gbr|neusser-strasse-224|50733|k-ln-nippes', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.192
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.192  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191  fachanwaelte-nippes-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=ra-schraml-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.191  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.190  Creating link with ID: ra-schraml-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.190  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.190
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.190  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.190  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8c7d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8d090>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwalt Florian Benedikt Schraml', 'Namenszeile 1': 'Rechtsanwalt Florian Benedikt Schraml', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '92280', 'Ort': 'Kastl', 'Ortsteil': '', 'Straße': 'Gewerbegebiet', 'Hausnummer': '12', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Florian', 'Entscheider 1 Nachname': 'Schraml', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 821 50898810', 'e-mail-adresse': 'info@ra-schraml.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'ra-schraml.de'}, 'dedupe_key': 'rechtsanwalt-florian-benedikt-schraml|gewerbegebiet-12|92280|kastl', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.189
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.189  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188  ra-schraml-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-markus-mueller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.188  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.187  Creating link with ID: kanzlei-markus-mueller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.187  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.186
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.186  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.140  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8d050>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8f190>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Markus Müller', 'Namenszeile 1': 'Kanzlei Markus Müller', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '71638', 'Ort': 'Ludwigsburg', 'Ortsteil': '', 'Straße': 'Schorndorfer Str.', 'Hausnummer': '25', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Markus', 'Entscheider 1 Nachname': 'Müller', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7141 7025040', 'e-mail-adresse': 'info@kanzlei-markus-mueller.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-markus-mueller.de'}, 'dedupe_key': 'kanzlei-markus-m-ller|schorndorfer-str--25|71638|ludwigsburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.140
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.140  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138  kanzlei-markus-mueller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-gietl-koll-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.138  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137  Creating link with ID: rae-gietl-koll-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8d1d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8a250>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Rechtsanwälte Gietl & Kollegen', 'Namenszeile 1': 'Kanzlei Rechtsanwälte Gietl & Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '85049', 'Ort': 'Ingolstadt', 'Ortsteil': '', 'Straße': 'Theresienstraße', 'Hausnummer': '13', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Peter', 'Entscheider 1 Nachname': 'Gietl', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 841 9351312', 'e-mail-adresse': 'info@rae-gietl-koll.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-gietl-koll.de'}, 'dedupe_key': 'kanzlei-rechtsanw-lte-gietl-kollegen|theresienstrasse-13|85049|ingolstadt', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.137  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135  rae-gietl-koll-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=gottschalk-ra-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.135  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134  Creating link with ID: gottschalk-ra-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8a1d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8b310>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Marc Ulrich Gottschalk', 'Namenszeile 1': 'Marc Ulrich Gottschalk', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '63785', 'Ort': 'Obernburg', 'Ortsteil': '', 'Straße': 'Wendelinusplatz', 'Hausnummer': '3', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Marc Ulrich', 'Entscheider 1 Nachname': 'Gottschalk', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 6022 710800', 'e-mail-adresse': 'kanzlei@gottschalk-ra.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'gottschalk-ra.de'}, 'dedupe_key': 'marc-ulrich-gottschalk|wendelinusplatz-3|63785|obernburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.134  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.133  gottschalk-ra-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.133
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.133  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.133  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=aiblingeranwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.132
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.132  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.132  Creating link with ID: aiblingeranwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8b6d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bbba10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Aiblinger Anwälte in Bürogemeinschaft', 'Namenszeile 1': 'Aiblinger Anwälte in Bürogemeinschaft', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '83043', 'Ort': 'Bad Aibling', 'Ortsteil': '', 'Straße': 'Marienplatz', 'Hausnummer': '9', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Petra', 'Entscheider 1 Nachname': 'Laschat', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 8061 90960', 'e-mail-adresse': 'info@aiblingeranwaelte.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'aiblingeranwaelte.de'}, 'dedupe_key': 'aiblinger-anw-lte-in-b-rogemeinschaft|marienplatz-9|83043|bad-aibling', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.131  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.130  aiblingeranwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.130
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.130  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.129  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwalt-podei-schoenebeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.129
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.129  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128  Creating link with ID: rechtsanwalt-podei-schoenebeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b89390>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bdd8d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwaltskanzlei Nico Podei', 'Namenszeile 1': 'Rechtsanwaltskanzlei Nico Podei', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '39218', 'Ort': 'Schönebeck', 'Ortsteil': '', 'Straße': 'Steinstr.', 'Hausnummer': '21', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Nico', 'Entscheider 1 Nachname': 'Podei', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3928 410100', 'e-mail-adresse': 'info@rechtsanwalt-podei-schoenebeck.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwalt-podei-schoenebeck.de'}, 'dedupe_key': 'rechtsanwaltskanzlei-nico-podei|steinstr--21|39218|sch-nebeck', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.128  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.127  rechtsanwalt-podei-schoenebeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.126
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.126  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.126  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-diethelm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.126
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.126  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119  Creating link with ID: kanzlei-diethelm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b8bd50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b88590>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Diethelm Partnerschaft mbB', 'Namenszeile 1': 'Rechtsanwälte Diethelm Partnerschaft mbB', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '44135', 'Ort': 'Dortmund', 'Ortsteil': '', 'Straße': 'Hamburger Str.', 'Hausnummer': '130', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Matthias', 'Entscheider 1 Nachname': 'Diethelm', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 231 524412', 'e-mail-adresse': 'kontakt@kanzlei-diethelm.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-diethelm.de'}, 'dedupe_key': 'rechtsanw-lte-diethelm-partnerschaft-mbb|hamburger-str--130|44135|dortmund', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.119  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117  kanzlei-diethelm-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=schlabeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.117  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116  Creating link with ID: schlabeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a48a50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b89690>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Dr. Schlabeck & Kollegen', 'Namenszeile 1': 'Kanzlei Dr. Schlabeck & Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '32052', 'Ort': 'Herford', 'Ortsteil': '', 'Straße': 'Berliner Straße', 'Hausnummer': '3', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Michael', 'Entscheider 1 Nachname': 'Bauer', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 5221 16350', 'e-mail-adresse': 'datenschutz@schlabeck.com', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'schlabeck.com'}, 'dedupe_key': 'kanzlei-dr-schlabeck-kollegen|berliner-strasse-3|32052|herford', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.116  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.115  schlabeck-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.115
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.115  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.114  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=wah-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.114
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.114  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.114  Creating link with ID: wah-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9b88210>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bbba10>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Weyers, Altmann & Hölscher Rechtsanwaltsgesellschaft mbH', 'Namenszeile 1': 'Weyers, Altmann & Hölscher Rechtsanwaltsgesellschaft mbH', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '89129', 'Ort': 'Langenau', 'Ortsteil': '', 'Straße': 'Hindenburgstraße', 'Hausnummer': '40', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Anna', 'Entscheider 1 Nachname': 'Altmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 711 6155410', 'e-mail-adresse': 'office@wah-rechtsanwaelte.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'wah-rechtsanwaelte.de'}, 'dedupe_key': 'weyers-altmann-h-lscher-rechtsanwaltsgesellschaft-mbh|hindenburgstrasse-40|89129|langenau', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.113  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112  wah-rechtsanwaelte-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-bergedorf-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.112  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.111  Creating link with ID: kanzlei-bergedorf-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.111  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.110
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.110  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.110  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a239d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a48a50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Schröter Hartmann Rechtsanwälte', 'Namenszeile 1': 'Schröter Hartmann Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '21029', 'Ort': 'Hamburg', 'Ortsteil': '', 'Straße': 'Weidenbaumsweg', 'Hausnummer': '17', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Janina', 'Entscheider 1 Nachname': 'Konerding', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 40 7254050', 'e-mail-adresse': 'schroeter.hartmann@hamburg.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-bergedorf.de'}, 'dedupe_key': 'schr-ter-hartmann-rechtsanw-lte|weidenbaumsweg-17|21029|hamburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.110
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.110  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.109  kanzlei-bergedorf-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.109
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.109  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.108  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzleiwilli-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.108
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.108  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.108  Creating link with ID: kanzleiwilli-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23f50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bbb090>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Willi & Janocha Partnerschaft mbB', 'Namenszeile 1': 'Rechtsanwälte Willi & Janocha Partnerschaft mbB', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '89420', 'Ort': 'Höchstädt a', 'Ortsteil': '', 'Straße': 'Herzog-Philipp-Ludwig-Straße', 'Hausnummer': '13', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Manfred', 'Entscheider 1 Nachname': 'Janocha', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9074 95550', 'e-mail-adresse': 'lucas.janocha@kanzleiwilli.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzleiwilli.de'}, 'dedupe_key': 'rechtsanw-lte-willi-janocha-partnerschaft-mbb|herzog-philipp-ludwig-strasse-13|89420|h-chst-dt-a', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.107  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.106  kanzleiwilli-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.106
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.106  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.106  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=dein-anwalt-amberg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.105
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.105  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104  Creating link with ID: dein-anwalt-amberg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20dd0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a201d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwaltskanzlei Rockenstein • Lösche & Kollegen', 'Namenszeile 1': 'Rechtsanwaltskanzlei Rockenstein • Lösche & Kollegen', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '92224', 'Ort': 'Amberg', 'Ortsteil': '', 'Straße': 'Fabrikstraße', 'Hausnummer': '12', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Andreas', 'Entscheider 1 Nachname': 'Lösche', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 9621 6033180', 'e-mail-adresse': 'kanzlei@rockenstein-loesche.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'dein-anwalt-amberg.de'}, 'dedupe_key': 'rechtsanwaltskanzlei-rockenstein-l-sche-kollegen|fabrikstrasse-12|92224|amberg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.104  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103  dein-anwalt-amberg-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwaelte-zshp-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.103  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.102  Creating link with ID: rechtsanwaelte-zshp-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.102  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.102
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.102  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.101  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22ad0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20310>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Rechtsanwälte Dr. Hartman-Hilter & Pointner GbR', 'Namenszeile 1': 'Rechtsanwälte Dr. Hartman-Hilter & Pointner GbR', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '80331', 'Ort': 'München', 'Ortsteil': '', 'Straße': 'Tal', 'Hausnummer': '33', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Jost', 'Entscheider 1 Nachname': 'Hartman-Hilter', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 8041 78380', 'e-mail-adresse': 'datenschutz@rechtsanwaelte-zshp.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwaelte-zshp.de'}, 'dedupe_key': 'rechtsanw-lte-dr-hartman-hilter-pointner-gbr|tal-33|80331|m-nchen', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.101
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.101  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.100  rechtsanwaelte-zshp-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.100
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.099  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.099  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=waniek-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.099
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.099  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098  Creating link with ID: waniek-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22f10>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20350>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Waniek & Biernath PartG mbB Rechtsanwälte', 'Namenszeile 1': 'Waniek & Biernath PartG mbB Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '51429', 'Ort': 'Bergisch Gladbach', 'Ortsteil': '', 'Straße': 'Eichelstraße', 'Hausnummer': '16', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Felix', 'Entscheider 1 Nachname': 'Waniek', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 2204 7060520', 'e-mail-adresse': 'info@waniek-partner.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'waniek-partner.de'}, 'dedupe_key': 'waniek-biernath-partg-mbb-rechtsanw-lte|eichelstrasse-16|51429|bergisch-gladbach', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.098  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.097  waniek-partner-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.097
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.097  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.097  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-stoof-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.096
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.096  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.096  Creating link with ID: kanzlei-stoof-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20b50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20d50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Frau', 'Namenszeile': 'Martina Stoof', 'Namenszeile 1': 'Martina Stoof', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '14974', 'Ort': 'Ludwigsfelde', 'Ortsteil': '', 'Straße': 'Potsdamer Str.', 'Hausnummer': '33', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Frau', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Martina', 'Entscheider 1 Nachname': 'Stoof', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3378 801935', 'e-mail-adresse': 'info@kanzlei-stoof.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-stoof.de'}, 'dedupe_key': 'martina-stoof|potsdamer-str--33|14974|ludwigsfelde', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.095  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094  kanzlei-stoof-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rechtsanwälte-hanschmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.094  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093  Creating link with ID: rechtsanwälte-hanschmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20b90>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21090>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'RECHTSANWÄLTE HANSCHMANN & PARTNER', 'Namenszeile 1': 'RECHTSANWÄLTE HANSCHMANN & PARTNER', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '79098', 'Ort': 'Freiburg', 'Ortsteil': '', 'Straße': 'Gartenstraße', 'Hausnummer': '21', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Henning', 'Entscheider 1 Nachname': 'Hanschmann', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 7741 60090', 'e-mail-adresse': 'info@hanschmann-partner.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rechtsanwälte-hanschmann.de'}, 'dedupe_key': 'rechtsanw-lte-hanschmann-partner|gartenstrasse-21|79098|freiburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.093
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.092  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091  rechtsanwälte-hanschmann-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091  Processing rows:  96%|█████████▌| 1502/1567 [00:34<00:01, 56.31row/s]
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=alvermann-schmidt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.091  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089  Creating link with ID: alvermann-schmidt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a208d0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22590>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Alvermann Schmidt Kuldszun Partnerschaftsgesellschaft - Rechtsanwälte', 'Namenszeile 1': 'Alvermann Schmidt Kuldszun Partnerschaftsgesellschaft - Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '42853', 'Ort': 'Remscheid', 'Ortsteil': '', 'Straße': 'Daniel-Schürmann-Str.', 'Hausnummer': '39', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Daniel', 'Entscheider 1 Nachname': 'Schmidt', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 2191 24071', 'e-mail-adresse': 'kanzlei@alvermann-schmidt.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'alvermann-schmidt.de'}, 'dedupe_key': 'alvermann-schmidt-kuldszun-partnerschaftsgesellschaft-rechtsanw-lte|daniel-sch-rmann-str--39|42853|remscheid', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.089  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.088  alvermann-schmidt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.088
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.088  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.088  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=ra-hh-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.087
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.087  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.033  Creating link with ID: ra-hh-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20710>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a4b750>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Hofer & Hoynatzky Rechtsanwälte', 'Namenszeile 1': 'Hofer & Hoynatzky Rechtsanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '85368', 'Ort': 'Moosburg a.d. Isar', 'Ortsteil': '', 'Straße': 'Burgermühlstraße', 'Hausnummer': '1', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': '', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Stephan', 'Entscheider 1 Nachname': 'Hoynatzky', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 8761 74350', 'e-mail-adresse': 'info@ra-hh.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'ra-hh.de'}, 'dedupe_key': 'hofer-hoynatzky-rechtsanw-lte|burgerm-hlstrasse-1|85368|moosburg-a-d-isar', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.032  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.031  ra-hh-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.030
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.030  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.030  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=bruessler-moeller-suhl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.030
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.030  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029  Creating link with ID: bruessler-moeller-suhl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a22610>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a23e50>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': '98527 Suhl', 'Namenszeile 1': '98527 Suhl', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '98527', 'Ort': 'Suhl', 'Ortsteil': '', 'Straße': 'Gothaer Str.', 'Hausnummer': '24', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Christian', 'Entscheider 1 Nachname': 'Brüßler', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3681 75680', 'e-mail-adresse': 'info@rechtsanwaelte-suhl.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'bruessler-moeller-suhl.de'}, 'dedupe_key': '98527-suhl|gothaer-str--24|98527|suhl', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.029
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.028  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.027  bruessler-moeller-suhl-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.026
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.026  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.026  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=pirna-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.026
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.026  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025  Creating link with ID: pirna-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a21cd0>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a207d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Anwaltskanzlei Irrgang & Hahn', 'Namenszeile 1': 'Anwaltskanzlei Irrgang & Hahn', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '1796', 'Ort': 'Pirna', 'Ortsteil': '', 'Straße': 'Gartenstr.', 'Hausnummer': '12', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Thorsten', 'Entscheider 1 Nachname': 'Hahn', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 3501 444360', 'e-mail-adresse': 'info@pirna-anwalt.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'pirna-anwalt.de'}, 'dedupe_key': 'anwaltskanzlei-irrgang-hahn|gartenstr--12|1796|pirna', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.025  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024  pirna-anwalt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=hornkollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.024  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.023  Creating link with ID: hornkollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.023  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.023
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.022  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.022  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20990>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a20050>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Jochen Horn', 'Namenszeile 1': 'Jochen Horn', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '90429', 'Ort': 'Nürnberg', 'Ortsteil': '', 'Straße': 'Fürther Strasse', 'Hausnummer': '139', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Katharina', 'Entscheider 1 Nachname': 'Reidel', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 911 261909', 'e-mail-adresse': 'info@hornkollegen.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'hornkollegen.de'}, 'dedupe_key': 'jochen-horn|f-rther-strasse-139|90429|n-rnberg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.022
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.022  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021  hornkollegen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-ohly-zoeller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.021  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.020  Creating link with ID: rae-ohly-zoeller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a50350>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9bb8650>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Ohly//Zöller Rechtsanwälte und Fachanwälte', 'Namenszeile 1': 'Ohly//Zöller Rechtsanwälte und Fachanwälte', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '63741', 'Ort': 'Aschaffenburg', 'Ortsteil': '', 'Straße': 'Dämmer Tor', 'Hausnummer': '3', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Marcel', 'Entscheider 1 Nachname': 'Ohly', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 6021 3868330', 'e-mail-adresse': 'ohly@rae-ohly-zoeller.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'rae-ohly-zoeller.com'}, 'dedupe_key': 'ohly-z-ller-rechtsanw-lte-und-fachanw-lte|d-mmer-tor-3|63741|aschaffenburg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.019  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017  rae-ohly-zoeller-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=kanzlei-gebhardt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.017  DEBUG tracking_link:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.016  Creating link with ID: kanzlei-gebhardt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.016  https://www.rocket-letter.de
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.016
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.015  DEBUG dest:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.015  {'business_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a51e50>, 'status': 'linked', 'reason_excluded': None, 'link_ref': <google.cloud.firestore_v1.document.DocumentReference object at 0x7ff5f9a517d0>, 'import_row': {'Adress-ID': '', 'Anrede': 'Herr', 'Namenszeile': 'Kanzlei Gebhardt', 'Namenszeile 1': 'Kanzlei Gebhardt', 'Namenszeile 2': '', 'Namenszeile 3': '', 'PLZ': '96515', 'Ort': 'Sonneberg', 'Ortsteil': '', 'Straße': 'Bismarckstraße', 'Hausnummer': '37', 'Branchencode WZ': '', 'Branchenname WZ': '', 'Dachmarkt WZ': '', 'Bundesland': '', 'Entscheider 1 Anrede': 'Herr', 'Entscheider 1 Titel': '', 'Entscheider 1 Vorname': 'Uwe', 'Entscheider 1 Nachname': 'Gebhardt', 'Entscheider 1 Funktionsnummer': '', 'Entscheider 1 Funktionsname': 'Geschäftsführer/in', 'vorwahl_telefon': '', 'telefonnummer': '+49 361 654880', 'e-mail-adresse': 'mail@kanzlei-gebhardt.de', 'template': 'Jendrich-test.pdf', 'tracking_link': '', 'Domain': 'kanzlei-gebhardt.de'}, 'dedupe_key': 'kanzlei-gebhardt|bismarckstrasse-37|96515|sonneberg', 'created_at': Sentinel: Value used to set a document field to the server timestamp., 'updated_at': Sentinel: Value used to set a document field to the server timestamp.}
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.015
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.015  DEBUG target_payload:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.014  kanzlei-gebhardt-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.014
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.014  DEBUG final_id:
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.014  https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/redirector/?id=rae-kaussen-2
+       upload-processor  ogyKur8jNeUF  2026-01-28 10:50:00.013

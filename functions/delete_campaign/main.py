@@ -1,7 +1,9 @@
 import os
 import json
+import re
 from typing import Dict, List, Set
 from google.cloud import firestore, storage
+from google.cloud.firestore_v1 import ArrayRemove
 from google.api_core.exceptions import NotFound
 from flask import Request
 import functions_framework
@@ -68,6 +70,77 @@ def _count_query_fast(q) -> int:
     """
     return sum(1 for _ in _iter_query_docrefs(q))
 # -------------------------------------------------------------
+
+
+def _sanitize_id(value: str) -> str:
+    """
+    Normalize IDs exactly like upload/migration logic.
+    """
+    if value is None:
+        return ""
+    v = str(value).strip()
+    v = re.sub(r"[^A-Za-z0-9äöüÄÖÜß]+", "-", v)
+    v = re.sub(r"-{2,}", "-", v).strip("-")
+    return v.lower()
+
+
+def _iter_overlay_refs_for_campaign(campaign_ref):
+    """
+    Derive customer overlay refs from links for this campaign.
+    Source of truth: links.owner_id + links.business_ref.id
+    """
+    q = COL_LINKS.where("campaign_ref", "==", campaign_ref)
+    seen_paths = set()
+    for snap in q.stream():
+        data = snap.to_dict() or {}
+        owner_id = data.get("owner_id")
+        biz_ref = data.get("business_ref")
+        if not owner_id or not isinstance(owner_id, str):
+            continue
+        if not biz_ref or not hasattr(biz_ref, "id"):
+            continue
+        normalized_biz_id = _sanitize_id(biz_ref.id)
+        if not normalized_biz_id:
+            continue
+        overlay_ref = (
+            db.collection("customers")
+            .document(owner_id)
+            .collection("businesses")
+            .document(normalized_biz_id)
+        )
+        if overlay_ref.path in seen_paths:
+            continue
+        seen_paths.add(overlay_ref.path)
+        yield overlay_ref
+
+
+def _count_overlays_for_campaign(campaign_ref) -> int:
+    return sum(1 for _ in _iter_overlay_refs_for_campaign(campaign_ref))
+
+
+def _remove_campaign_from_overlays(campaign_ref, campaign_id: str):
+    """
+    Remove campaign membership from customer overlays.
+    Does not delete overlays; only updates campaign_ids + timestamp.
+    """
+    batch = db.batch()
+    ops = 0
+    for overlay_ref in _iter_overlay_refs_for_campaign(campaign_ref):
+        batch.set(
+            overlay_ref,
+            {
+                "campaign_ids": ArrayRemove([campaign_id]),
+                "campaign_updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+        ops += 1
+        if ops >= BATCH_SIZE:
+            batch.commit()
+            batch = db.batch()
+            ops = 0
+    if ops:
+        batch.commit()
 
 
 def _json(req: Request) -> Dict:
@@ -262,6 +335,7 @@ def delete_campaign(request: Request):
     unique_ips_count = _count_unique_ips_for_campaign(campaign_ref)
     links_count = _count_links_for_campaign(campaign_ref)
     hits_count = _count_hits_for_campaign(campaign_ref)
+    overlays_count = _count_overlays_for_campaign(campaign_ref)
     #biz_refs = _list_businesses_from_links(link_refs) if delete_businesses else set() #will be null, this will not work with the current schema
 
     # Filter businesses to only those unused elsewhere
@@ -277,6 +351,7 @@ def delete_campaign(request: Request):
             "uniqueIps": unique_ips_count,
             "links": links_count,
             "hits": hits_count,
+            "overlaysCampaignMembership": overlays_count,
             "businessesToMaybeDelete": 0,
             "businessesPrunable": len(prunable_biz_refs),
             "campaignDoc": 1,
@@ -301,7 +376,8 @@ def delete_campaign(request: Request):
         return (json.dumps({"ok": True, "dryRun": dry_run, "plan": plan}), 200)
 
     # 4) Execute (order matters)
-    # hits → targets → links → (businesses optional) → campaign → storage
+    # overlays campaign membership -> hits -> targets -> links -> (businesses optional) -> campaign -> storage
+    _remove_campaign_from_overlays(campaign_ref, campaign_id)
     _delete_hits_for_campaign(campaign_ref)
     _delete_targets_for_campaign(campaign_ref)
     _delete_unique_ips_for_campaign(campaign_ref)
@@ -324,6 +400,7 @@ def delete_campaign(request: Request):
             "targets": targets_count,
             "unique_ips": unique_ips_count,
             "links": links_count,
+            "overlaysCampaignMembership": overlays_count,
             "businesses": len(prunable_biz_refs),
             "campaignDoc": 1,
             "bucket_name": bucket_name,

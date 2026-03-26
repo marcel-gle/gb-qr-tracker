@@ -52,9 +52,9 @@ def set_user_claims(uid: str, is_admin: bool, credential_path: Optional[str] = N
 
 if __name__ == "__main__":
     # Example usage:
-    #credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #Dev account
-    credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service//gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json"  # Use Application Default Credentials (ADC)
-    uid = "xLRk37rnV7T4CbOXzW5N3saxVfy1"
+    credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json" #Dev account
+    #credentials_local_path = "/Users/marcelgleich/Desktop/Software/Firebase_Service//gb-qr-tracker-firebase-adminsdk-fbsvc-e89462f043.json"  # Use Application Default Credentials (ADC)
+    uid = "Panugay5HYQ6WzyiBvUB5E3FSRB3"
 
     claims = set_user_claims(uid, is_admin=False, credential_path=credentials_local_path)  # uses ADC
     # claims = set_user_claims("some-uid-123", is_admin=False, credential_path="service-account.json")
