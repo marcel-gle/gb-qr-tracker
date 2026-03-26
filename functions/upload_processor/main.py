@@ -1624,6 +1624,9 @@ def process_business_upload(cloud_event):
         #use business domain as tracking id 
     }
 
+    # Optional: link a search_group (and all its searches) to this campaign.
+    search_group_info = manifest.get("search_group") or {}
+
     campaign_code = params["campaign_code"]
     if not campaign_code:
         raise RuntimeError("campaign_code is required.")
@@ -1677,6 +1680,41 @@ def process_business_upload(cloud_event):
                 "out_path": out_path,
             },
         )
+
+        # If a search_group was provided in the manifest, link it (and all of its
+        # searches) to this campaign by setting campaign_id / campaign_ref once.
+        sg_id = search_group_info.get("id")
+        if sg_id and ownerId and params.get("campaign_id"):
+            try:
+                campaign_ref = COL_CAMPAIGNS.document(params["campaign_id"])
+                customer_ref = db.collection("customers").document(ownerId)
+                sg_ref = customer_ref.collection("search_groups").document(sg_id)
+
+                # Link the search_group document itself
+                sg_ref.set(
+                    {
+                        "campaign_id": params["campaign_id"],
+                        "campaign_ref": campaign_ref,
+                    },
+                    merge=True,
+                )
+
+                # Link all searches under this group that are not yet linked
+                searches_col = sg_ref.collection("searches")
+                for search_doc in searches_col.stream():
+                    data_doc = search_doc.to_dict() or {}
+                    if not data_doc.get("campaign_id") and not data_doc.get("campaign_ref"):
+                        search_doc.reference.set(
+                            {
+                                "campaign_id": params["campaign_id"],
+                                "campaign_ref": campaign_ref,
+                            },
+                            merge=True,
+                        )
+                print(f"[search_group] Linked search_group '{sg_id}' and its searches to campaign {params['campaign_id']}")
+            except Exception as link_err:
+                # Don't fail the whole upload if linking the search_group fails.
+                print(f"[search_group] Failed to link search_group '{sg_id}' for owner '{ownerId}': {link_err}")
 
         # Upload output next to input (same folder), with suffix
         out_name = os.path.basename(out_path)

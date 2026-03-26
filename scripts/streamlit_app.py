@@ -687,6 +687,12 @@ def render_step6() -> None:
     campaign_code = st.text_input("Campaign code", value=st.session_state.get("step6_code", ""), key="step6_code", placeholder="RLIT")
     campaign_name = st.text_input("Campaign name (optional)", value=st.session_state.get("step6_name", ""), key="step6_name", placeholder="Rocket Letter - IT 2")
     campaign_id = st.text_input("Campaign ID (optional; UUID if empty)", value=st.session_state.get("campaign_base_path", "").split("/")[-1] if st.session_state.get("campaign_base_path") else "", key="step6_campaign_id", placeholder="003-20260304-management-forum-stress")
+    search_group_id = st.text_input(
+        "Search group ID (optional; link this search group + its searches to the campaign)",
+        value=st.session_state.get("step6_search_group_id", ""),
+        key="step6_search_group_id",
+        placeholder="search-group-id",
+    )
     input_csv = st.text_input("Input CSV", value=default_in, key="step6_input", placeholder="/path/to/final-with-template.csv")
     templates_dir = st.text_input("Templates directory", value=default_tpl, key="step6_templates", placeholder="/path/to/templates")
     destination = st.text_input("Destination URL", value=st.session_state.get("step6_destination", ""), key="step6_destination", placeholder="https://www.rocket-letter.de/erstgespraech")
@@ -705,6 +711,8 @@ def render_step6() -> None:
                 cmd.extend(["--campaign-name", campaign_name])
             if campaign_id:
                 cmd.extend(["--campaign-id", campaign_id])
+            if search_group_id:
+                cmd.extend(["--search-group-id", search_group_id])
             if do_upload:
                 cmd.append("--upload")
 

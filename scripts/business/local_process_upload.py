@@ -434,6 +434,14 @@ def main(argv: List[str] | None = None) -> int:
         required=True,
         help="Destination URL to store in manifest (used by upload_processor).",
     )
+    parser.add_argument(
+        "--search-group-id",
+        required=False,
+        help=(
+            "Optional search_group document ID under customers/{ownerId}/search_groups "
+            "that should be linked to the created campaign (its searches will also be linked)."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -453,6 +461,7 @@ def main(argv: List[str] | None = None) -> int:
 
     env = args.env
     owner_id = args.owner_id
+    search_group_id: str | None = args.search_group_id
     # If no campaign_id is provided, generate a UUID v4 similar to frontend crypto.randomUUID()
     campaign_id = args.campaign_id or str(uuid.uuid4())
     campaign_root_prefix = f"uploads/{env}/{owner_id}/{campaign_id}"
@@ -519,6 +528,13 @@ def main(argv: List[str] | None = None) -> int:
             "skip_existing": True,
             "geocode": False,
         }
+
+        # Optionally pass through search group metadata so upload_processor
+        # can link the search_group + its searches to this campaign.
+        if search_group_id:
+            manifest["search_group"] = {
+                "id": search_group_id,
+            }
 
         csv_uri, manifest_uri = _upload_to_gcs(
             bucket_name=bucket_name,
