@@ -75,3 +75,15 @@ migrations:
     dependencies: []
     reversible: false
 
+  - id: "20260326_001"
+    name: "Backfill campaign_ids on customer business overlays"
+    script: "scripts/migrations/backfill_campaign_ids.py"
+    description: "Backfills customers/{customerId}/businesses/{businessId} campaign_ids from links using owner_id + normalized business_ref.id, and writes campaign_count plus campaign_updated_at."
+    created_date: "2026-03-26"
+    status: "completed"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: true
+

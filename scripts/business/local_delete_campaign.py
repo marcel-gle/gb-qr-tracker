@@ -24,7 +24,7 @@ from pathlib import Path
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def _get_env_config(env: str) -> tuple[str, str, str]:
@@ -114,6 +114,7 @@ def main() -> int:
     unique_ips_count = cf_main._count_unique_ips_for_campaign(campaign_ref)
     links_count = cf_main._count_links_for_campaign(campaign_ref)
     hits_count = cf_main._count_hits_for_campaign(campaign_ref)
+    overlays_count = cf_main._count_overlays_for_campaign(campaign_ref)
 
     plan = {
         "counts": {
@@ -121,6 +122,7 @@ def main() -> int:
             "uniqueIps": unique_ips_count,
             "links": links_count,
             "hits": hits_count,
+            "overlaysCampaignMembership": overlays_count,
             "businessesToMaybeDelete": 0,
             "businessesPrunable": 0,
             "campaignDoc": 1,
@@ -146,6 +148,7 @@ def main() -> int:
         return 0
 
     # Execute (same order as the function)
+    cf_main._remove_campaign_from_overlays(campaign_ref, args.campaign_id)
     cf_main._delete_hits_for_campaign(campaign_ref)
     cf_main._delete_targets_for_campaign(campaign_ref)
     cf_main._delete_unique_ips_for_campaign(campaign_ref)
@@ -164,6 +167,7 @@ def main() -> int:
             "targets": targets_count,
             "unique_ips": unique_ips_count,
             "links": links_count,
+            "overlaysCampaignMembership": overlays_count,
             "businesses": 0,
             "campaignDoc": 1,
             "bucket_name": bucket_name,

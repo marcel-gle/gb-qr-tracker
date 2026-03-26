@@ -36,7 +36,7 @@ MIGRATIONS_YAML = "migrations.yaml"
 
 def load_migrations_yaml() -> Dict[str, Any]:
     """Load migrations from YAML file."""
-    yaml_path = Path(__file__).parent.parent / MIGRATIONS_YAML
+    yaml_path = Path(__file__).parent.parent.parent / MIGRATIONS_YAML
     if not yaml_path.exists():
         print(f"Warning: {MIGRATIONS_YAML} not found", file=sys.stderr)
         return {"migrations": []}
