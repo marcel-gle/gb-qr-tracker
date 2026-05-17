@@ -21,10 +21,14 @@ import re
 import hmac
 import hashlib
 import time
+from dataclasses import dataclass
 from ipaddress import ip_address, ip_network
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+from cachetools import TTLCache
 from google.api_core.exceptions import AlreadyExists
+
+from tenant_utils import normalize_original_host
 from flask import Request, redirect
 import requests
 from google.cloud import firestore
@@ -55,6 +59,24 @@ Increment = firestore.Increment
 SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
 
 HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET", "")
+
+# off | log_only | enforce — only applies to Cloudflare Worker traffic (valid HMAC)
+REDIRECTOR_DOMAIN_TENANT_CHECK = "enforce"
+
+# Firestore: customer_domains/{hostname} -> { tenant_id?, shared? }
+CUSTOMER_DOMAINS_COLLECTION = "customer_domains"
+
+@dataclass(frozen=True)
+class _CachedCustomerDomain:
+    """Snapshot from customer_domains/{host}; exists=False if document missing."""
+
+    exists: bool
+    tenant_id: str | None
+    shared: bool
+
+
+# customer_domains/{hostname} -> _CachedCustomerDomain
+_DOMAIN_INFO_CACHE: TTLCache = TTLCache(maxsize=256, ttl=600)
 
 
 _geo_reader = None
@@ -91,6 +113,20 @@ def _is_safe_url(url: str) -> bool:
     try:
         p = urlparse(url)
         return p.scheme.lower() in ALLOWED_SCHEMES and bool(p.netloc)
+    except Exception:
+        return False
+
+
+def _request_has_forbidden_explicit_port(request: Request) -> bool:
+    """True if the request URL includes :port (canonical URLs omit the port)."""
+    try:
+        p = urlparse(request.url)
+        if p.port is None:
+            return False
+        host = (p.hostname or '').lower()
+        if host in ('localhost', '127.0.0.1', '::1') or host.endswith('.localhost'):
+            return False
+        return True
     except Exception:
         return False
 
@@ -199,28 +235,141 @@ def _extract_link_id(request):
     Resolves the link id from either:
       - query param:  ?id=TRACKING-ID
       - path:         /TRACKING-ID   or   /r/TRACKING-ID   or   /go/TRACKING-ID
+
+    Path must match exactly: no extra segments (e.g. /id/extra/file → invalid).
     """
-    # 1) Prefer query param (backwards compatible)
     q = (request.args.get("id") or "").strip()
     print("Extracted link ID from query param:", q)
     if q:
         return q
 
-    # 2) Fallback to path
-    path = (request.path or "/").strip("/")  # e.g., "TRACKING-ID" or "r/TRACKING-ID"
+    path = (request.path or "/").strip("/")
     if not path:
         return ""
 
     parts = path.split("/")
-    # Support optional short prefixes to avoid route collisions
-    #if parts[0] in {"r", "go", "t"} and len(parts) >= 2:
-    #    return parts[1].strip()
 
-    # Otherwise treat the first segment as the id
+    if len(parts) == 1:
+        link_id = parts[0].strip()
+        print("Extracted link ID from path:", link_id)
+        return link_id
 
-    link_id = parts[0].strip()
-    print("Extracted link ID from path:", link_id)
-    return link_id
+    if len(parts) == 2 and parts[0] in {"r", "go", "t"}:
+        link_id = parts[1].strip()
+        print("Extracted link ID from path (prefixed):", link_id)
+        return link_id
+
+    return ""
+
+
+def _get_customer_domain_info(hostname: str) -> _CachedCustomerDomain | None:
+    """Load customer_domains/{hostname} with TTL cache. None if hostname empty."""
+    if not hostname or not str(hostname).strip():
+        return None
+    key = str(hostname).strip().lower()
+    if not key:
+        return None
+    if key in _DOMAIN_INFO_CACHE:
+        return _DOMAIN_INFO_CACHE[key]
+    snap = _db.collection(CUSTOMER_DOMAINS_COLLECTION).document(key).get()
+    if not snap.exists:
+        info = _CachedCustomerDomain(exists=False, tenant_id=None, shared=False)
+    else:
+        d = snap.to_dict() or {}
+        raw_tid = d.get("tenant_id")
+        tid: str | None = None
+        if isinstance(raw_tid, str) and raw_tid.strip():
+            tid = raw_tid.strip()
+        shared = bool(d.get("shared"))
+        info = _CachedCustomerDomain(exists=True, tenant_id=tid, shared=shared)
+    _DOMAIN_INFO_CACHE[key] = info
+    return info
+
+
+def _normalized_link_allowed_hosts(raw) -> list[str]:
+    """Normalize allowed_hosts from link document (list of hostnames, lowercase, no port)."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for x in raw:
+        if not isinstance(x, str) or not x.strip():
+            continue
+        h = normalize_original_host(x.strip())
+        if h:
+            out.append(h)
+    return out
+
+
+def _apply_worker_domain_tenant_enforcement(
+    request: Request,
+    source: str,
+    link_id: str,
+    link_tenant_id: str | None,
+    link_allowed_hosts: list[str] | None,
+) -> tuple | None:
+    """
+    For Worker traffic only:
+    - Unknown host / missing customer_domains doc -> reject.
+    - Shared domain (customer_domains.shared true): link must list host in allowed_hosts.
+    - Dedicated domain: link tenant_id must match domain tenant_id.
+    Returns Flask tuple to short-circuit, or None to continue.
+    """
+    mode = REDIRECTOR_DOMAIN_TENANT_CHECK
+    if mode not in ("log_only", "enforce") or source != "cloudflare_worker":
+        return None
+
+    host = normalize_original_host(request.headers.get("X-Original-Host") or "")
+    info = _get_customer_domain_info(host) if host else None
+
+    ltid = (link_tenant_id or "").strip() if isinstance(link_tenant_id, str) else ""
+    ltid = ltid or None
+    allowed = _normalized_link_allowed_hosts(link_allowed_hosts)
+
+    unknown_host = not host or info is None or not info.exists
+    shared_host_not_listed = False
+    missing_link_tenant = False
+    missing_domain_tenant = False
+    mismatch = False
+
+    if not unknown_host and info.shared:
+        shared_host_not_listed = host not in allowed
+    elif not unknown_host and not info.shared:
+        missing_link_tenant = ltid is None
+        missing_domain_tenant = info.tenant_id is None
+        mismatch = not missing_link_tenant and not missing_domain_tenant and ltid != info.tenant_id
+
+    bad = (
+        unknown_host
+        or shared_host_not_listed
+        or missing_link_tenant
+        or missing_domain_tenant
+        or mismatch
+    )
+
+    if not bad:
+        return None
+
+    print(
+        "[REDIRECTOR_DOMAIN_TENANT] "
+        f"link_id={link_id!r} host={host!r} domain_shared={getattr(info, 'shared', None)} "
+        f"domain_tenant={getattr(info, 'tenant_id', None)!r} link_tenant={ltid!r} "
+        f"allowed_hosts={allowed!r} unknown_host={unknown_host} shared_host_not_listed={shared_host_not_listed} "
+        f"missing_link_tenant={missing_link_tenant} missing_domain_tenant={missing_domain_tenant} mismatch={mismatch}"
+    )
+
+    if mode == "log_only":
+        return None
+
+    return (
+        "Link not found.",
+        404,
+        {"Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store"},
+    )
+
 
 def _is_from_worker(request: Request, link_id: str) -> bool:
     """Return True if signature is valid for this request (ts:id)."""
@@ -236,20 +385,7 @@ def _is_from_worker(request: Request, link_id: str) -> bool:
             return False
 
         msg = f"{ts}:{link_id}"
-        expected = hmac.new(
-            HMAC_SECRET.encode("utf-8"),
-            msg.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-
-        # timing-safe compare
-
-        compared = hmac.compare_digest(expected, sig)
-        #print("Expected HMAC:", expected)
-        #print("Provided HMAC:", sig)
-        #print("HMAC comparison result:", compared)
-        msg = f"{ts}:{link_id}"
-        secret = os.environ.get("WORKER_HMAC_SECRET", "")
+        secret = os.environ.get("WORKER_HMAC_SECRET", "") or HMAC_SECRET
 
         #print("DEBUG ts=", repr(ts))
         #print("DEBUG id=", repr(link_id))
@@ -263,15 +399,19 @@ def _is_from_worker(request: Request, link_id: str) -> bool:
             secret = secret[1:-1]
 
         expected = hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
-        #print("Expected HMAC:", expected)
-        #print("Provided HMAC:", sig)
-        #print("HMAC comparison result:", hmac.compare_digest(expected, (sig or "").lower()))
-        return compared
+        return hmac.compare_digest(expected, (sig or "").lower())
     except Exception:
         return False
 
 
 def redirector(request: Request):
+    if _request_has_forbidden_explicit_port(request):
+        return (
+            'Invalid URL: do not include a port in the address.',
+            400,
+            {'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store'},
+        )
+
     # Health
     #test deploy2
     if request.path.strip('/') == 'health':
@@ -298,6 +438,16 @@ def redirector(request: Request):
     destination = data.get('destination')
     if not destination or not _is_safe_url(destination):
         return ('Destination is invalid or missing.', 500)
+
+    blocked = _apply_worker_domain_tenant_enforcement(
+        request,
+        source,
+        link_id,
+        data.get("tenant_id"),
+        data.get("allowed_hosts"),
+    )
+    if blocked is not None:
+        return blocked
 
     # --- Pull refs from link (new schema) ---
     campaign_ref = data.get('campaign_ref')     # DocumentReference or None

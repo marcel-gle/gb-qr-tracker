@@ -311,7 +311,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     limit: int,
                                     mapbox_token: Optional[str],
                                     skip_existing: bool,
-                                    geocode: bool = True):
+                                    geocode: bool = True,
+                                    tenant_id: Optional[str] = None,
+                                    allowed_hosts: Optional[List[str]] = None):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
     ext = os.path.splitext(path)[1].lower()
@@ -460,6 +462,10 @@ def assign_links_from_business_file(path: str, base_url: str,
                             "owner_id": ownerId,
                             "snapshot_mailing": snapshot
                         }
+                        if tenant_id:
+                            link_payload["tenant_id"] = tenant_id
+                        if allowed_hosts:
+                            link_payload["allowed_hosts"] = allowed_hosts
                         batch.set(link_ref, link_payload, merge=True); ops += 1
                         created_links += 1
                 else:
@@ -533,6 +539,10 @@ if __name__ == '__main__':
                    help='Fast pre-scan to skip creating links whose IDs already exist.')
     p.add_argument('--geocode', action='store_true',
                    help='Enable Mapbox geocoding (deduped per unique address).')
+    p.add_argument('--tenant-id', default=None,
+                   help='Redirector tenant slug (links.tenant_id; must match customer_domains/{go-host}).')
+    p.add_argument('--allowed-hosts', default=None,
+                   help='Comma-separated hostnames for shared go.* domains (links.allowed_hosts).')
 
     args = p.parse_args()
 
@@ -541,6 +551,11 @@ if __name__ == '__main__':
             p.error('--base-url is required when using --business-file')
         if not args.ownerId:
             p.error('--ownerId is required when using --business-file')
+        ah = (
+            [s.strip() for s in args.allowed_hosts.split(",") if s.strip()]
+            if args.allowed_hosts
+            else None
+        )
         assign_links_from_business_file(
             path=args.business_file,
             base_url=args.base_url,
@@ -552,6 +567,8 @@ if __name__ == '__main__':
             mapbox_token=args.mapbox_token,
             skip_existing=args.skip_existing,
             geocode=args.geocode,
+            tenant_id=args.tenant_id,
+            allowed_hosts=ah,
         )
     else:
         p.error('Provide: --business-file + --base-url + --ownerId (optional: --dest, --campaign-code, --campaign-name, --limit, --skip-existing, --geocode).')

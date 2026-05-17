@@ -2,13 +2,21 @@
 
 
 import csv
+import sys
 import time
 import re
+from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urljoin
 
+_BUSINESS_DIR = Path(__file__).resolve().parent.parent / "business"
+if str(_BUSINESS_DIR) not in sys.path:
+    sys.path.insert(0, str(_BUSINESS_DIR))
+
 import requests
 from bs4 import BeautifulSoup
+
+from imprint_md_extract import extract_managing_director_combined
 
 # ------------- Config -------------
 
@@ -22,7 +30,7 @@ DELAY_BETWEEN_REQUESTS = 1.0  # polite delay in seconds
 
 # Column names from your CSV
 COL_COMPANY = "Company"
-COL_DOMAIN = "Domain"
+COL_DOMAIN = "domain"
 COL_PHONE = "Generic Company Phones"
 COL_EMAIL = "Generic Company Emails"
 COL_ADDRESS = "Headquarter Raw Address"
@@ -148,24 +156,12 @@ def extract_address_from_text(text: str) -> Optional[str]:
 
 def extract_md_from_text(text: str) -> Optional[str]:
     """
-    Heuristic: look for lines with 'Geschäftsführer', 'Inhaber', 'vertreten durch' etc.
-    Returns the part after ':' if present.
+    Heuristic extraction of managing director / legal representative name(s).
+
+    Delegates to imprint_md_extract (heading-adjacent HTML, next-line after labels,
+    Yoast-style meta descriptions, etc.).
     """
-    keywords = ["geschäftsführer", "inhaber", "vertretungsberechtigt", "vertreten durch", "geschäftsleitung"]
-    for line in normalize_lines(text):
-        low = line.lower()
-        if any(k in low for k in keywords):
-            # e.g. "Geschäftsführer: Max Mustermann"
-            if ":" in line:
-                return line.split(":", 1)[1].strip()
-            # fallback: drop keyword itself
-            for k in keywords:
-                if k in low:
-                    idx = low.find(k)
-                    candidate = line[idx + len(k):].strip(" :-–")
-                    if candidate:
-                        return candidate
-    return None
+    return extract_managing_director_combined(text)
 
 
 def extract_legal_name_from_text(text: str) -> Optional[str]:
@@ -217,7 +213,7 @@ def scrape_imprint_data(domain: str) -> Dict[str, Optional[str]]:
     plain_text = soup.get_text("\n")
 
     address = extract_address_from_text(plain_text)
-    md = extract_md_from_text(plain_text)
+    md = extract_md_from_text(text)
     legal_name = extract_legal_name_from_text(plain_text)
 
     result["address"] = address
@@ -254,9 +250,10 @@ def legal_name_incomplete(name: str) -> bool:
     return False
 
 
-def enrich_csv(input_path: str, output_path: str):
+def enrich_csv(input_path: str, output_path: str, *, save_output: bool = False) -> None:
     """
-    Read input CSV, enrich missing fields by scraping, and write to output CSV.
+    Read input CSV, enrich missing fields by scraping.
+    When save_output is True, writes all rows (including unchanged) to output_path.
     """
     with open(input_path, "r", encoding="utf-8-sig", newline="") as f_in:
         reader = csv.DictReader(f_in, delimiter=";")
@@ -347,6 +344,14 @@ def enrich_csv(input_path: str, output_path: str):
 
         print("="*80)
 
+    if save_output:
+        out = Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w", encoding="utf-8-sig", newline="") as f_out:
+            writer = csv.DictWriter(f_out, fieldnames=fieldnames, delimiter=";")
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"\nWrote {len(rows)} rows to {out.resolve()}")
 
 
 if __name__ == "__main__":
@@ -354,7 +359,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Enrich German business data from website imprints.")
     parser.add_argument("input_csv", help="Input CSV file path")
-    parser.add_argument("output_csv", help="Output CSV file path")
+    parser.add_argument("output_csv", help="Output CSV file path (used when --save_output is set)")
+    parser.add_argument(
+        "--save_output",
+        action="store_true",
+        help="Write the full enriched table to output_csv after processing.",
+    )
 
     args = parser.parse_args()
-    enrich_csv(args.input_csv, args.output_csv)
+    enrich_csv(args.input_csv, args.output_csv, save_output=args.save_output)

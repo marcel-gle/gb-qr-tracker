@@ -290,6 +290,8 @@ def build_link_and_target_payloads(
     campaign_name: Optional[str],
     db: gcf.Client,
     run_timestamp: Optional[datetime] = None,
+    tenant_id: Optional[str] = None,
+    allowed_hosts: Optional[list] = None,
 ) -> Tuple[Dict, Dict, str, gcf.DocumentReference, gcf.DocumentReference]:
     """
     Build link + target payloads for a single missing tracking_id.
@@ -334,6 +336,10 @@ def build_link_and_target_payloads(
         "campaign_name": campaign_name,
         "short_code": tid,
     }
+    if tenant_id and str(tenant_id).strip():
+        link_payload["tenant_id"] = str(tenant_id).strip()
+    if allowed_hosts:
+        link_payload["allowed_hosts"] = list(allowed_hosts)
 
     target_payload = {
         "business_ref": biz_ref,
@@ -417,6 +423,16 @@ def main() -> int:
         "--verbose",
         action="store_true",
         help="Print per-link diagnostics.",
+    )
+    parser.add_argument(
+        "--tenant-id",
+        default=None,
+        help="Redirector tenant slug (links.tenant_id; must match customer_domains/{go-host}).",
+    )
+    parser.add_argument(
+        "--allowed-hosts",
+        default=None,
+        help="Comma-separated hostnames for shared go.* domains (links.allowed_hosts).",
     )
 
     args = parser.parse_args()
@@ -562,6 +578,12 @@ def main() -> int:
                 campaign_name=campaign_name,
                 db=db,
                 run_timestamp=run_timestamp,
+                tenant_id=args.tenant_id,
+                allowed_hosts=(
+                    [s.strip() for s in args.allowed_hosts.split(",") if s.strip()]
+                    if args.allowed_hosts
+                    else None
+                ),
             )
         except Exception as e:
             print(f"[ERROR] Failed to build payloads for {tid}: {e}")

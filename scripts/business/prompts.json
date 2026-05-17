@@ -180,9 +180,98 @@
         }
       },
       "user_prompt_template": "Analysiere diese Homepage:\n\nUnternehmensgegenstand: {gegenstand}\n\nDomain: {domain}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nAntworte ausschließlich mit:\n{{\"match_score\": SCORE}}"
+    },
+    {
+      "name": "bav_vermittler",
+      "description": "Lead-Scoring für Briefmarketing: Versicherungsmakler/Berater mit bAV, KMU ca. 3–30 Mitarbeiter",
+      "version": "1.0",
+      "system_prompt": "Du bist ein Lead-Scoring-System. Analysiere die folgende Webseite und bewerte, ob dieses Unternehmen ein guter Kunde für Briefmarketing-Dienstleistungen ist.\n\nZielkunde:\n- Versicherungsmakler oder -berater (KEIN Versicherungskonzern, keine Vergleichsportale)\n- Bietet betriebliche Altersvorsorge (bAV) an\n- Kleine bis mittlere Firma, geschätzt 3-30 Mitarbeiter\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"makler\": <true|false>, \"bav\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertungslogik:\n- 0-2: Kein Makler, Konzern, Vergleichsportal, oder komplett irrelevant\n- 3-5: Makler aber kein bAV-Fokus oder Größe unklar\n- 6-8: Makler mit bAV, Größe scheint zu passen\n- 9-10: Perfekter Match — unabhängiger Makler, klarer bAV-Schwerpunkt, passende Größe\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "min": 0,
+            "max": 10,
+            "description": "Lead quality 0–10 for Briefmarketing fit"
+          },
+          "makler": {
+            "type": "boolean",
+            "description": "Versicherungsmakler/-berater (kein Konzern/Portal)"
+          },
+          "bav": {
+            "type": "boolean",
+            "description": "bAV-Angebot erkennbar"
+          },
+          "firmengroesse": {
+            "type": "string",
+            "description": "zu_klein | passt | zu_gross | unklar"
+          },
+          "begruendung": {
+            "type": "string",
+            "description": "Eine kurze Begründung"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nWEBSEITE:\n\"\"\"\n{homepage_text}\n\"\"\""
+    },
+    {
+      "name": "performance-agentur",
+      "description": "Lead-Scoring: inhabergeführte Performance-Marketing-Agentur mit PPC/Meta/Google Ads, 3–30 MA",
+      "version": "1.0",
+      "system_prompt": "Du bist ein Lead-Scoring-System. Bewerte, ob diese Agentur ein guter Kunde für unsere Dienstleistungen ist.\n\nZielkunde:\n- Inhabergeführte Performance-Marketing-Agentur (KEINE Konzerne, Netzwerkagenturen, Freelancer-Einzelpersonen)\n- 3-30 Mitarbeiter\n- Bietet Meta Ads, Google Ads oder PPC-Kampagnen an\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"inhabergefuehrt\": <true|false>, \"ppc\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertung:\n- 0-2: Freelancer, Konzern, Netzwerkagentur, SEO-only, Webdesign-only, oder irrelevant\n- 3-5: Agentur aber kein PPC-Fokus oder Größe/Inhaberführung unklar\n- 6-8: Inhabergeführt, macht PPC, Größe scheint zu passen\n- 9-10: Perfekt — klar inhabergeführt, PPC/Paid-Ads-Schwerpunkt, 3-30 MA erkennbar\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "min": 0,
+            "max": 10,
+            "description": "Lead quality 0–10"
+          },
+          "inhabergefuehrt": {
+            "type": "boolean",
+            "description": "Inhabergeführt / kein Konzern-Netzwerk-Freelancer-Solo"
+          },
+          "ppc": {
+            "type": "boolean",
+            "description": "Meta Ads, Google Ads oder PPC erkennbar"
+          },
+          "firmengroesse": {
+            "type": "string",
+            "description": "zu_klein | passt | zu_gross | unklar"
+          },
+          "begruendung": {
+            "type": "string",
+            "description": "Eine kurze Begründung"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nWEBSEITE:\n\"\"\"\n{homepage_text}\n\"\"\""
+    },
+    {
+      "name": "agentur_plattform_kurz",
+      "description": "Kurzklassifikation: Agentur vs. Plattform vs. unklar (zuerst Agentur, dann Plattform prüfen)",
+      "version": "1.0",
+      "system_prompt": "Du ordnest die Homepage (nur sichtbarer Text: Menü, Überschriften, CTAs) einer Kategorie zu.\n\n- agentur: Leistungen für Auftraggeber/Marken (Projekt/Retainer): Werbung, Marketing, Design, Web/PR als Projekt, Kundenportfolio, „wir entwickeln/betreuen für Sie“.\n- plattform: Marktplatz, Vermittlung, zwei Seiten (Anbieter/Kunden), „Anbieter finden“, Provision, Partnernetzwerk, Portal für Drittanbieter.\n- unklar: Weder eindeutig Agentur noch eindeutig Plattform, gemischt, zu wenig Text, Coming Soon.\n\nRegel: Zuerst Agentur prüfen, dann Plattform; wenn beides schwach oder widersprüchlich → unklar.\n\nmatch_score strikt setzen: plattform=0, unklar=1, agentur=2.\n\nAntwort NUR ein JSON-Objekt (kein Markdown, kein Text davor oder danach) im Format:\n{\"typ\":\"<agentur|plattform|unklar>\",\"match_score\":<int>}\nwobei int=0 bei typ plattform, int=1 bei typ unklar, int=2 bei typ agentur.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "typ": {
+            "type": "string",
+            "enum": ["agentur", "plattform", "unklar"],
+            "description": "Klassifikation laut System-Prompt"
+          },
+          "match_score": {
+            "type": "integer",
+            "min": 0,
+            "max": 2,
+            "description": "0=plattform, 1=unklar, 2=agentur"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nTyp?"
     }
-    
-    
   ]
 }
 

@@ -36,8 +36,10 @@ var index_default = {
     if (!rawId) {
       const parts = path.split("/").filter(Boolean);
       if (parts.length >= 2 && ["r", "go", "t"].includes(parts[0])) {
-        rawId = parts[1].trim();
-      } else if (parts.length >= 1 && parts[0]) {
+        if (parts.length === 2) {
+          rawId = parts[1].trim();
+        }
+      } else if (parts.length === 1) {
         rawId = parts[0].trim();
       }
     }

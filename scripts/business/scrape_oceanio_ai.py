@@ -19,6 +19,11 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from tqdm import tqdm
 
+from imprint_md_extract import (
+    extract_managing_director_from_imprint_plaintext,
+    gpt_managing_directors_is_empty,
+)
+
 # ---------------- Load environment variables from .env file ----------------
 
 # Try to load from .env file if python-dotenv is available
@@ -251,6 +256,7 @@ Notes:
   * "full_name": Should contain the complete name as it appears in the text (for reference and fallback).
   * Always try to split names into first_name and last_name. Common German name patterns: "Max Mustermann" (first: "Max", last: "Mustermann"), "Herr Thomas Herrmann" (first: "Thomas", last: "Herrmann", gender: "Herr").
   * If there are multiple managing directors, include all of them in the array. The first one in the array will be used for the separate CSV columns.
+  * Headings often split label and name across lines (e.g. a line or heading "Geschäftsführer:" with the person's name on the following line or in the next paragraph). Treat the following line as the name when it clearly looks like a person and not a new section (Kontakt, Telefon, Register, etc.).
 - If you are not sure about a field, set it to null or an empty list.
 - Only include information that appears in the text; do not invent data.
 - If there are multiple possible addresses, choose the one that most likely represents the head office / main business location.
@@ -587,6 +593,14 @@ COL_MD_SALUTATION = "Salutation"
 COL_LEGAL_NAME = "Imprint: Company legal name"
 
 
+def _normalize_header_name(value: Optional[str]) -> str:
+    """Normalize CSV header names for resilient matching."""
+    if value is None:
+        return ""
+    # Handle BOM and accidental surrounding whitespace.
+    return str(value).replace("\ufeff", "").strip().lower()
+
+
 def address_incomplete(addr: str) -> bool:
     """
     Very simple heuristic: treat short or non-specific addresses as incomplete.
@@ -808,6 +822,28 @@ def process_row(
         with domain_lock:
             if domain in domain_cache:
                 gpt_data = domain_cache[domain]
+
+    need_any_md = need_md or need_md_vorname or need_md_nachname or need_md_salutation
+    if (
+        need_any_md
+        and imprint_text
+        and gpt_managing_directors_is_empty(gpt_data.get("managing_directors"))
+    ):
+        hint = extract_managing_director_from_imprint_plaintext(imprint_text)
+        if hint:
+            gpt_data = {
+                **gpt_data,
+                "managing_directors": [
+                    {
+                        "first_name": None,
+                        "last_name": None,
+                        "gender": None,
+                        "full_name": hint,
+                    }
+                ],
+            }
+            with domain_lock:
+                domain_cache[domain] = gpt_data
 
     # Apply updates
     updated = False
@@ -1138,50 +1174,93 @@ def enrich_with_gpt(input_csv: str, output_csv: str, max_workers: Optional[int] 
         max_workers: Maximum number of concurrent workers (default: MAX_WORKERS_HTTP)
     """
     with open(input_csv, "r", encoding="utf-8-sig", newline="") as f_in:
-        # Try to automatically detect whether the file is comma- or semicolon-separated
+        # Try to automatically detect whether the file is comma- or semicolon-separated.
         sample = f_in.read(4096)
         f_in.seek(0)
         try:
             dialect = csv.Sniffer().sniff(sample, delimiters=";,")
         except csv.Error:
-            # Fallback: assume comma-delimited if detection fails
+            # Fallback: assume comma-delimited if detection fails.
             dialect = csv.get_dialect("excel")
 
         reader = csv.DictReader(f_in, dialect=dialect)
         fieldnames = list(reader.fieldnames) if reader.fieldnames else []
-        if not fieldnames:
-            raise ValueError("No header found in CSV")
+        rows = list(reader) if fieldnames else []
 
-        # Drop anonymous/extra header field used for overflow columns
-        fieldnames = [fn for fn in fieldnames if fn not in (None, "")]
+    # Fallback: if autodetection produced one giant header field, retry explicitly with ';'.
+    if (not fieldnames) or (
+        len(fieldnames) == 1
+        and isinstance(fieldnames[0], str)
+        and ";" in fieldnames[0]
+    ):
+        with open(input_csv, "r", encoding="utf-8-sig", newline="") as f_in:
+            reader = csv.DictReader(f_in, delimiter=";")
+            fieldnames = list(reader.fieldnames) if reader.fieldnames else []
+            rows = list(reader) if fieldnames else []
 
-        rows = list(reader)
+    if not fieldnames:
+        raise ValueError("No header found in CSV")
 
-        # Clean up any anonymous/extra columns stored under the key None
-        # (can happen when a row has more separators than header columns)
+    # Clean up any anonymous/extra columns stored under the key None
+    # (can happen when a row has more separators than header columns)
+    for row in rows:
+        if None in row:
+            del row[None]
+
+    # Normalize known core headers so we can accept variants like
+    # "domain", " Domain ", or "website/webseite".
+    header_lookup = {_normalize_header_name(fn): fn for fn in fieldnames if fn}
+
+    domain_source = None
+    for candidate in ("domain", "website", "webseite", "url"):
+        if candidate in header_lookup:
+            domain_source = header_lookup[candidate]
+            break
+    if domain_source and domain_source != COL_DOMAIN:
         for row in rows:
-            if None in row:
-                del row[None]
-        
-        # Ensure new columns exist in fieldnames
-        new_columns = [
-            COL_ADDRESS_STREET,
-            COL_ADDRESS_HOUSE_NUMBER,
-            COL_ADDRESS_POSTCODE,
-            COL_ADDRESS_CITY,
-            COL_MD_VORNAME,
-            COL_MD_NACHNAME,
-            COL_MD_SALUTATION,
-        ]
+            if not (row.get(COL_DOMAIN) or "").strip():
+                row[COL_DOMAIN] = (row.get(domain_source) or "").strip()
+        if COL_DOMAIN not in fieldnames:
+            fieldnames.append(COL_DOMAIN)
+
+    company_source = None
+    for candidate in ("company", "firma", "name", "unternehmen"):
+        if candidate in header_lookup:
+            company_source = header_lookup[candidate]
+            break
+    if company_source and company_source != COL_COMPANY:
+        for row in rows:
+            if not (row.get(COL_COMPANY) or "").strip():
+                row[COL_COMPANY] = (row.get(company_source) or "").strip()
+        if COL_COMPANY not in fieldnames:
+            fieldnames.append(COL_COMPANY)
+
+    # Ensure enrichment target columns exist in fieldnames.
+    # This prevents DictWriter failures when GPT updates legacy columns
+    # that were not present in the original input header.
+    new_columns = [
+        COL_ADDRESS,
+        COL_MD,
+        COL_LEGAL_NAME,
+        COL_PHONE,
+        COL_EMAIL,
+        COL_ADDRESS_STREET,
+        COL_ADDRESS_HOUSE_NUMBER,
+        COL_ADDRESS_POSTCODE,
+        COL_ADDRESS_CITY,
+        COL_MD_VORNAME,
+        COL_MD_NACHNAME,
+        COL_MD_SALUTATION,
+    ]
+    for col in new_columns:
+        if col not in fieldnames:
+            fieldnames.append(col)
+
+    # Ensure all rows have the new columns initialized
+    for row in rows:
         for col in new_columns:
-            if col not in fieldnames:
-                fieldnames.append(col)
-        
-        # Ensure all rows have the new columns initialized
-        for row in rows:
-            for col in new_columns:
-                if col not in row:
-                    row[col] = ""
+            if col not in row:
+                row[col] = ""
 
     if max_workers is None:
         max_workers = MAX_WORKERS_HTTP

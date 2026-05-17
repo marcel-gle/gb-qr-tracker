@@ -18,6 +18,22 @@
 // Optional: align with your backend rules
 const ID_PATTERN = /^[A-Za-z0-9_äöüÄÖÜß-]{2,100}$/;
 
+/** True when the URL contains :port (only canonical https://host/path allowed in production). */
+function hasForbiddenExplicitPort(url: URL): boolean {
+  if (!url.port) return false;
+  const h = url.hostname.toLowerCase();
+  // wrangler / local dev uses http://localhost:8787/...
+  if (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "::1" ||
+    h.endsWith(".localhost")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 //Helper function
 async function hmacHex(keyStr: string, msg: string) {
   const key = await crypto.subtle.importKey(
@@ -39,6 +55,13 @@ export default {
     const host = request.headers.get("host") || "";   // e.g., go.customer.com
     const path = url.pathname.replace(/^\/+/, "");    // e.g., "r/ID" or "ID" or ""
 
+    if (hasForbiddenExplicitPort(url)) {
+      return new Response("Ungültige URL: Bitte ohne Port in der Adresse aufrufen.", {
+        status: 400,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+
     // 1) Health endpoint (served instantly from the edge)
     if (path === "health") {
       return new Response("ok", {
@@ -50,14 +73,16 @@ export default {
       });
     }
 
-    // 2) Resolve tracking ID from query (?id=...) OR path (/ID or /r/ID or /go/ID)
+    // 2) Resolve tracking ID from query (?id=...) OR exact path: /ID, /ID/, /r/ID, /go/ID, /t/ID (no extra segments)
     let rawId = (url.searchParams.get("id") || "").trim();
 
     if (!rawId) {
-      const parts = path.split("/").filter(Boolean); // ["r","TRACKING"] or ["TRACKING"]
+      const parts = path.split("/").filter(Boolean);
       if (parts.length >= 2 && ["r", "go", "t"].includes(parts[0])) {
-        rawId = parts[1].trim();
-      } else if (parts.length >= 1 && parts[0]) {
+        if (parts.length === 2) {
+          rawId = parts[1].trim();
+        }
+      } else if (parts.length === 1) {
         rawId = parts[0].trim();
       }
     }

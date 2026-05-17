@@ -14,6 +14,7 @@ ENV_VARS=(
   "GEOIP_API_URL=https://ipapi.co/{ip}/json/"
   "STORE_IP_HASH=1"
   "LOG_HIT_ERRORS=1"
+  "REDIRECTOR_DOMAIN_TENANT_CHECK=off"
 )
 
 SECRETS=(

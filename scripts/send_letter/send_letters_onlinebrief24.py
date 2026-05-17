@@ -15,7 +15,9 @@ while avoiding duplicate sends.
 
 Usage (example):
 
-1. Prepare a CSV with at least these columns:
+1. Prepare a CSV with at least these columns (names are case-insensitive; common
+   lettershop exports such as `Entscheider 1 Vorname`, `PLZ`, `Ort`, and
+   `Namenszeile` / `Namenszeile 1` are accepted — see HEADER_TO_CANONICAL):
    `QR Code URL`, `Tracking Code URL`, `Template`, `Vorname`, `Nachname`,
    `Unternehmen`, `Straße`, `Hausnummer`, `Postleitzahl`, `Stadt`.
 
@@ -157,8 +159,19 @@ HEADER_TO_CANONICAL: Dict[str, str] = {
     "house_number": "Hausnummer",
     "postleitzahl": "Postleitzahl",
     "postcode": "Postleitzahl",
+    "plz": "Postleitzahl",
+    "zip": "Postleitzahl",
+    "zip code": "Postleitzahl",
     "stadt": "Stadt",
     "city": "Stadt",
+    "ort": "Stadt",
+    "ortschaft": "Stadt",
+    # German B2B / lettershop list columns (e.g. Ocean.io style)
+    "entscheider 1 vorname": "Vorname",
+    "entscheider 1 nachname": "Nachname",
+    "entscheider 1 anrede": "Anrede",
+    # Single line — Namenszeile 2/3 stay as separate keys until fill helper runs
+    "namenszeile": "Unternehmen",
 }
 
 
@@ -382,6 +395,24 @@ def _normalize_header(header: str) -> str:
     return HEADER_TO_CANONICAL.get(key, raw)
 
 
+def _lettershop_fill_missing_company(contact: Dict[str, str]) -> None:
+    """
+    If Unternehmen is empty, use the first non-empty Namenszeile / Namenszeile N
+    column (common in German address exports). Keys are matched case-insensitively.
+    """
+    if (contact.get("Unternehmen") or "").strip():
+        return
+    lower_to_actual = {(k or "").strip().lower(): k for k in contact}
+    for want in ("namenszeile", "namenszeile 1", "namenszeile 2", "namenszeile 3"):
+        actual = lower_to_actual.get(want)
+        if not actual:
+            continue
+        v = (contact.get(actual) or "").strip()
+        if v:
+            contact["Unternehmen"] = v
+            return
+
+
 def _detect_delimiter(sample: str) -> str:
     """
     Detect CSV delimiter from a sample (comma, tab, or semicolon).
@@ -444,6 +475,7 @@ def load_contacts_csv(path: Path) -> Tuple[List[Dict[str, str]], str]:
             if i < len(canonical_headers):
                 key = canonical_headers[i]
                 contact[key] = (value.strip() if value else "")
+        _lettershop_fill_missing_company(contact)
         contacts.append(contact)
 
     return contacts, delimiter

@@ -105,7 +105,9 @@ def create_or_merge_link(doc_id: str, destination: str,
                          campaign: Optional[str] = None,
                          template: Optional[str] = None,
                          business_ref: Optional[firestore.DocumentReference] = None,
-                         business_id: Optional[str] = None):
+                         business_id: Optional[str] = None,
+                         tenant_id: Optional[str] = None,
+                         allowed_hosts: Optional[List[str]] = None):
     """
     Create links/{doc_id}. If it already exists, merge business/template back so association isn't lost.
     """
@@ -133,6 +135,10 @@ def create_or_merge_link(doc_id: str, destination: str,
         payload['business'] = business_ref
     if business_id:
         payload['business_id'] = business_id
+    if tenant_id:
+        payload['tenant_id'] = tenant_id
+    if allowed_hosts:
+        payload['allowed_hosts'] = allowed_hosts
 
     ref = links.document(doc_id)
     try:
@@ -150,6 +156,10 @@ def create_or_merge_link(doc_id: str, destination: str,
             merge_fields['business_name'] = business_name
         if business_id:
             merge_fields['business_id'] = business_id
+        if tenant_id:
+            merge_fields['tenant_id'] = tenant_id
+        if allowed_hosts:
+            merge_fields['allowed_hosts'] = allowed_hosts
         if merge_fields:
             ref.set(merge_fields, merge=True)
         raise  # let caller handle counting/logging
@@ -302,7 +312,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     prefix: Optional[str],
                                     ownerId: str,
                                     limit: int,
-                                    mapbox_token: Optional[str]):
+                                    mapbox_token: Optional[str],
+                                    tenant_id: Optional[str] = None,
+                                    allowed_hosts: Optional[List[str]] = None):
     created, skipped, errors = 0, 0, 0
     ext = os.path.splitext(path)[1].lower()
     is_excel = ext in ('.xlsx', '.xls')
@@ -361,7 +373,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                     doc_id, dest,
                     ownerId, True, business_name, campaign, adjusted_template,
                     business_ref=biz_ref,
-                    business_id=biz_id
+                    business_id=biz_id,
+                    tenant_id=tenant_id,
+                    allowed_hosts=allowed_hosts,
                 )
                 created += 1
             except AlreadyExists:
@@ -410,6 +424,10 @@ if __name__ == '__main__':
     p.add_argument('--limit', type=int, default=0, help='Only process/upload the first X rows from the file (0 = all)')
     p.add_argument('--mapbox-token', default=os.environ.get("MAPBOX_TOKEN"),
                    help='Mapbox API token for geocoding (or set env MAPBOX_TOKEN).')
+    p.add_argument('--tenant-id', default=None,
+                   help='Redirector tenant slug (links.tenant_id; must match customer_domains/{go-host}).')
+    p.add_argument('--allowed-hosts', default=None,
+                   help='Comma-separated hostnames for shared go.* domains (links.allowed_hosts).')
 
     args = p.parse_args()
 
@@ -418,6 +436,11 @@ if __name__ == '__main__':
             p.error('--base-url is required when using --business-file')
         if not args.ownerId:
             p.error('--ownerId is required when using --business-file')
+        ah = (
+            [s.strip() for s in args.allowed_hosts.split(",") if s.strip()]
+            if args.allowed_hosts
+            else None
+        )
         assign_links_from_business_file(
             path=args.business_file,
             base_url=args.base_url,
@@ -426,6 +449,8 @@ if __name__ == '__main__':
             ownerId=args.ownerId,
             limit=args.limit,
             mapbox_token=args.mapbox_token,
+            tenant_id=args.tenant_id,
+            allowed_hosts=ah,
         )
     else:
         p.error('Provide: --business-file + --base-url + --ownerId (optional: --dest, --campaign, --prefix, --limit).')

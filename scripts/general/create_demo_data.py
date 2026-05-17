@@ -4,7 +4,7 @@ Generate coherent demo data for all Firestore collections.
 
 This script creates realistic, interconnected demo data that maintains
 referential integrity across all collections (campaigns, businesses, targets,
-links, hits). All demo data is marked with is_demo: True for easy identification
+links, hits, calls). All demo data is marked with is_demo: True for easy identification
 and cleanup.
 
 Note: The customer/user must already exist in both Firestore customers collection
@@ -22,10 +22,11 @@ Setup:
 Cleanup:
     All demo data is marked with is_demo: True flag, making it easy to identify
     and delete. The cleanup function queries for is_demo == True across all
-    collections (campaigns, businesses, targets, links, hits).
+    collections (campaigns, businesses, targets, links, hits, calls).
 """
 
 import argparse
+import hashlib
 import random
 import re
 import uuid
@@ -36,11 +37,13 @@ from typing import Dict, List, Optional, Tuple
 import firebase_admin
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import ArrayUnion, SERVER_TIMESTAMP
-from google.api_core.exceptions import AlreadyExists
 
 # --- 🔧 CONFIGURATION ---
 DEFAULT_CREDENTIALS_PATH = "/Users/marcelgleich/Desktop/Software/Firebase_Service/gb-qr-tracker-dev-firebase-adminsdk-fbsvc-51be21988f.json"
 DEFAULT_OWNER_ID = "Panugay5HYQ6WzyiBvUB5E3FSRB3"
+# Demo links use this tenant_id; add customer_domains/{your-demo-go-host} with the same tenant_id for Worker tests.
+DEMO_TENANT_ID = "demo"
+CALLS_COLLECTION = "calls"
 
 # German cities with coordinates (city, region, lat, lon, sample_postcode)
 GERMAN_CITIES = [
@@ -168,6 +171,27 @@ CAMPAIGN_STATUSES = ["draft", "active", "active", "active", "archived"]  # More 
 # Target statuses
 TARGET_STATUSES = ["linked", "validated", "excluded"]
 
+# call_process presets (weight, process dict) — aligned with frontend outcomeToCallProcess
+CALL_PROCESS_PRESETS = [
+    (35, {"reach": "not_reached", "gatekeeper": None, "interest": None, "appointment": None}),
+    (15, {"reach": "reached", "gatekeeper": "not_overcome", "interest": None, "appointment": None}),
+    (20, {"reach": "reached", "gatekeeper": "none", "interest": "interested", "appointment": "no"}),
+    (15, {"reach": "reached", "gatekeeper": "overcome", "interest": "interested", "appointment": "no"}),
+    (10, {"reach": "reached", "gatekeeper": "overcome", "interest": "interested", "appointment": "yes"}),
+    (5, {"reach": "reached", "gatekeeper": "none", "interest": "not_interested", "appointment": "no"}),
+]
+
+DEMO_CALL_NOTES = [
+    "Erneut versucht, GF nicht verfügbar.",
+    "Kurzes Gespräch, Infomaterial per E-Mail zugesagt.",
+    "Termin für nächste Woche vereinbart.",
+    "Kein Interesse am Moment, Follow-up in 4 Wochen.",
+    "Gatekeeper legt auf, Rückruf versprochen.",
+    "Positives Feedback zum QR-Briefing.",
+    "Falsche Durchwahl, korrekte Nummer notiert.",
+    None,
+]
+
 
 # --- HELPERS ---
 def sanitize_id(value: str) -> str:
@@ -188,6 +212,71 @@ def make_business_id(business_name: Optional[str], postcode: Optional[str]) -> s
     if postcode:
         base = f"{base}-{sanitize_id(postcode)}" if base else sanitize_id(postcode)
     return base or "biz"
+
+
+def normalize_postcode(value: Optional[str]) -> str:
+    """Normalize to a 5-digit German PLZ string (keeps leading zeros)."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    if not digits:
+        return "00000"
+    return digits.zfill(5)[-5:]
+
+
+def jitter_postcode(value: Optional[str], suffix_delta: int = 15) -> str:
+    """
+    Return a nearby valid 5-digit PLZ without stripping leading zeros.
+
+    Jitters only the last two digits so the regional prefix (first 3) stays stable.
+    """
+    plz = normalize_postcode(value)
+    prefix, suffix = plz[:3], int(plz[3:])
+    suffix = max(0, min(99, suffix + random.randint(-suffix_delta, suffix_delta)))
+    return f"{prefix}{suffix:02d}"
+
+
+def allocate_demo_business_id(
+    db: firestore.Client,
+    base_business_id: str,
+    max_attempts: int = 100,
+) -> str:
+    """
+    Pick a businesses/{id} that is free or already marked is_demo.
+
+    Never returns the ID of a non-demo document (avoids overwriting production data).
+    """
+    candidate = base_business_id or "biz"
+    for n in range(max_attempts):
+        snap = db.collection("businesses").document(candidate).get()
+        if not snap.exists:
+            return candidate
+        if (snap.to_dict() or {}).get("is_demo"):
+            return candidate
+        candidate = f"{base_business_id}-demo-{n + 1}"
+    raise RuntimeError(
+        f"Could not allocate demo business id for {base_business_id!r} "
+        f"after {max_attempts} attempts"
+    )
+
+
+def business_data_from_snapshot(
+    snap: firestore.DocumentSnapshot,
+) -> Dict:
+    """Build target/link payload fields from an existing business document."""
+    data = snap.to_dict() or {}
+    business_name = data.get("business_name") or data.get("name") or ""
+    return {
+        "business_id": snap.id,
+        "business_name": business_name,
+        "name": data.get("name") or business_name,
+        "street": data.get("street"),
+        "house_number": data.get("house_number"),
+        "postcode": data.get("postcode"),
+        "city": data.get("city"),
+        "address": data.get("address"),
+        "email": data.get("email"),
+        "phone": data.get("phone"),
+        "salutation": data.get("salutation"),
+    }
 
 
 def random_timestamp_within_days(days: int) -> datetime:
@@ -214,6 +303,73 @@ def random_timestamp_within_weeks(weeks: int) -> datetime:
     ts = (now - timedelta(days=days_back)).replace(hour=0, minute=0, second=0, microsecond=0)
     ts += timedelta(seconds=seconds_in_day)
     return min(ts, now)
+
+
+def random_call_time_within_weeks(weeks: int = 4) -> datetime:
+    """Random call_time in the last N weeks, weekday business hours 8–18 UTC."""
+    ts = random_timestamp_within_weeks(weeks)
+    return ts.replace(
+        hour=random.randint(8, 18),
+        minute=random.randint(0, 59),
+        second=random.randint(0, 59),
+        microsecond=0,
+    )
+
+
+def random_call_process() -> Dict:
+    """Sample a valid call_process map (canonical V2 shape)."""
+    processes = [p for _, p in CALL_PROCESS_PRESETS]
+    weights = [w for w, _ in CALL_PROCESS_PRESETS]
+    chosen = random.choices(processes, weights=weights, k=1)[0]
+    return dict(chosen)
+
+
+def sample_demo_call_note() -> Optional[str]:
+    return random.choice(DEMO_CALL_NOTES)
+
+
+def demo_ip_hash(seed: str) -> str:
+    """Deterministic SHA-256 hex digest (same shape as redirector ip_hash)."""
+    return hashlib.sha256(f"demo-ip:{seed}".encode("utf-8")).hexdigest()
+
+
+def pick_demo_ip_hash(
+    used_hashes: set,
+    reuse_pool: Optional[List[str]] = None,
+    reuse_probability: float = 0.35,
+) -> str:
+    """
+    Return an ip_hash for a demo hit.
+
+    Prefer globally unique hashes; when reuse_pool is set (same link), sometimes
+    reuse an earlier hash for that link (~35% by default).
+    """
+    if reuse_pool and random.random() < reuse_probability:
+        return random.choice(reuse_pool)
+
+    for _ in range(50):
+        candidate = demo_ip_hash(uuid.uuid4().hex)
+        if candidate not in used_hashes:
+            used_hashes.add(candidate)
+            return candidate
+
+    # Extremely unlikely fallback: allow collision rather than fail the run.
+    candidate = demo_ip_hash(f"overflow-{len(used_hashes)}-{random.random()}")
+    used_hashes.add(candidate)
+    return candidate
+
+
+def firestore_add_ref(collection, data: dict) -> firestore.DocumentReference:
+    """
+    Add a document and return its reference.
+
+    google-cloud-firestore may return (write_time, DocumentReference) or only
+    DocumentReference depending on version; firebase_admin wraps the client.
+    """
+    result = collection.add(data)
+    if isinstance(result, tuple):
+        return result[1]
+    return result
 
 
 def small_jitter(v: float, max_abs_delta: float = 0.01) -> float:
@@ -327,15 +483,13 @@ def generate_businesses(
         business_name = generate_business_name()
         street, house_number = generate_street_address()
         
-        # Add jitter to postcode for variety
-        postcode_num = int(postcode)
-        postcode = f"{postcode_num + random.randint(-100, 100):05d}"
+        postcode = jitter_postcode(postcode)
         
-        business_id = make_business_id(business_name, postcode)
+        base_business_id = make_business_id(business_name, postcode)
         address = compose_full_address(street, house_number, postcode, city)
-        
-        business_data = {
-            "business_id": business_id,
+
+        generated_data = {
+            "business_id": base_business_id,
             "business_name": business_name,
             "name": business_name,
             "street": street,
@@ -355,29 +509,43 @@ def generate_businesses(
             "last_hit_at": None,
             "created_at": random_timestamp_within_days(365),
             "updated_at": random_timestamp_within_days(365),
-            "is_demo": True,  # Mark as demo data for easy cleanup
+            "is_demo": True,
         }
-        
-        business_ref = db.collection("businesses").document(business_id)
-        
-        if not dry_run:
-            # Try to create new document with ownerIds as regular array
-            # If it already exists, use set() with ArrayUnion
-            try:
-                create_payload = dict(business_data)
+
+        if dry_run:
+            business_id = allocate_demo_business_id(db, base_business_id)
+            business_ref = db.collection("businesses").document(business_id)
+            snap = business_ref.get()
+            if snap.exists and (snap.to_dict() or {}).get("is_demo"):
+                business_data = business_data_from_snapshot(snap)
+                print(
+                    f"[DRY RUN] Would reuse demo business: "
+                    f"{business_data['business_name']} ({business_id})"
+                )
+            else:
+                business_data = {**generated_data, "business_id": business_id}
+                print(
+                    f"[DRY RUN] Would create business: {business_name} ({business_id})"
+                )
+        else:
+            business_id = allocate_demo_business_id(db, base_business_id)
+            business_ref = db.collection("businesses").document(business_id)
+            snap = business_ref.get()
+            if snap.exists:
+                # Existing demo doc only — never merge generated fields onto production.
+                business_ref.set({"ownerIds": ArrayUnion([owner_id])}, merge=True)
+                business_data = business_data_from_snapshot(snap)
+                print(
+                    f"✓ Reused demo business: "
+                    f"{business_data['business_name']} ({business_id})"
+                )
+            else:
+                create_payload = {**generated_data, "business_id": business_id}
                 create_payload["ownerIds"] = [owner_id]
                 business_ref.create(create_payload)
+                business_data = create_payload
                 print(f"✓ Created business: {business_name} ({business_id})")
-            except AlreadyExists:
-                # Business already exists, update with merge and add ownerId to array
-                business_ref.set(business_data, merge=True)
-                business_ref.set({"ownerIds": ArrayUnion([owner_id])}, merge=True)
-                print(f"✓ Updated business: {business_name} ({business_id})")
-        else:
-            # For dry run, include ownerIds in the data for display
-            business_data["ownerIds"] = [owner_id]
-            print(f"[DRY RUN] Would create business: {business_name} ({business_id})")
-        
+
         businesses.append((business_ref, business_data))
     
     return businesses
@@ -392,16 +560,17 @@ def generate_targets(
 ) -> List[Tuple[firestore.DocumentReference, firestore.DocumentReference, Dict]]:
     """Generate target documents for a campaign. Returns list of (target_ref, business_ref, business_data) tuples."""
     targets = []
-    
-    # Select businesses for this campaign (with some overlap between campaigns)
-    selected_businesses = random.sample(businesses, min(links_per_campaign, len(businesses)))
+
+    # Every business in the pool is a mailing target (capped only if pool exceeds links_per_campaign).
+    cap = min(len(businesses), links_per_campaign) if links_per_campaign > 0 else len(businesses)
+    selected_businesses = businesses[:cap]
     
     for business_ref, business_data in selected_businesses:
         target_id = str(uuid.uuid4())
         target_ref = campaign_ref.collection("targets").document(target_id)
         
-        # Most targets are linked, some validated, few excluded
-        status_weights = [0.8, 0.15, 0.05]  # linked, validated, excluded
+        # linked / validated only so each business can receive a tracking link
+        status_weights = [0.85, 0.15, 0.0]  # linked, validated, excluded
         status = random.choices(TARGET_STATUSES, weights=status_weights)[0]
         
         import_row = {
@@ -441,30 +610,32 @@ def generate_links(
     campaign_name: str,
     targets: List[Tuple[firestore.DocumentReference, firestore.DocumentReference, Dict]],
     owner_id: str,
+    business_link_cache: Dict[str, firestore.DocumentReference],
     dry_run: bool = False
 ) -> List[Tuple[firestore.DocumentReference, firestore.DocumentReference, firestore.DocumentReference, firestore.DocumentReference]]:
     """Generate link documents. Returns list of (link_ref, business_ref, target_ref, campaign_ref) tuples."""
     links = []
-    
+
     for target_ref, business_ref, business_data in targets:
-        # Skip excluded targets
         if not dry_run:
             target_data = target_ref.get().to_dict()
             if target_data and target_data.get("status") == "excluded":
                 continue
-        else:
-            # In dry run, assume some are excluded
-            if random.random() < 0.05:
-                continue
-        
-        # Generate link ID using business data (available in both dry-run and real mode)
+
         business_name = business_data.get("business_name", "business") if business_data else "business"
         postcode = business_data.get("postcode", "00000") if business_data else "00000"
-        
+        business_id = business_ref.id
+
         base_id = sanitize_id(business_name)
         link_id = f"{base_id}-{postcode}" if base_id else f"link-{postcode}"
-        
-        # Check for collisions and add suffix if needed
+
+        if business_id in business_link_cache:
+            link_ref = business_link_cache[business_id]
+            if not dry_run:
+                target_ref.update({"link_ref": link_ref, "status": "linked"})
+            links.append((link_ref, business_ref, target_ref, campaign_ref))
+            continue
+
         if not dry_run:
             existing = db.collection("links").document(link_id).get()
             if existing.exists:
@@ -475,17 +646,15 @@ def generate_links(
                         link_id = candidate
                         break
                     counter += 1
-        
+
         link_ref = db.collection("links").document(link_id)
-        
-        # Generate destination URL
+
         domain_base = sanitize_id(business_name.split()[0].lower())
         domain_base = re.sub(r"-(gmbh|ug|ag|kg|ek|mbh|ohg)$", "", domain_base)
         destination = f"https://{domain_base}.de/angebot" if domain_base else "https://example.com/offer"
-        
+
         template_id = random.choice(TEMPLATE_IDS)
-        
-        # Create snapshot_mailing
+
         snapshot_mailing = {
             "business_name": business_name,
             "address_lines": [f"{business_data.get('street', '')} {business_data.get('house_number', '')}"],
@@ -494,9 +663,9 @@ def generate_links(
             "country": "Germany",
             "recipient_name": None,
         }
-        
+
         active = random.random() < 0.9  # 90% active
-        
+
         if not dry_run:
             link_ref.set({
                 "short_code": link_id,
@@ -505,6 +674,7 @@ def generate_links(
                 "business_ref": business_ref,
                 "target_ref": target_ref,
                 "owner_id": owner_id,
+                "tenant_id": DEMO_TENANT_ID,
                 "template_id": template_id,
                 "campaign_name": campaign_name,
                 "snapshot_mailing": snapshot_mailing,
@@ -512,34 +682,40 @@ def generate_links(
                 "hit_count": 0,
                 "last_hit_at": None,
                 "created_at": SERVER_TIMESTAMP,
-                "is_demo": True,  # Mark as demo data for easy cleanup
+                "is_demo": True,
             })
-            
-            # Update target with link_ref
+
             target_ref.update({"link_ref": link_ref, "status": "linked"})
-            
-            # Upsert customer-specific overlay (only when link exists)
-            business_id = business_ref.id
-            customer_business_ref = db.collection('customers').document(owner_id).collection('businesses').document(business_id)
-            customer_overlay_data = {
-                "business_id": business_id,
-                "business_ref": business_ref,
-                "salutation": business_data.get("salutation"),
-                "name": business_data.get("name"),
-                "email": business_data.get("email"),
-                "phone": business_data.get("phone"),
-                "hit_count": 0,
-                "last_hit_at": None,
-                "updated_at": SERVER_TIMESTAMP,
-            }
-            customer_business_ref.set(customer_overlay_data, merge=True)
-            
+
+            customer_business_ref = (
+                db.collection("customers")
+                .document(owner_id)
+                .collection("businesses")
+                .document(business_id)
+            )
+            customer_business_ref.set(
+                {
+                    "business_id": business_id,
+                    "business_ref": business_ref,
+                    "salutation": business_data.get("salutation"),
+                    "name": business_data.get("name"),
+                    "email": business_data.get("email"),
+                    "phone": business_data.get("phone"),
+                    "hit_count": 0,
+                    "last_hit_at": None,
+                    "updated_at": SERVER_TIMESTAMP,
+                },
+                merge=True,
+            )
+
+            business_link_cache[business_id] = link_ref
             print(f"  ✓ Created link: {link_id}")
         else:
+            business_link_cache[business_id] = link_ref
             print(f"  [DRY RUN] Would create link: {link_id}")
-        
+
         links.append((link_ref, business_ref, target_ref, campaign_ref))
-    
+
     return links
 
 
@@ -553,7 +729,8 @@ def generate_hits(
 ) -> int:
     """Generate hit documents. Returns total number of hits created."""
     total_hits = 0
-    
+    used_ip_hashes: set = set()
+
     for link_ref, business_ref, target_ref, campaign_ref in links:
         # Realistic low conversion distribution: only ~2% of links receive any hits.
         # Approximate distribution (per link):
@@ -598,15 +775,26 @@ def generate_hits(
         
         # Sort timestamps to ensure chronological order (optional, but more realistic)
         hit_timestamps.sort()
-        
+
+        # IPs for this link: first hit is always new; later hits may reuse one of these.
+        link_ip_hashes: List[str] = []
+
         for ts in hit_timestamps:
+            ip_hash = pick_demo_ip_hash(
+                used_ip_hashes,
+                reuse_pool=link_ip_hashes if link_ip_hashes else None,
+                reuse_probability=0.35,
+            )
+            if ip_hash not in link_ip_hashes:
+                link_ip_hashes.append(ip_hash)
+
             city, region, lat, lon, _ = random.choice(GERMAN_CITIES)
             device = random.choice(DEVICE_TYPES)
             browser = random.choice(BROWSERS)
             os_ = random.choice(OSES)
             user_agent = generate_user_agent(browser)
             hit_origin = random.choice(HIT_ORIGINS)
-            
+
             hit_data = {
                 "link_id": link_ref.id,
                 "campaign_ref": campaign_ref,
@@ -627,12 +815,12 @@ def generate_hits(
                 "geo_lat": round(small_jitter(lat), 6),
                 "geo_lon": round(small_jitter(lon), 6),
                 "geo_source": "demo",
-                "ip_hash": "6d1c7ed813d50e8349259aea620e9d8a8c58a373145e2e261a7aee6d13d4a7b7",
+                "ip_hash": ip_hash,
                 "is_demo": True,
             }
             
             if not dry_run:
-                db.collection("hits").add(hit_data)
+                firestore_add_ref(db.collection("hits"), hit_data)
             total_hits += 1
         
         if not dry_run and num_hits > 0:
@@ -796,6 +984,149 @@ def update_aggregates(
     print("✓ Updated aggregates")
 
 
+def generate_calls(
+    db: firestore.Client,
+    owner_id: str,
+    businesses: List[Tuple[firestore.DocumentReference, Dict]],
+    business_pct: float = 0.20,
+    dry_run: bool = False,
+) -> Tuple[int, List[str]]:
+    """
+    Create demo call logs for a random subset of businesses.
+
+    Returns (total_calls_created, business_ids that received calls).
+    """
+    if not businesses:
+        return 0, []
+
+    k = max(1, round(len(businesses) * business_pct))
+    k = min(k, len(businesses))
+    selected = random.sample(businesses, k)
+
+    total_calls = 0
+    businesses_with_calls: List[str] = []
+
+    for business_ref, _ in selected:
+        business_id = business_ref.id
+        num_calls = random.choices([1, 2, 3], weights=[70, 25, 5], k=1)[0]
+        use_callback = num_calls >= 2 and random.random() < 0.05
+        first_call_id: Optional[str] = None
+
+        for call_idx in range(num_calls):
+            call_process = random_call_process()
+            call_time = random_call_time_within_weeks(4)
+            call_kind = "outbound_attempt"
+            callback_of_call_id = None
+            callback_origin = None
+
+            if use_callback and call_idx == 1 and first_call_id:
+                call_kind = "owner_callback"
+                callback_of_call_id = first_call_id
+                callback_origin = "owner"
+
+            payload = {
+                "customer_id": owner_id,
+                "business_id": business_id,
+                "business_ref": business_ref,
+                "owner_id": owner_id,
+                "created_by_uid": owner_id,
+                "status": "successful",
+                "call_process": call_process,
+                "call_note": sample_demo_call_note(),
+                "created_at": call_time,
+                "updated_at": call_time,
+                "call_time": call_time,
+                "call_kind": call_kind,
+                "callback_of_call_id": callback_of_call_id,
+                "callback_origin": callback_origin,
+                "is_demo": True,
+            }
+
+            if not dry_run:
+                doc_ref = firestore_add_ref(db.collection(CALLS_COLLECTION), payload)
+                call_id = doc_ref.id
+            else:
+                call_id = f"dry-run-{uuid.uuid4().hex[:12]}"
+
+            if call_idx == 0:
+                first_call_id = call_id
+            total_calls += 1
+
+        businesses_with_calls.append(business_id)
+        action = "Would create" if dry_run else "Created"
+        print(f"  ✓ {action} {num_calls} call(s) for business: {business_id}")
+
+    return total_calls, businesses_with_calls
+
+
+def backfill_call_overlays(
+    db: firestore.Client,
+    owner_id: str,
+    business_ids: List[str],
+) -> None:
+    """Set latest_call_process on customer business overlays from newest demo call."""
+    if not business_ids:
+        return
+
+    business_id_set = set(business_ids)
+    latest_by_business: Dict[str, Tuple[object, Dict]] = {}
+
+    calls_query = (
+        db.collection(CALLS_COLLECTION)
+        .where("customer_id", "==", owner_id)
+        .where("is_demo", "==", True)
+    )
+    for doc in calls_query.stream():
+        data = doc.to_dict() or {}
+        bid = data.get("business_id")
+        if not bid or bid not in business_id_set:
+            continue
+        call_time = data.get("call_time")
+        call_process = data.get("call_process")
+        if not call_process:
+            continue
+
+        prev = latest_by_business.get(bid)
+        if prev is None:
+            latest_by_business[bid] = (call_time, call_process)
+            continue
+        prev_time = prev[0]
+        try:
+            if call_time and (prev_time is None or call_time > prev_time):
+                latest_by_business[bid] = (call_time, call_process)
+        except (TypeError, AttributeError):
+            if call_time is not None:
+                latest_by_business[bid] = (call_time, call_process)
+
+    batch = db.batch()
+    batch_count = 0
+    for business_id, (_, call_process) in latest_by_business.items():
+        overlay_ref = (
+            db.collection("customers")
+            .document(owner_id)
+            .collection("businesses")
+            .document(business_id)
+        )
+        batch.set(
+            overlay_ref,
+            {
+                "latest_call_process": call_process,
+                "updated_at": SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+        batch_count += 1
+        if batch_count >= 500:
+            batch.commit()
+            batch = db.batch()
+            batch_count = 0
+
+    if batch_count > 0:
+        batch.commit()
+
+    print(f"✓ Backfilled latest_call_process on {len(latest_by_business)} overlays")
+
+
 def cleanup_demo_data(
     db: firestore.Client,
     owner_id: str,
@@ -806,6 +1137,7 @@ def cleanup_demo_data(
     
     deleted_counts = {
         "hits": 0,
+        "calls": 0,
         "links": 0,
         "targets": 0,
         "campaigns": 0,
@@ -832,6 +1164,33 @@ def cleanup_demo_data(
         # Count in dry run
         hits_query = db.collection("hits").where("is_demo", "==", True).stream()
         deleted_counts["hits"] = sum(1 for _ in hits_query)
+
+    # Delete demo calls for this customer
+    if not dry_run:
+        calls_query = (
+            db.collection(CALLS_COLLECTION)
+            .where("is_demo", "==", True)
+            .where("customer_id", "==", owner_id)
+        )
+        batch = db.batch()
+        batch_count = 0
+        for call in calls_query.stream():
+            batch.delete(call.reference)
+            batch_count += 1
+            deleted_counts["calls"] += 1
+            if batch_count >= 500:
+                batch.commit()
+                batch = db.batch()
+                batch_count = 0
+        if batch_count > 0:
+            batch.commit()
+    else:
+        calls_query = (
+            db.collection(CALLS_COLLECTION)
+            .where("is_demo", "==", True)
+            .where("customer_id", "==", owner_id)
+        )
+        deleted_counts["calls"] = sum(1 for _ in calls_query.stream())
     
     # Delete links with is_demo flag
     if not dry_run:
@@ -886,14 +1245,56 @@ def cleanup_demo_data(
             targets_query = campaign.reference.collection("targets").where("is_demo", "==", True).stream()
             deleted_counts["targets"] += sum(1 for _ in targets_query)
     
-    # Delete businesses with is_demo flag
-    # Note: Only delete if marked as demo - this ensures we don't delete shared businesses
+    # Resolve demo business IDs before deleting canonical businesses (overlays need the ref/doc).
+    demo_business_ids = {
+        doc.id
+        for doc in db.collection("businesses").where("is_demo", "==", True).stream()
+    }
+
+    def _overlay_is_demo(overlay) -> bool:
+        if overlay.id in demo_business_ids:
+            return True
+        overlay_data = overlay.to_dict() or {}
+        business_id = overlay_data.get("business_id")
+        if isinstance(business_id, str) and business_id in demo_business_ids:
+            return True
+        business_ref = overlay_data.get("business_ref")
+        if business_ref:
+            business_doc = business_ref.get()
+            if business_doc.exists and (business_doc.to_dict() or {}).get("is_demo"):
+                return True
+        return False
+
+    # Delete customer business overlays while demo businesses still exist.
+    customer_businesses_ref = (
+        db.collection("customers").document(owner_id).collection("businesses")
+    )
     if not dry_run:
-        businesses_query = db.collection("businesses").where("is_demo", "==", True).stream()
         batch = db.batch()
         batch_count = 0
-        for business in businesses_query:
-            batch.delete(business.reference)
+        for overlay in customer_businesses_ref.stream():
+            if not _overlay_is_demo(overlay):
+                continue
+            batch.delete(overlay.reference)
+            batch_count += 1
+            deleted_counts["customer_businesses"] += 1
+            if batch_count >= 500:
+                batch.commit()
+                batch = db.batch()
+                batch_count = 0
+        if batch_count > 0:
+            batch.commit()
+    else:
+        for overlay in customer_businesses_ref.stream():
+            if _overlay_is_demo(overlay):
+                deleted_counts["customer_businesses"] += 1
+
+    # Delete businesses with is_demo flag (after overlays).
+    if not dry_run:
+        batch = db.batch()
+        batch_count = 0
+        for business_id in demo_business_ids:
+            batch.delete(db.collection("businesses").document(business_id))
             batch_count += 1
             deleted_counts["businesses"] += 1
             if batch_count >= 500:
@@ -903,41 +1304,7 @@ def cleanup_demo_data(
         if batch_count > 0:
             batch.commit()
     else:
-        businesses_query = db.collection("businesses").where("is_demo", "==", True).stream()
-        deleted_counts["businesses"] = sum(1 for _ in businesses_query)
-    
-    # Delete customer business overlays for demo businesses
-    if not dry_run:
-        customer_businesses_ref = db.collection('customers').document(owner_id).collection('businesses')
-        customer_businesses_query = customer_businesses_ref.stream()
-        batch = db.batch()
-        batch_count = 0
-        for overlay in customer_businesses_query:
-            overlay_data = overlay.to_dict()
-            business_ref = overlay_data.get("business_ref")
-            if business_ref:
-                business_doc = business_ref.get()
-                if business_doc.exists and business_doc.to_dict().get("is_demo"):
-                    batch.delete(overlay.reference)
-                    batch_count += 1
-                    deleted_counts["customer_businesses"] += 1
-                    if batch_count >= 500:
-                        batch.commit()
-                        batch = db.batch()
-                        batch_count = 0
-        if batch_count > 0:
-            batch.commit()
-    else:
-        # Count in dry run
-        customer_businesses_ref = db.collection('customers').document(owner_id).collection('businesses')
-        customer_businesses_query = customer_businesses_ref.stream()
-        for overlay in customer_businesses_query:
-            overlay_data = overlay.to_dict()
-            business_ref = overlay_data.get("business_ref")
-            if business_ref:
-                business_doc = business_ref.get()
-                if business_doc.exists and business_doc.to_dict().get("is_demo"):
-                    deleted_counts["customer_businesses"] += 1
+        deleted_counts["businesses"] = len(demo_business_ids)
     
     print(f"✓ Cleanup complete:")
     for collection, count in deleted_counts.items():
@@ -958,26 +1325,32 @@ def main():
     parser.add_argument(
         "--campaigns",
         type=int,
-        default=5,
-        help="Number of campaigns to create (default: 5)"
+        default=2,
+        help="Number of campaigns to create (default: 2)"
     )
     parser.add_argument(
         "--businesses",
         type=int,
-        default=50,
-        help="Number of businesses to create (default: 50)"
+        default=500,
+        help="Number of businesses to create (default: 500)"
     )
     parser.add_argument(
         "--links-per-campaign",
         type=int,
-        default=20,
-        help="Average number of links per campaign (default: 20)"
+        default=500,
+        help="Max targets per campaign; all businesses get a link, up to this cap (default: 500)"
     )
     parser.add_argument(
         "--hits-per-link",
         type=int,
         default=10,
         help="Average number of hits per link (default: 10)"
+    )
+    parser.add_argument(
+        "--calls-business-pct",
+        type=float,
+        default=0.20,
+        help="Fraction of demo businesses that receive call logs (default: 0.20)"
     )
     parser.add_argument(
         "--cleanup",
@@ -1018,6 +1391,7 @@ def main():
     print(f"Businesses: {args.businesses}")
     print(f"Links per campaign: {args.links_per_campaign}")
     print(f"Hits per link (avg): {args.hits_per_link}")
+    print(f"Calls business %%: {args.calls_business_pct * 100:.0f}")
     print(f"Cleanup: {args.cleanup}")
     print(f"Dry run: {args.dry_run}")
     print("=" * 60)
@@ -1042,8 +1416,9 @@ def main():
     businesses = generate_businesses(db, args.owner_id, args.businesses, args.dry_run)
     print()
     
-    # 3. Generate targets and links for each campaign
+    # 3. Generate targets and links for each campaign (one link doc per business, reused across campaigns)
     all_links = []
+    business_link_cache: Dict[str, firestore.DocumentReference] = {}
     for i, campaign_ref in enumerate(campaigns):
         if not args.dry_run:
             campaign_data = campaign_ref.get().to_dict()
@@ -1053,7 +1428,15 @@ def main():
         
         print(f"3.{i+1}. Generating targets and links for campaign {i+1}...")
         targets = generate_targets(db, campaign_ref, businesses, args.links_per_campaign, args.dry_run)
-        links = generate_links(db, campaign_ref, campaign_name, targets, args.owner_id, args.dry_run)
+        links = generate_links(
+            db,
+            campaign_ref,
+            campaign_name,
+            targets,
+            args.owner_id,
+            business_link_cache,
+            args.dry_run,
+        )
         all_links.extend(links)
         print()
     
@@ -1079,6 +1462,20 @@ def main():
         print("5. Updating aggregates...")
         update_aggregates(db, campaigns, all_links, businesses, args.owner_id, args.dry_run)
         print()
+
+    # 6. Generate calls
+    print("6. Generating calls...")
+    total_calls, businesses_with_calls = generate_calls(
+        db,
+        args.owner_id,
+        businesses,
+        args.calls_business_pct,
+        args.dry_run,
+    )
+    if not args.dry_run and businesses_with_calls:
+        print("   Backfilling latest_call_process on overlays...")
+        backfill_call_overlays(db, args.owner_id, businesses_with_calls)
+    print()
     
     print("=" * 60)
     print("✅ DONE")
@@ -1086,8 +1483,9 @@ def main():
     print(f"Created:")
     print(f"  - {len(campaigns)} campaigns")
     print(f"  - {len(businesses)} businesses")
-    print(f"  - {len(all_links)} links")
+    print(f"  - {len(business_link_cache)} links ({len(all_links)} campaign targets with links)")
     print(f"  - {total_hits} hits")
+    print(f"  - {total_calls} calls ({len(businesses_with_calls)} businesses)")
     print("=" * 60)
 
 

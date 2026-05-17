@@ -12,6 +12,7 @@ Usage:
     python scripts/analyze_handwerk_domains.py input.csv output.csv [--domain-column DOMAIN]
 """
 
+import io
 import os
 import sys
 import csv
@@ -292,17 +293,52 @@ def process_domain(domain: str, prompt: Prompt) -> Dict[str, Any]:
 
 
 def detect_delimiter(file_path: Path) -> str:
-    """Detect CSV delimiter."""
+    """
+    Detect CSV delimiter.
+
+    Prefer the delimiter that yields the widest first row via csv.reader, so
+    semicolon-separated files are not misread as comma (one synthetic column
+    named \"query;title;url;...\").
+    Falls back to csv.Sniffer, then raw delimiter counts on the first line.
+    """
+    candidates = [",", ";", "\t", "|"]
     with open(file_path, "r", encoding="utf-8-sig", newline="") as f:
-        sample = f.read(4096)
-        f.seek(0)
+        sample = f.read(65536)
+    if not sample.strip():
+        return ","
+
+    best_delimiter = ","
+    best_width = 0
+    for delim in candidates:
         try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
-            return dialect.delimiter
-        except Exception:
-            # Fallback: detect by counts
-            counts = {d: sample.count(d) for d in [",", ";", "\t", "|"]}
-            return max(counts, key=counts.get) if max(counts.values()) > 0 else ","
+            reader = csv.reader(io.StringIO(sample), delimiter=delim)
+            row = next(reader)
+        except (StopIteration, csv.Error):
+            continue
+        width = len(row)
+        if width > best_width:
+            best_width = width
+            best_delimiter = delim
+
+    if best_width > 1:
+        return best_delimiter
+
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters="".join(candidates))
+        d = dialect.delimiter
+        if d in candidates:
+            reader = csv.reader(io.StringIO(sample), delimiter=d)
+            row = next(reader)
+            if len(row) > best_width:
+                return d
+    except Exception:
+        pass
+
+    first_line = sample.splitlines()[0] if sample.splitlines() else ""
+    counts = {d: first_line.count(d) for d in candidates}
+    if counts and max(counts.values()) > 0:
+        return max(counts, key=counts.get)
+    return ","
 
 
 def process_csv(
@@ -366,10 +402,9 @@ def process_csv(
         if "analysis_error" not in fieldnames:
             fieldnames.append("analysis_error")
         
-        # For backward compatibility, also add match_score if the prompt schema includes it
-        # (we'll populate it from the result)
-        schema = prompt.output_format.get("schema", {})
-        if "match_score" not in fieldnames and "match_score" in schema:
+        # Always expose match_score as a flat column when present in LLM JSON
+        # ("match_score" or alias "score" for 0–10 style prompts).
+        if "match_score" not in fieldnames:
             fieldnames.append("match_score")
         
         for row in reader:
@@ -497,9 +532,12 @@ def process_csv(
         if result_data["result"]:
             rows[i]["analysis_result"] = json.dumps(result_data["result"], ensure_ascii=False)
             
-            # For backward compatibility, extract match_score if present
-            if "match_score" in result_data["result"]:
-                rows[i]["match_score"] = str(result_data["result"]["match_score"])
+            # Flat column: match_score from JSON, or score (0–10 prompts)
+            res = result_data["result"]
+            if "match_score" in res:
+                rows[i]["match_score"] = str(res["match_score"])
+            elif "score" in res and res["score"] is not None:
+                rows[i]["match_score"] = str(res["score"])
         else:
             rows[i]["analysis_result"] = ""
             rows[i]["match_score"] = ""
@@ -540,17 +578,20 @@ def process_csv(
             print(f"     - Empty domains: {stats['empty_domain']}")
     
     if successful > 0:
-        # Try to extract match_score for backward compatibility
         scores = []
         for r in results.values():
-            if r.get("result") and "match_score" in r["result"]:
-                score = r["result"]["match_score"]
-                if isinstance(score, int):
-                    scores.append(score)
-        
+            res = r.get("result")
+            if not res:
+                continue
+            v = res.get("match_score") if "match_score" in res else res.get("score")
+            if isinstance(v, int):
+                scores.append(v)
+
         if scores:
+            use_ten_scale = any(s > 5 for s in scores)
+            rng = range(11) if use_ten_scale else range(6)
             print(f"   Score distribution:")
-            for score in range(6):
+            for score in rng:
                 count = scores.count(score)
                 if count > 0:
                     percentage = (count / len(scores)) * 100

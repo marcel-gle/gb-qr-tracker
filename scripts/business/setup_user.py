@@ -16,6 +16,9 @@ Usage examples:
   # Prod user, explicit password, non-admin
   python setup_user.py --env prod --email user@example.com --password "StrongPass123"
 
+  # New user with a fixed Firebase UID (create only; must match if user already exists)
+  python setup_user.py --env dev --email user@example.com --uid YOUR_UID --no-admin --password "StrongPass123"
+
 You need the Firebase Admin SDK installed:
   pip install firebase-admin
 """
@@ -65,14 +68,23 @@ def ensure_auth_user(
     password: str,
     display_name: Optional[str],
     inactive: bool,
+    uid: Optional[str] = None,
 ) -> Tuple[auth.UserRecord, bool]:
     """
     Get or create a Firebase Auth user by email and ensure the password is set.
+
+    If uid is set, it is used only when creating a new user. For an existing user
+    looked up by email, uid must match their current uid or a ValueError is raised.
 
     Returns (user, created?).
     """
     try:
         user = auth.get_user_by_email(email)
+        if uid and user.uid != uid:
+            raise ValueError(
+                f"Email {email!r} is already registered to uid {user.uid!r}; "
+                f"cannot use --uid {uid!r}."
+            )
         # Update password (and optionally display name / disabled flag) on existing user.
         user = auth.update_user(
             user.uid,
@@ -82,12 +94,24 @@ def ensure_auth_user(
         )
         return user, False
     except auth.UserNotFoundError:
-        user = auth.create_user(
-            email=email,
-            password=password,
-            display_name=display_name or None,
-            disabled=inactive,
-        )
+        create_kwargs = {
+            "email": email,
+            "password": password,
+            "display_name": display_name or None,
+            "disabled": inactive,
+        }
+        if uid:
+            try:
+                existing = auth.get_user(uid)
+            except auth.UserNotFoundError:
+                pass
+            else:
+                raise ValueError(
+                    f"UID {uid!r} is already in use by email {existing.email!r}; "
+                    "choose a different --uid or use that account."
+                )
+            create_kwargs["uid"] = uid
+        user = auth.create_user(**create_kwargs)
         return user, True
 
 
@@ -166,6 +190,14 @@ def main() -> None:
         description="Create or update a customer user (Auth + Firestore) in dev/prod."
     )
     parser.add_argument("--email", required=True, help="User login email")
+    parser.add_argument(
+        "--uid",
+        metavar="UID",
+        help=(
+            "Firebase Auth UID to use when creating a new user. "
+            "Must be unused. If the user already exists (by email), --uid must match their uid."
+        ),
+    )
     parser.add_argument("--password", help="Password to set (if omitted, a random one is generated)")
     parser.add_argument("--name", help="Display name (defaults to email prefix)")
     parser.add_argument(
@@ -238,11 +270,14 @@ def main() -> None:
     # Generate password if not provided.
     password = args.password or _generate_password()
 
+    requested_uid = (args.uid or "").strip() or None
+
     print("=" * 60)
     print("SETUP USER")
     print("=" * 60)
     print(f"Environment: {args.env}")
     print(f"Email:       {args.email}")
+    print(f"UID:         {requested_uid or '(auto on create)'}")
     print(f"Admin flag:  {is_admin if is_admin is not None else '(unchanged)'}")
     print(f"Active:      {is_active}")
     print(f"Plan:        {args.plan}")
@@ -259,6 +294,7 @@ def main() -> None:
         password=password,
         display_name=args.name,
         inactive=not is_active,
+        uid=requested_uid,
     )
 
     # Set claims (userId always, isAdmin optionally).

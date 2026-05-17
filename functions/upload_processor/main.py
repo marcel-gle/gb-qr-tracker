@@ -88,6 +88,88 @@ COL_LINKS = db.collection('links')
 COL_BUSINESSES = db.collection('businesses')
 COL_CAMPAIGNS = db.collection('campaigns')
 
+CUSTOMER_DOMAINS_COLLECTION = "customer_domains"
+
+
+def resolve_tenant_id_for_upload(
+    manifest_tenant: Optional[str],
+    tracking_url_prefix: Optional[str],
+) -> Optional[str]:
+    """
+    Prefer explicit manifest tenant_id; else map tracking_url_prefix hostname -> customer_domains/{host}.tenant_id.
+    """
+    if manifest_tenant and str(manifest_tenant).strip():
+        return str(manifest_tenant).strip()
+    if not tracking_url_prefix or not str(tracking_url_prefix).strip():
+        return None
+    raw = str(tracking_url_prefix).strip()
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    p = urllib.parse.urlparse(raw)
+    host = (p.hostname or "").lower()
+    if not host:
+        return None
+    snap = db.collection(CUSTOMER_DOMAINS_COLLECTION).document(host).get()
+    if not snap.exists:
+        return None
+    tid = (snap.to_dict() or {}).get("tenant_id")
+    if isinstance(tid, str) and tid.strip():
+        return tid.strip()
+    return None
+
+
+def _hostname_from_tracking_url_prefix(tracking_url_prefix: Optional[str]) -> Optional[str]:
+    if not tracking_url_prefix or not str(tracking_url_prefix).strip():
+        return None
+    raw = str(tracking_url_prefix).strip()
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    p = urllib.parse.urlparse(raw)
+    h = (p.hostname or "").lower()
+    return h or None
+
+
+def _coerce_manifest_allowed_hosts(val) -> list[str]:
+    if val is None:
+        return []
+    if isinstance(val, str):
+        return [s.strip() for s in val.split(",") if s.strip()]
+    if isinstance(val, list):
+        return [str(s).strip() for s in val if s is not None and str(s).strip()]
+    return []
+
+
+def _normalize_allowed_host_entry(h: str) -> str:
+    s = (h or "").strip()
+    if not s:
+        return ""
+    if "://" in s:
+        p = urllib.parse.urlparse(s)
+        return (p.hostname or "").lower()
+    return s.split(":", 1)[0].strip().lower()
+
+
+def resolve_allowed_hosts_for_upload(
+    manifest_allowed_hosts,
+    tracking_url_prefix: Optional[str],
+) -> list[str]:
+    """
+    Build links.allowed_hosts: manifest list + tracking_url_prefix host if that host is a shared customer_domains doc.
+    """
+    out: list[str] = []
+    for x in _coerce_manifest_allowed_hosts(manifest_allowed_hosts):
+        nh = _normalize_allowed_host_entry(x)
+        if nh and nh not in out:
+            out.append(nh)
+    th = _hostname_from_tracking_url_prefix(tracking_url_prefix)
+    if th:
+        snap = db.collection(CUSTOMER_DOMAINS_COLLECTION).document(th).get()
+        if snap.exists and bool((snap.to_dict() or {}).get("shared")):
+            if th not in out:
+                out.append(th)
+    return out
+
+
 # Optional deps (pandas, requests, tqdm)
 try:
     import pandas as pd
@@ -787,7 +869,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     mapbox_token: Optional[str],
                                     skip_existing: bool,
                                     geocode: bool = True,
-                                    tracking_url_prefix: Optional[str] = None):
+                                    tracking_url_prefix: Optional[str] = None,
+                                    tenant_id: Optional[str] = None,
+                                    allowed_hosts: Optional[List[str]] = None):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
     blacklisted_count = 0
@@ -1110,6 +1194,10 @@ def assign_links_from_business_file(path: str, base_url: str,
                         "snapshot_mailing": snapshot,
                         "campaign_name": campaign_name,
                     }
+                    if tenant_id:
+                        base_link_payload["tenant_id"] = tenant_id
+                    if allowed_hosts:
+                        base_link_payload["allowed_hosts"] = allowed_hosts
 
                     # Try to create link with final_id via a direct create() so that
                     # AlreadyExists is raised here (not deferred to batch.commit()).
@@ -1621,6 +1709,8 @@ def process_business_upload(cloud_event):
         # Optional prefix for printable tracking URL in exports.
         # If omitted, we fall back to "ihr-brief.de/<final_id>".
         "tracking_url_prefix": manifest.get("tracking_url_prefix") or metadata.get("tracking_url_prefix"),
+        "tenant_id": manifest.get("tenant_id") or metadata.get("tenant_id"),
+        "allowed_hosts": manifest.get("allowed_hosts") or metadata.get("allowed_hosts"),
         #use business domain as tracking id 
     }
 
@@ -1634,6 +1724,22 @@ def process_business_upload(cloud_event):
 
 
     print("PARAMS", params)
+
+    resolved_tenant_id = resolve_tenant_id_for_upload(
+        params.get("tenant_id"),
+        params.get("tracking_url_prefix"),
+    )
+    if resolved_tenant_id:
+        print(f"[tenant_id] resolved={resolved_tenant_id!r}")
+    else:
+        print("[tenant_id] not resolved (set manifest.tenant_id or customer_domains/* for tracking_url_prefix host)")
+
+    resolved_allowed_hosts = resolve_allowed_hosts_for_upload(
+        params.get("allowed_hosts"),
+        params.get("tracking_url_prefix"),
+    )
+    if resolved_allowed_hosts:
+        print(f"[allowed_hosts] resolved={resolved_allowed_hosts!r}")
 
     # Download uploaded file to /tmp
     local_in = os.path.join("/tmp", os.path.basename(object_name))
@@ -1659,6 +1765,8 @@ def process_business_upload(cloud_event):
             skip_existing=params["skip_existing"],
             geocode=params["geocode"],
             tracking_url_prefix=params.get("tracking_url_prefix"),
+            tenant_id=resolved_tenant_id,
+            allowed_hosts=resolved_allowed_hosts or None,
         )
 
         out_path = result["output_path"]

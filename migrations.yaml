@@ -15,6 +15,18 @@
 # - reversible: Whether the migration can be rolled back
 
 migrations:
+  - id: "20260410_001"
+    name: "Backfill links.tenant_id"
+    script: "scripts/migrations/migrate_links_tenant_id.py"
+    description: "Sets links.tenant_id from campaign.tenant_id or --default-tenant for redirector Worker hostname enforcement (links must match customer_domains/{host}.tenant_id when enforced)."
+    created_date: "2026-04-10"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments: []
+    dependencies: []
+    reversible: false
+
   - id: "20241228_001"
     name: "Delete Test Hits from Hits Collection"
     script: "scripts/migrate_delete_test_hits.py"
@@ -86,4 +98,17 @@ migrations:
     environments: []
     dependencies: []
     reversible: true
+
+  - id: "20260409_001"
+    name: "Callcenter V2 — migrate legacy conversations to root calls"
+    script: "scripts/migrations/migrate_callcenter_v2_calls.py"
+    description: "Migrates call logs from customers/{customerId}/businesses/{businessId}/conversations to root calls/{callId} with call_process, legacy_source_path, and idempotent deterministic IDs. Backfills customers/.../businesses latest_call_process; optional latest_outcome cleanup. Supports checkpoint resume, stream retries, --exclude-customer-id, and --customer-id scoped runs."
+    created_date: "2026-04-09"
+    status: "pending"
+    applied_date: null
+    applied_by: null
+    environments:
+      - dev
+    dependencies: []
+    reversible: false
 
