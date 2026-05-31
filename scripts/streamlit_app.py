@@ -685,34 +685,25 @@ def render_step6() -> None:
     env = st.selectbox("Environment", ["dev", "prod"], key="step6_env")
     owner_id = st.text_input("Owner ID", value=st.session_state.get("step6_owner", ""), key="step6_owner", placeholder="xLRk37rnV7T4CbOXzW5N3saxVfy1")
     campaign_code = st.text_input("Campaign code", value=st.session_state.get("step6_code", ""), key="step6_code", placeholder="RLIT")
-    campaign_name = st.text_input("Campaign name (optional)", value=st.session_state.get("step6_name", ""), key="step6_name", placeholder="Rocket Letter - IT 2")
+    campaign_name = st.text_input("Campaign name", value=st.session_state.get("step6_name", ""), key="step6_name", placeholder="Rocket Letter - IT 2")
     campaign_id = st.text_input("Campaign ID (optional; UUID if empty)", value=st.session_state.get("campaign_base_path", "").split("/")[-1] if st.session_state.get("campaign_base_path") else "", key="step6_campaign_id", placeholder="003-20260304-management-forum-stress")
-    search_group_id = st.text_input(
-        "Search group ID (optional; link this search group + its searches to the campaign)",
-        value=st.session_state.get("step6_search_group_id", ""),
-        key="step6_search_group_id",
-        placeholder="search-group-id",
-    )
     input_csv = st.text_input("Input CSV", value=default_in, key="step6_input", placeholder="/path/to/final-with-template.csv")
     templates_dir = st.text_input("Templates directory", value=default_tpl, key="step6_templates", placeholder="/path/to/templates")
     destination = st.text_input("Destination URL", value=st.session_state.get("step6_destination", ""), key="step6_destination", placeholder="https://www.rocket-letter.de/erstgespraech")
     do_upload = st.checkbox("Upload to GCS", value=False, key="step6_upload")
 
     if st.button("Run prepare/upload", key="step6_run"):
-        if not all([owner_id, campaign_code, input_csv, templates_dir, destination]):
-            st.error("Please set Owner ID, Campaign code, Input CSV, Templates dir, and Destination URL.")
+        if not all([owner_id, campaign_code, campaign_name.strip(), input_csv, templates_dir, destination]):
+            st.error("Please set Owner ID, Campaign code, Campaign name, Input CSV, Templates dir, and Destination URL.")
         else:
             cmd = [
                 sys.executable, str(REPO_ROOT / "scripts" / "business" / "local_process_upload.py"),
                 "--env", env, "--owner-id", owner_id, "--campaign-code", campaign_code,
+                "--campaign-name", campaign_name.strip(),
                 "--input-csv", input_csv, "--templates-dir", templates_dir, "--destination", destination,
             ]
-            if campaign_name:
-                cmd.extend(["--campaign-name", campaign_name])
             if campaign_id:
                 cmd.extend(["--campaign-id", campaign_id])
-            if search_group_id:
-                cmd.extend(["--search-group-id", search_group_id])
             if do_upload:
                 cmd.append("--upload")
 

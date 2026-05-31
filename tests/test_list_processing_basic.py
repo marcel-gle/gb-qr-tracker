@@ -5,6 +5,7 @@ from pathlib import Path
 from list_processing import ListProcessingConfig
 from list_processing.io import load_lead_records_from_csv, write_internal_csv
 from list_processing.llm.base import LLMClient
+from list_processing.models import LeadRecord
 from list_processing.pipeline import ListProcessingPipeline
 
 
@@ -63,4 +64,30 @@ def test_pipeline_no_llm_steps(tmp_path: Path) -> None:
     # At least the company names should appear somewhere in the CSV.
     assert "Beispiel GmbH" in text
     assert "Test AG" in text
+
+
+def test_internal_writer_flattens_analysis_json(tmp_path: Path) -> None:
+    record = LeadRecord(
+        company_name="Makler Beispiel GmbH",
+        website="makler-beispiel.de",
+        gegenstand="Versicherungsmakler",
+        domain_match_score=8,
+        domain_analysis_raw={
+            "score": 8,
+            "makler": True,
+            "bav": False,
+            "details": {"firmengroesse": "passt"},
+            "flags": ["homepage", "kontakt"],
+        },
+    )
+
+    output_path = tmp_path / "flattened_internal.csv"
+    write_internal_csv(output_path, [record])
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "analysis_score" in text
+    assert "analysis_makler" in text
+    assert "analysis_bav" in text
+    assert "analysis_details_firmengroesse" in text
+    assert "analysis_flags" in text
 

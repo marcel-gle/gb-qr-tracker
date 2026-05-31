@@ -329,9 +329,12 @@ class DomainScoringService:
             return False
 
         record.domain_analysis_raw = result
-        if "match_score" in result:
+        score_value = result.get("match_score")
+        if score_value is None:
+            score_value = result.get("score")
+        if score_value is not None:
             try:
-                record.domain_match_score = int(result["match_score"])
+                record.domain_match_score = int(score_value)
             except (TypeError, ValueError):
                 pass
 

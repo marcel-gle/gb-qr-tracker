@@ -1,0 +1,40 @@
+{
+    "_comment": "Example template configuration for send_letters_onlinebrief24.py. Adjust PDF filenames and coordinates to match your real templates. Coordinates are in PostScript points (1/72 inch), origin is bottom-left of the page.",
+    "rl-agenturen-meta.pdf": {
+      "pdf_filename": "rl-agenturen-meta.pdf",
+      "qr_positions": [
+        {
+          "page": 8,
+          "x": 455,
+          "y": 152,
+          "size": 90
+        }
+      ],
+      "tracking_text_positions": [
+        {
+          "page": 8,
+          "x": 300,
+          "y": 285,
+          "font_size": 20,
+          "align": "center"
+        }
+      ],
+  
+      "business_name_positions": [
+        { "page": 1, "x":  73, "y": 665, "font_size": 11, "max_width": 200 }
+      ],
+  
+      "full_name_positions": [
+        { "page": 1, "x": 73, "y": 650, "font_size": 11 }
+      ],
+  
+      "street_positions": [
+        { "page": 1, "x": 73, "y": 635, "font_size": 11 }
+      ],
+  
+      "city_positions": [
+        { "page": 1, "x": 73, "y": 620, "font_size": 11 }
+      ]
+    }
+  }
+  

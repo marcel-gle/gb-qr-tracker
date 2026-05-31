@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
 import re
 from typing import Any, Dict, List, Optional, Set
@@ -46,6 +47,33 @@ def normalize_postcode(postcode: object | None) -> Optional[str]:
         s = "0" + s
 
     return s
+
+
+def _sanitize_analysis_key(value: str) -> str:
+    key = re.sub(r"[^0-9A-Za-z_]+", "_", value.strip()).strip("_").lower()
+    return key or "value"
+
+
+def flatten_analysis_result(result: Any, prefix: str = "analysis") -> Dict[str, Any]:
+    flat: Dict[str, Any] = {}
+
+    def _walk(value: Any, path: List[str]) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                _walk(child, path + [_sanitize_analysis_key(str(key))])
+            return
+
+        flat_key = prefix if not path else f"{prefix}_{'_'.join(path)}"
+        if isinstance(value, list):
+            flat[flat_key] = json.dumps(value, ensure_ascii=False)
+            return
+
+        flat[flat_key] = "" if value is None else value
+
+    if isinstance(result, dict):
+        _walk(result, [])
+
+    return flat
 
 
 @dataclass
@@ -206,6 +234,14 @@ class LeadRecord:
 
         # prompts_used is a list of dataclasses; turn them into plain dicts.
         data["prompts_used"] = [asdict(p) for p in self.prompts_used]
+
+        if isinstance(self.domain_analysis_raw, dict):
+            analysis_json = json.dumps(self.domain_analysis_raw, ensure_ascii=False)
+            data["domain_analysis_raw"] = analysis_json
+            data["analysis_result"] = analysis_json
+            data.update(flatten_analysis_result(self.domain_analysis_raw))
+        else:
+            data["analysis_result"] = ""
 
         # Provide a flat alias for the domain match score so downstream
         # consumers can rely on a simple "match_score" column in CSV exports.

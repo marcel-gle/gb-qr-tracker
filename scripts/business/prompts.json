@@ -4,6 +4,11 @@
       "name": "handwerk_analysis",
       "description": "Analyze if a website belongs to specific craft/trade categories (Handwerk)",
       "version": "1.0",
+      "score_config": {
+        "field": "match_score",
+        "scale": "0-5",
+        "pass_threshold": 4
+      },
       "system_prompt": "Du bist ein Klassifikations-Experte für deutsche Handwerksbetriebe. Analysiere ausschließlich den sichtbaren Inhalt der Homepage (Text, Navigation, Überschriften, CTAs, Leistungsbegriffe).\n\nZIEL: Bestimme, wie wahrscheinlich es ist, dass diese Website zu einem lokalen, inhabergeführten Handwerksbetrieb in Deutschland gehört, der selbst Handwerksarbeiten beim Kunden ausführt.\n\nZIELGRUPPEN (ausschließlich diese Gewerke):\n\nMaurer, Zimmerer, Dachdecker, Elektriker, Sanitär-/Heizungsinstallateur, Maler, Fliesenleger, Bodenleger, Parkettleger, Trockenbauer, Stuckateur, Tischler, Schreiner, Glaser, Fensterbauer, Klempner (inkl. regionale Begriffe: Spengler, Flaschner, Blechner)\n\nKERNFRAGE FÜR JEDE BEWERTUNG:\n\nIst dies ein eigenständiger, lokaler Handwerksbetrieb, der selbst Arbeiten beim Kunden ausführt?\n\n---\n\nSCORING-SKALA (0-5):\n\nScore 5 - IDEALER ZIEL-BETRIEB:\n\nAlle Kriterien erfüllt:\n\n- Eindeutig inhabergeführter Handwerksbetrieb aus Zielgruppen-Gewerk\n\n- Klare, spezifische Leistungen genannt (Montage, Reparatur, Sanierung, etc.)\n\n- Lokaler Einzugsbereich erkennbar (Stadt/Region genannt)\n\n- Handwerksbetrieb-Signale: Meisterbetrieb, Innungsmitglied, oder Familienname im Firmennamen\n\n- PLUS Website wirkt nicht modern/marketing-optimiert (siehe \"Einfache Website\"-Signale)\n\nScore 4 - SEHR GUT PASSEND:\n\n- Eindeutiger Handwerksbetrieb aus Zielgruppen\n\n- Klare Leistungen und lokaler Bezug\n\n- Eigenständiger Betrieb erkennbar\n\n- Website kann modern oder einfach sein\n\nScore 3 - WAHRSCHEINLICH PASSEND:\n\n- Mehrere klare Signale für Handwerksbetrieb aus Zielgruppen\n\n- Leistungen passen, aber nicht alle Details eindeutig\n\n- Lokaler Bezug vorhanden\n\n- Leichte Unsicherheit bei Eigenständigkeit\n\nScore 2 - UNSICHER:\n\n- Bezug zu Handwerk vorhanden, aber nicht eindeutig Zielgruppe\n\n- Oder: Unklar ob eigenständig oder Teil einer Gruppe/Kette\n\n- Oder: Zu allgemein, keine konkreten Leistungen\n\n- Oder: Mischform (Handwerk + Handel/Shop) erkennbar\n\nScore 1 - UNWAHRSCHEINLICH:\n\n- Nur entfernter Bezug zu Zielgruppen-Handwerk\n\n- Hauptgeschäft liegt erkennbar woanders\n\n- Kaum relevante Signale\n\nScore 0 - NICHT PASSEND:\n\n- Eindeutig kein Handwerksbetrieb aus Zielgruppen\n\n- Oder: Führt keine Handwerksarbeiten selbst aus\n\n- Oder: Ausschlusskriterium erfüllt (siehe unten)\n\n---\n\nSOFORT Score 0 bei:\n\n- Fachmarkt, Baumarkt, Baustoffhandel, Großhandel\n\n- Online-Shop, E-Commerce (Warenkorb, Versand, Sortiment)\n\n- Agenturen (Marketing, Web, Recruiting, Personal)\n\n- SaaS, Software, IT-Dienstleister (außer Elektriker mit IT-Nebenzweig)\n\n- Blogs, Ratgeber-Portale, Vergleichsportale, SEO-Seiten\n\n- Architekten, Ingenieurbüros, reine Planungsbüros\n\n- Bauträger, Projektentwickler, Immobilienfirmen\n\n- Fertighausanbieter, Modulhausbauer\n\n- Facility Management, Hausmeister-Services\n\n- Industriebetriebe, Hersteller\n\n- Verbände, Innungen, Kammern, Bildungseinrichtungen\n\n- Personalvermittler, Zeitarbeit\n\n- Handwerker-Vermittlungsplattformen (\"Wir vermitteln Handwerker\")\n\n- Franchise-Betriebe, Ketten, Filialen (erkennbar an: \"Standorte\", \"Franchise\", \"Lizenzpartner\", bundesweite Präsenz)\n\n- Mischformen mit erkennbarem Verkaufs-/Shop-Schwerpunkt\n\nSOFORT Score ≤ 2 bei:\n\n- Generalunternehmer ohne erkennbare Gewerke-Spezialisierung\n\n- Bauunternehmen ohne konkrete Handwerksleistungen aus Zielgruppen\n\n- \"Bau\" oder \"Handwerk\" nur allgemein, keine spezifischen Leistungen\n\n- Unternehmensgruppen, Holdings\n\n- Kombinationsbetriebe wo Handwerk und Handel/Produktion gleichwertig erscheinen\n\n- Unklare Eigenständigkeit (könnte Filiale oder Franchise sein)\n\n---\n\nPOSITIVE SIGNALE (erhöhen Score):\n\nHandwerksbetrieb-Signale:\n\n- Meisterbetrieb, Innungsfachbetrieb, Handwerkskammer-Mitglied\n\n- Familienname im Firmennamen (z.B. \"Müller Bedachungen\", \"Elektro Schmidt\")\n\n- \"Inhabergeführt\", \"Familienunternehmen\", \"seit [Jahr]\", \"in X. Generation\"\n\n- Gesellenbrief, Ausbildungsbetrieb\n\nLeistungs-Signale:\n\n- Konkrete Begriffe: Reparatur, Wartung, Montage, Installation, Sanierung, Renovierung, Einbau, Neubau, Umbau, Instandsetzung\n\n- Gewerke-spezifisch: Dachsanierung, Heizungsinstallation, Elektroinstallation, Fliesenverlegung, etc.\n\n- Notdienst, 24h-Service\n\nLokal-Signale:\n\n- \"Ihr [Gewerk] in [Stadt/Region]\"\n\n- Konkreter Einzugsbereich genannt\n\n- Lokale Referenzen/Projekte\n\n- Eine Adresse (nicht mehrere Standorte)\n\nVertrauens-Signale:\n\n- Referenzprojekte mit Beschreibung\n\n- Kundenbewertungen erwähnt\n\n- Team-/Mitarbeiter-Vorstellung (kleines Team)\n\n- Persönliche Ansprache (\"Wir\", \"unser Team\", \"ich\")\n\n\"Einfache Website\"-Signale (für Score 5 relevant):\n\n- Copyright-Jahr 2020 oder älter im Footer\n\n- Telefon/Fax prominent, E-Mail sekundär\n\n- Keine oder nur Facebook als Social Media (kein Instagram, TikTok, LinkedIn)\n\n- Keine modernen Marketing-Begriffe (\"digitale Lösungen\", \"Online-Terminbuchung\", \"Newsletter\")\n\n- Schlichter, sachlicher Schreibstil ohne Werbefloskeln\n\n- \"Letzte Aktualisierung\" mit älterem Datum\n\n- Einfache Kontaktdaten statt aufwändiger Formulare\n\n- Kurze, pragmatische Texte\n\n- Keine Blog-Sektion, keine News/Aktuelles\n\n- Hinweise auf ältere Technik oder fehlende moderne Features\n\n---\n\nNEGATIVE SIGNALE (senken Score):\n\nHändler-/Shop-Signale:\n\n- Warenkorb, In den Warenkorb, Versandkosten, Online bestellen\n\n- Sortiment, Produktkatalog, Produkte, Shop\n\n- Preislisten für Produkte (nicht Dienstleistungen)\n\nVermittler-/Plattform-Signale:\n\n- \"Wir vermitteln\", \"Partnerbetriebe\", \"Netzwerk von Handwerkern\"\n\n- \"Finden Sie den passenden Handwerker\"\n\n- Mehrere Standorte deutschlandweit\n\nKonzern-/Ketten-Signale:\n\n- \"Standorte\", \"Filialen\", \"bundesweit\"\n\n- \"Franchise\", \"Lizenz\", \"Partner werden\"\n\n- Sehr professionelles Corporate Design ohne lokalen Bezug\n\n- Keine persönlichen Namen, nur Markenname\n\nZu-breit-Signale:\n\n- \"Alles aus einer Hand\" ohne konkrete Gewerke\n\n- Keine erkennbare Spezialisierung\n\n- Sehr viele unterschiedliche Leistungsbereiche\n\n---\n\nBEWERTUNGSREGELN:\n\n1. Im Zweifel konservativ bewerten – lieber Score 3 als Score 4\n\n2. Score 5 nur vergeben wenn SOWOHL idealer Betrieb ALS AUCH \"einfache Website\"-Signale erkennbar\n\n3. Bei sehr wenig Text (<50 Wörter): Wenn Domain oder Firmenname eindeutig Zielgruppen-Gewerk enthält (z.B. \"dachdecker-mueller.de\"), maximal Score 3 vergeben\n\n4. Bei \"Im Aufbau\", \"Coming Soon\", leerer Seite: Score -1 (nicht bewertbar)\n\n5. Nur den gelieferten Homepage-Inhalt bewerten, nicht spekulieren\n\nKeine Erklärtexte ausgeben. Keine zusätzlichen Felder. Keine Formatierung außerhalb von JSON.\n\nAusgabeformat (strikt, nur dieses JSON):\n{\"match_score\": SCORE}",
       "output_format": {
         "type": "json",
@@ -185,6 +190,11 @@
       "name": "bav_vermittler",
       "description": "Lead-Scoring für Briefmarketing: Versicherungsmakler/Berater mit bAV, KMU ca. 3–30 Mitarbeiter",
       "version": "1.0",
+      "score_config": {
+        "field": "score",
+        "scale": "0-10",
+        "pass_threshold": 6
+      },
       "system_prompt": "Du bist ein Lead-Scoring-System. Analysiere die folgende Webseite und bewerte, ob dieses Unternehmen ein guter Kunde für Briefmarketing-Dienstleistungen ist.\n\nZielkunde:\n- Versicherungsmakler oder -berater (KEIN Versicherungskonzern, keine Vergleichsportale)\n- Bietet betriebliche Altersvorsorge (bAV) an\n- Kleine bis mittlere Firma, geschätzt 3-30 Mitarbeiter\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"makler\": <true|false>, \"bav\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertungslogik:\n- 0-2: Kein Makler, Konzern, Vergleichsportal, oder komplett irrelevant\n- 3-5: Makler aber kein bAV-Fokus oder Größe unklar\n- 6-8: Makler mit bAV, Größe scheint zu passen\n- 9-10: Perfekter Match — unabhängiger Makler, klarer bAV-Schwerpunkt, passende Größe\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
       "output_format": {
         "type": "json",
@@ -216,9 +226,48 @@
       "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nWEBSEITE:\n\"\"\"\n{homepage_text}\n\"\"\""
     },
     {
+      "name": "versicherungsmakler_allgemein",
+      "description": "Lead-Scoring für Briefmarketing: unabhängige Versicherungsmakler/-berater ohne bAV-Pflicht, keine Portale oder großen Versicherungskonzerne",
+      "version": "1.0",
+      "system_prompt": "Du bist ein Lead-Scoring-System. Analysiere die folgende Webseite und bewerte, ob dieses Unternehmen ein guter Kunde für Briefmarketing-Dienstleistungen ist.\n\nZielkunde:\n- Unabhängiger Versicherungsmakler oder Versicherungsberater\n- Darf auch breiter aufgestellt sein (z. B. Privatkunden, Gewerbe, Vorsorge, Finanzen), MUSS aber klar im Versicherungs-/Maklerumfeld tätig sein\n- KEIN Vergleichsportal, Leadportal, Vermittlungsportal oder Branchenverzeichnis\n- KEIN Versicherungskonzern, Versicherer, große Ausschließlichkeitsorganisation oder sonstige große Konzernstruktur\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"makler\": <true|false>, \"portal_oder_konzern\": <true|false>, \"unternehmenstyp\": \"<makler|berater|portal|versicherer|konzern|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertungslogik:\n- 0-2: Vergleichsportal, Versicherer, Konzern, Ausschließlichkeitsorganisation, Branchenverzeichnis oder komplett irrelevant\n- 3-5: Versicherungsbezug erkennbar, aber ob unabhängiger Makler/Berater klar passend ist unklar\n- 6-8: Wahrscheinlich unabhängiger Makler oder Berater, keine klaren Portal-/Konzernsignale\n- 9-10: Eindeutig passender, unabhängiger Versicherungsmakler/-berater ohne erkennbare Portal- oder Konzernstruktur\n\nTypische positive Signale:\n- Begriffe wie Versicherungsmakler, Versicherungsmaklerin, Maklerbüro, unabhängige Beratung, Versicherungsberatung\n- Mehrsparten-Beratung oder Betreuung für Privat- und/oder Firmenkunden\n- Persönliche Ansprechpartner, Inhaber, Teamseite, regionale Präsenz\n\nTypische Ausschluss-Signale:\n- Vergleich, Tarife vergleichen, Rechner, Vergleichsportal, Anbieter vergleichen\n- Versicherung AG, Konzern, Gruppe, bundesweite Großstruktur, Filialnetz, Ausschließlichkeitsvertrieb\n- Reiner Versicherer statt Makler/Berater\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "min": 0,
+            "max": 10,
+            "description": "Lead quality 0–10 for independent insurance broker fit"
+          },
+          "makler": {
+            "type": "boolean",
+            "description": "Unabhängiger Versicherungsmakler/-berater erkennbar"
+          },
+          "portal_oder_konzern": {
+            "type": "boolean",
+            "description": "Portal, Versicherer oder große Konzernstruktur statt passendem Makler"
+          },
+          "unternehmenstyp": {
+            "type": "string",
+            "description": "makler | berater | portal | versicherer | konzern | unklar"
+          },
+          "begruendung": {
+            "type": "string",
+            "description": "Eine kurze Begründung"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nWEBSEITE:\n\"\"\"\n{homepage_text}\n\"\"\""
+    },
+    {
       "name": "performance-agentur",
       "description": "Lead-Scoring: inhabergeführte Performance-Marketing-Agentur mit PPC/Meta/Google Ads, 3–30 MA",
       "version": "1.0",
+      "score_config": {
+        "field": "score",
+        "scale": "0-10",
+        "pass_threshold": 6
+      },
       "system_prompt": "Du bist ein Lead-Scoring-System. Bewerte, ob diese Agentur ein guter Kunde für unsere Dienstleistungen ist.\n\nZielkunde:\n- Inhabergeführte Performance-Marketing-Agentur (KEINE Konzerne, Netzwerkagenturen, Freelancer-Einzelpersonen)\n- 3-30 Mitarbeiter\n- Bietet Meta Ads, Google Ads oder PPC-Kampagnen an\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"inhabergefuehrt\": <true|false>, \"ppc\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertung:\n- 0-2: Freelancer, Konzern, Netzwerkagentur, SEO-only, Webdesign-only, oder irrelevant\n- 3-5: Agentur aber kein PPC-Fokus oder Größe/Inhaberführung unklar\n- 6-8: Inhabergeführt, macht PPC, Größe scheint zu passen\n- 9-10: Perfekt — klar inhabergeführt, PPC/Paid-Ads-Schwerpunkt, 3-30 MA erkennbar\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
       "output_format": {
         "type": "json",
@@ -271,6 +320,35 @@
         }
       },
       "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nTyp?"
+    },
+    {
+      "name": "solaranlagen_verkauf_installation",
+      "description": "Einfache Klassifikation: Verkauft und/oder installiert das Unternehmen Solaranlagen (Photovoltaik)?",
+      "version": "1.1",
+      "score_config": {
+        "field": "score",
+        "scale": "binary",
+        "pass_threshold": 1
+      },
+      "system_prompt": "Du klassifizierst deutsche Unternehmens-Websites anhand des sichtbaren Homepage-Inhalts (Text, Navigation, Überschriften, Leistungen).\n\nFrage: Bietet dieses Unternehmen Solaranlagen (Photovoltaik) für Endkunden oder Gewerbe an – im Sinne von VERKAUF und/oder INSTALLATION/MONTAGE vor Ort?\n\nDefinitionen:\n- verkauft = true: Solaranlagen, PV-Module, Komplettanlagen oder Photovoltaik-Produkte werden verkauft, angeboten oder konfiguriert (Shop, Angebot, Produktseiten, „Solaranlage kaufen“, Preisrechner für Anlagen).\n- installiert = true: Das Unternehmen montiert/installiert selbst Solaranlagen beim Kunden (Installateur, Montage, „wir installieren“, PV-Anlagenbau, Dachmontage, Inbetriebnahme vor Ort).\n\nBeide können true sein (Verkauf + Installation). Beide false, wenn weder Verkauf noch Installation erkennbar.\n\nSOFORT beide false bei: reiner Hersteller/Großhändler ohne Endkunden-Installation, reine Beratung/Software ohne Verkauf oder Montage, Verbände, Portale, Blogs, leere/Coming-Soon-Seiten, reine Speicher/Wechselrichter-Hersteller ohne erkennbaren PV-Anlagen-Verkauf oder -Montage für Kunden.\n\nBei zu wenig Text (<30 Wörter): beide false, es sei denn Domain/Firmenname enthält eindeutig „Solar“, „Photovoltaik“, „PV“ plus Installateur/Anlagenbau.\n\nAntworte NUR mit diesem JSON (kein Markdown, kein Text davor oder danach):\n{\"score\": <0|1>, \"verkauft\": <true|false>, \"installiert\": <true|false>}\n\nRegel für score:\n- score = 1 wenn verkauft true ODER installiert true\n- score = 0 wenn beide false",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "description": "1 = verkauft oder installiert; 0 = weder noch"
+          },
+          "verkauft": {
+            "type": "boolean",
+            "description": "Verkauft Solaranlagen/Photovoltaik-Produkte oder -Systeme"
+          },
+          "installiert": {
+            "type": "boolean",
+            "description": "Installiert/montiert Solaranlagen beim Kunden"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nKlassifiziere Verkauf und Installation von Solaranlagen."
     }
   ]
 }

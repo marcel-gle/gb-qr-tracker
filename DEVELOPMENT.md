@@ -73,6 +73,22 @@ Test:
 curl "http://localhost:8080?id=test-link-id"
 ```
 
+#### Redirector: `customer_domains` collection and `tenant_id` (Worker hostname enforcement)
+
+Short links on multiple Custom Hostnames (`go.customer-a.de`, `go.customer-b.de`) share one redirector. To prevent a link from resolving on the wrong customer’s `go.*` domain:
+
+1. **Firestore `customer_domains`**: one document per hostname, document ID = hostname (lowercase, no port), field `tenant_id` (string slug), e.g. `customer_domains/go.rocket-letter.de` → `{ "tenant_id": "rocket-letter" }`.
+2. **`links` documents**: set `tenant_id` to the same slug when creating or migrating links.
+3. **Cloud Function env** `REDIRECTOR_DOMAIN_TENANT_CHECK`:
+   - `off` — no check (default after deploy).
+   - `log_only` — for Worker (HMAC) requests, log `[REDIRECTOR_DOMAIN_TENANT]` on unknown host / missing link `tenant_id` / mismatch; still redirect and count hits.
+   - `enforce` — same conditions return **404** (no hit, no redirect).
+4. **Direct** calls to `…cloudfunctions.net/redirector?id=…` (no valid Worker HMAC) **skip** the host/tenant check (behavior unchanged).
+5. **Uploads**: set `tenant_id` in `manifest.json`, or rely on `tracking_url_prefix` hostname → lookup `customer_domains/{host}.tenant_id` when the domain doc exists.
+6. **Migration**: [scripts/migrations/migrate_links_tenant_id.py](scripts/migrations/migrate_links_tenant_id.py) backfills `links.tenant_id` from `campaigns/{id}.tenant_id` (and optional `--default-tenant`). Optionally set `tenant_id` on campaign docs first.
+
+Rollout: seed `customer_domains` → deploy redirector with `off` → migrate links → `log_only` and watch logs → `enforce`.
+
 #### Upload Processor Function
 
 The upload processor is triggered by Cloud Storage events, so local testing requires:
@@ -245,7 +261,7 @@ class TestRedirector(unittest.TestCase):
 
 Run tests:
 ```bash
-python -m pytest functions/redirector/test_redirector.py
+cd functions/redirector && python -m pytest test_tenant_utils.py -v
 ```
 
 ### Integration Testing

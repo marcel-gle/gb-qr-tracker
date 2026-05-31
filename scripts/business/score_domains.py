@@ -14,13 +14,14 @@ Usage:
 
 import io
 import os
+import re
 import sys
 import csv
 import json
 import time
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Semaphore
@@ -196,6 +197,47 @@ def extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
         except json.JSONDecodeError:
             return None
     return None
+
+
+def _sanitize_analysis_key(value: str) -> str:
+    key = re.sub(r"[^0-9A-Za-z_]+", "_", value.strip()).strip("_").lower()
+    return key or "value"
+
+
+def flatten_analysis_result(result: Any, prefix: str = "analysis") -> Dict[str, Any]:
+    flat: Dict[str, Any] = {}
+
+    def _walk(value: Any, path: List[str]) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                _walk(child, path + [_sanitize_analysis_key(str(key))])
+            return
+
+        flat_key = prefix if not path else f"{prefix}_{'_'.join(path)}"
+        if isinstance(value, list):
+            flat[flat_key] = json.dumps(value, ensure_ascii=False)
+            return
+
+        flat[flat_key] = "" if value is None else value
+
+    if isinstance(result, dict):
+        _walk(result, [])
+
+    return flat
+
+
+def apply_flat_analysis_result(row: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+    row["analysis_result"] = json.dumps(result, ensure_ascii=False)
+
+    flat = flatten_analysis_result(result)
+    row.update(flat)
+
+    score_value = result.get("match_score")
+    if score_value is None:
+        score_value = result.get("score")
+    row["match_score"] = "" if score_value is None else str(score_value)
+
+    return flat
 
 
 def analyze_domain_with_llm(domain: str, homepage_text: str, prompt: Prompt) -> Optional[Dict[str, Any]]:
@@ -408,6 +450,14 @@ def process_csv(
             fieldnames.append("match_score")
         
         for row in reader:
+            existing_result = (row.get("analysis_result") or "").strip()
+            if existing_result:
+                parsed = extract_json_from_response(existing_result)
+                if parsed is not None:
+                    flat = apply_flat_analysis_result(row, parsed)
+                    for key in flat:
+                        if key not in fieldnames:
+                            fieldnames.append(key)
             rows.append(row)
     
     logger.info(f"Loaded {len(rows)} rows from CSV")
@@ -512,6 +562,7 @@ def process_csv(
                     print(f"\n⚠ Error processing domain {domain}: {e}")
                     results[i] = {
                         "domain": domain,
+                        "result": None,
                         "match_score": None,
                         "status": "error",
                         "error": str(e)
@@ -529,15 +580,12 @@ def process_csv(
         rows[i]["analysis_error"] = result_data.get("error", "") or ""
         
         # Store the full result as JSON
-        if result_data["result"]:
-            rows[i]["analysis_result"] = json.dumps(result_data["result"], ensure_ascii=False)
-            
-            # Flat column: match_score from JSON, or score (0–10 prompts)
-            res = result_data["result"]
-            if "match_score" in res:
-                rows[i]["match_score"] = str(res["match_score"])
-            elif "score" in res and res["score"] is not None:
-                rows[i]["match_score"] = str(res["score"])
+        result_payload = result_data.get("result")
+        if result_payload:
+            flat = apply_flat_analysis_result(rows[i], result_payload)
+            for key in flat:
+                if key not in fieldnames:
+                    fieldnames.append(key)
         else:
             rows[i]["analysis_result"] = ""
             rows[i]["match_score"] = ""

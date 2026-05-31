@@ -601,6 +601,29 @@ def _normalize_header_name(value: Optional[str]) -> str:
     return str(value).replace("\ufeff", "").strip().lower()
 
 
+def _extract_domain_from_email_value(value: Optional[str]) -> str:
+    """
+    Extract a usable domain from an email field.
+
+    Supports plain email addresses, mailto: links, and comma/semicolon-separated
+    values by using the first valid email-like token it finds.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+
+    candidate = re.split(r"[;,]", raw, maxsplit=1)[0].strip()
+    if candidate.lower().startswith("mailto:"):
+        candidate = candidate[7:].strip()
+
+    match = re.search(r"@([A-Z0-9.\-]+\.[A-Z]{2,})", candidate, flags=re.IGNORECASE)
+    if not match:
+        return ""
+
+    domain = match.group(1).strip().strip(" >)\"'").lower().rstrip(".")
+    return domain
+
+
 def address_incomplete(addr: str) -> bool:
     """
     Very simple heuristic: treat short or non-specific addresses as incomplete.
@@ -666,6 +689,13 @@ def process_row(
     """
     domain = (row.get(COL_DOMAIN) or "").strip()
     company = (row.get(COL_COMPANY) or "").strip()
+    email = (row.get(COL_EMAIL) or "").strip()
+
+    if not domain and email:
+        domain = _extract_domain_from_email_value(email)
+        if domain:
+            row = row.copy()
+            row[COL_DOMAIN] = domain
 
     print(f"\n[{row_idx}/{total_rows}] {company} — {domain}")
 
@@ -1208,7 +1238,7 @@ def enrich_with_gpt(input_csv: str, output_csv: str, max_workers: Optional[int] 
             del row[None]
 
     # Normalize known core headers so we can accept variants like
-    # "domain", " Domain ", or "website/webseite".
+    # "domain", " Domain ", "website/webseite", or derive a domain from email.
     header_lookup = {_normalize_header_name(fn): fn for fn in fieldnames if fn}
 
     domain_source = None
@@ -1216,10 +1246,26 @@ def enrich_with_gpt(input_csv: str, output_csv: str, max_workers: Optional[int] 
         if candidate in header_lookup:
             domain_source = header_lookup[candidate]
             break
-    if domain_source and domain_source != COL_DOMAIN:
+
+    email_source = None
+    for candidate in ("generic company emails", "email", "e-mail", "e-mail-adresse", "mail"):
+        if candidate in header_lookup:
+            email_source = header_lookup[candidate]
+            break
+
+    if domain_source or email_source:
         for row in rows:
-            if not (row.get(COL_DOMAIN) or "").strip():
+            if (row.get(COL_DOMAIN) or "").strip():
+                continue
+
+            if domain_source:
                 row[COL_DOMAIN] = (row.get(domain_source) or "").strip()
+
+            if not (row.get(COL_DOMAIN) or "").strip() and email_source:
+                derived_domain = _extract_domain_from_email_value(row.get(email_source))
+                if derived_domain:
+                    row[COL_DOMAIN] = derived_domain
+
         if COL_DOMAIN not in fieldnames:
             fieldnames.append(COL_DOMAIN)
 
