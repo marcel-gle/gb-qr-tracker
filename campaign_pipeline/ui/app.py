@@ -76,6 +76,19 @@ def load_prompt_score_config(name: str) -> ScoreConfig:
     return ScoreConfig()
 
 
+def load_prompt_metadata(name: str) -> dict:
+    path = _prompts_path()
+    with path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    for p in data.get("prompts", []):
+        if p.get("name") == name:
+            return {
+                "content_extraction": p.get("content_extraction") or {},
+                "pass_rules": p.get("pass_rules") or {},
+            }
+    return {"content_extraction": {}, "pass_rules": {}}
+
+
 def load_config_options() -> list[tuple[str, Path]]:
     config_dir = REPO_ROOT / "scripts" / "send_letter" / "configs"
     if not config_dir.exists():
@@ -329,12 +342,39 @@ def render_scoring() -> None:
     prompts = load_prompt_names()
     prompt = st.selectbox("Scoring prompt", prompts, key="scoring_prompt")
     score_cfg = load_prompt_score_config(prompt)
+    prompt_meta = load_prompt_metadata(prompt)
+    extraction_mode = prompt_meta.get("content_extraction", {}).get("mode", "text_only")
+    browser_fallback = bool(prompt_meta.get("content_extraction", {}).get("browser_fallback", False))
+    if extraction_mode == "text_and_technical":
+        fallback_note = " (mit Browser-Fallback)" if browser_fallback else ""
+        st.caption(f"Extraktion: sichtbarer Text + technische HTML-Signale{fallback_note}")
+    else:
+        st.caption("Extraktion: nur sichtbarer Webseiten-Text")
+    require_boolean = prompt_meta.get("pass_rules", {}).get("require_boolean")
+    if require_boolean:
+        st.caption(
+            f"Pass-Filter: score ≥ Schwellwert und {require_boolean}"
+        )
     st.caption(f"Scale: **{score_cfg.scale}** | default threshold: **{score_cfg.pass_threshold}**")
     st.number_input("Pass threshold", value=float(score_cfg.pass_threshold), step=0.5, key="pass_threshold")
     st.selectbox("Backend", ["local", "openai"], key="backend")
     st.number_input("Max workers HTTP", min_value=1, max_value=50, value=10, key="max_workers_http")
     st.number_input("Max workers LLM", min_value=1, max_value=20, value=5, key="max_workers_llm")
-    only_new = st.checkbox("Score only new domains", value=False)
+    only_missing = st.checkbox(
+        "Score only missing results",
+        value=False,
+        key="score_only_missing",
+        help=(
+            "Load the existing `_scored.csv`, score rows with empty `domain_analysis_raw` / "
+            "`match_score` only, and keep rows that already have results."
+        ),
+    )
+    only_new = st.checkbox(
+        "Score only new domains",
+        value=False,
+        disabled=only_missing,
+        help="Uses the pipeline registry (raw stage). Ignored when scoring only missing results.",
+    )
 
     if st.button("Run scoring"):
         pipe = _pipeline()
@@ -355,10 +395,20 @@ def render_scoring() -> None:
                     f"ETA **~{_format_duration(eta)}** · last `{domain}`"
                 )
 
-            stats = pipe.score(only_new=only_new, progress_callback=on_scoring_progress)
+            stats = pipe.score(
+                only_new=only_new,
+                only_missing=only_missing,
+                progress_callback=on_scoring_progress,
+            )
             progress_bar.progress(1.0)
             if stats.get("scored", 0) == 0:
                 status.caption("No domains to score.")
+            elif only_missing:
+                status.markdown(
+                    f"Scored **{stats.get('scored', 0)}** missing row(s) · "
+                    f"missing **{stats.get('missing_before', 0)}** → **{stats.get('missing_after', 0)}** · "
+                    f"**{stats.get('passed', 0)}** passed filter"
+                )
             else:
                 status.markdown(
                     f"Finished scoring **{stats.get('scored', 0)}** domains · "

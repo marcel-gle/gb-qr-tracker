@@ -8,7 +8,7 @@ from campaign_pipeline.config import CampaignConfig, ScoreConfig
 from campaign_pipeline.models import BusinessRow, normalize_domain
 from campaign_pipeline.naming import stage_path
 from campaign_pipeline.registry import PipelineRegistry
-from campaign_pipeline.steps.scoring import extract_score_from_result, normalize_score
+from campaign_pipeline.steps.scoring import evaluate_pass, extract_score_from_result, normalize_score
 from campaign_pipeline.imprint.extract import gender_to_salutation
 
 SAMPLES = Path(__file__).resolve().parent.parent / "campaign_pipeline" / "samples"
@@ -59,6 +59,14 @@ def test_binary_solar_fields():
         {"verkauft": False, "installiert": False}, cfg
     )
     assert not passed and norm == 0.0
+
+
+def test_evaluate_pass_without_pass_rules_uses_score_only():
+    cfg = ScoreConfig(field="score", scale="0-10", pass_threshold=6)
+    _, _, passed = evaluate_pass({"score": 7, "makler": False}, cfg, None)
+    assert passed
+    _, _, failed = evaluate_pass({"score": 5, "makler": True}, cfg, {})
+    assert not failed
 
 
 def test_score_config_scales():
@@ -204,3 +212,66 @@ def test_final_review_respects_keep_decisions(tmp_path: Path):
     assert "match_score" not in header
     assert "Template" in header
     assert final_path.read_text(encoding="utf-8").splitlines()[1].endswith("t.pdf")
+
+
+def test_business_row_has_score_result():
+    empty = BusinessRow.from_dict({"domain": "a.de"})
+    assert empty.has_score_result() is False
+
+    with_score = BusinessRow.from_dict(
+        {"domain": "b.de", "match_score": 6, "domain_analysis_raw": '{"score": 6, "makler": true}'}
+    )
+    assert with_score.has_score_result() is True
+
+    score_only = BusinessRow.from_dict({"domain": "c.de", "match_score": 4})
+    assert score_only.has_score_result() is True
+
+
+def test_run_scoring_only_missing_preserves_existing(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.run_scoring import run_scoring
+    from campaign_pipeline.steps.scoring import DomainScoringService
+    from unittest.mock import MagicMock
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(
+        campaign_dir=campaign,
+        base_name="test",
+        scoring_prompt_name="immo_makler_webseite",
+    )
+
+    rows = [
+        BusinessRow.from_dict(
+            {
+                "domain": "done.de",
+                "match_score": 7,
+                "domain_analysis_raw": '{"score": 7, "makler": true}',
+                "passed_score_filter": True,
+            }
+        ),
+        BusinessRow.from_dict({"domain": "pending.de", "company_name": "Pending GmbH"}),
+    ]
+    scored_path = stage_path(campaign, "test", "scored")
+    write_business_rows(scored_path, rows)
+
+    def fake_score_row(self, row: BusinessRow) -> bool:
+        row.domain_analysis_raw = {"score": 5, "makler": True}
+        row.match_score = 5.0
+        row.score_raw = 5.0
+        row.passed_score_filter = False
+        return True
+
+    monkeypatch.setattr(DomainScoringService, "score_row", fake_score_row)
+
+    _, stats = run_scoring(cfg, MagicMock(), only_missing=True)
+    assert stats["missing_before"] == 1
+    assert stats["scored"] == 1
+    assert stats["missing_after"] == 0
+
+    reloaded = load_rows_as_business(scored_path)
+    by_domain = {r.domain: r for r in reloaded}
+    assert by_domain["done.de"].match_score == 7.0
+    assert by_domain["pending.de"].match_score == 5.0
+    assert by_domain["pending.de"].domain_analysis_raw == {"score": 5, "makler": True}

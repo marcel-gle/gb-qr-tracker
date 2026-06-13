@@ -3,10 +3,12 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from campaign_pipeline.imprint.fetch import (
+    _is_html_response,
     _score_imprint_candidate,
     extract_text_from_url,
     find_imprint_url,
     looks_like_imprint,
+    normalize_domain_to_base_url,
 )
 
 
@@ -26,6 +28,42 @@ SAMPLE_MARKETING = """
 COPPEN - Solaranlagen & Wärmepumpen aus Deutschland
 Premium Photovoltaik-Lösungen für Ihr Zuhause
 """
+
+
+def test_is_html_response_accepts_missing_content_type_with_html_body():
+    resp = MagicMock()
+    resp.headers = {}
+    resp.text = "<!DOCTYPE html><html><body>Hi</body></html>"
+    assert _is_html_response(resp) is True
+
+
+@patch("campaign_pipeline.imprint.fetch._fetch_url", return_value=None)
+def test_normalize_domain_to_base_url_falls_back_when_http_blocked(mock_fetch):
+    url = normalize_domain_to_base_url("immoprofi-mueller.de")
+    assert url == "https://immoprofi-mueller.de/"
+    assert mock_fetch.call_count >= 2
+
+
+@patch("campaign_pipeline.imprint.fetch._fetch_url", return_value=None)
+def test_normalize_domain_to_base_url_falls_back_for_valid_host(mock_fetch):
+    url = normalize_domain_to_base_url("r-schultes.de")
+    assert url == "https://r-schultes.de/"
+
+
+@patch("campaign_pipeline.imprint.fetch._fetch_url")
+def test_normalize_domain_to_base_url_tries_www_variant(mock_fetch):
+    def side_effect(url: str, **kwargs):
+        if url == "https://www.example.de":
+            resp = MagicMock()
+            resp.url = url
+            resp.status_code = 200
+            resp.headers = {"Content-Type": "text/html"}
+            resp.text = "<html></html>"
+            return resp
+        return None
+
+    mock_fetch.side_effect = side_effect
+    assert normalize_domain_to_base_url("example.de") == "https://www.example.de"
 
 
 def test_looks_like_imprint_accepts_legal_text():
@@ -58,7 +96,7 @@ def test_find_imprint_url_ranks_candidates(monkeypatch):
     """
     calls: list[str] = []
 
-    def fake_fetch(url: str):
+    def fake_fetch(url: str, **kwargs):
         calls.append(url)
         resp = MagicMock()
         resp.status_code = 200

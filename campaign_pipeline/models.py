@@ -147,6 +147,12 @@ class BusinessRow:
     directors: List[Dict[str, Optional[str]]] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
 
+    def has_score_result(self) -> bool:
+        """True when this row already has LLM scoring output."""
+        if isinstance(self.domain_analysis_raw, dict) and self.domain_analysis_raw:
+            return True
+        return self.match_score is not None
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any], max_directors: int = MAX_DIRECTORS_DEFAULT) -> "BusinessRow":
         domain = normalize_domain(

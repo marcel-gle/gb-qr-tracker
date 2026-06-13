@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import logging
 import re
+import warnings
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from threading import Lock
 from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
+import urllib3
 from bs4 import BeautifulSoup
+from requests.exceptions import RequestException, SSLError
+
+from ..models import normalize_domain
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +27,13 @@ USER_AGENT = (
 )
 REQUEST_TIMEOUT = 10
 MAX_TEXT_CHARS = 15_000
-BROWSER_GOTO_TIMEOUT_MS = 15_000
+BROWSER_GOTO_TIMEOUT_MS = 20_000
 BROWSER_SELECTOR_TIMEOUT_MS = 5_000
+BROWSER_CLOUDFLARE_WAIT_MS = 3_000
 
 IMPRINT_KEYWORDS = (
+    "impressum",
+    "imprint",
     "handelsregister",
     "geschäftsführ",
     "geschaeftsfuehr",
@@ -63,23 +73,53 @@ BROWSER_WAIT_SELECTORS = (
     "h1:has-text('Impressum')",
 )
 
-_browser_lock = Lock()
-_playwright: Any = None
-_browser: Any = None
+_browser_executor: ThreadPoolExecutor | None = None
+_browser_executor_lock = Lock()
+_browser_pw_state: dict[str, Any] = {"playwright": None, "browser": None}
 
 
-def _fetch_url(url: str) -> Optional[requests.Response]:
+def _is_html_response(resp: requests.Response) -> bool:
+    content_type = resp.headers.get("Content-Type", "").lower()
+    if "text/html" in content_type or "application/xhtml" in content_type:
+        return True
+    if not content_type or content_type.startswith("text/"):
+        snippet = (resp.text or "")[:800].lower()
+        return "<html" in snippet or "<!doctype html" in snippet
+    return False
+
+
+def _fetch_url(url: str, *, verify: bool = True) -> Optional[requests.Response]:
     try:
-        resp = requests.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
-            timeout=REQUEST_TIMEOUT,
-        )
-        if resp.status_code == 200 and "text/html" in resp.headers.get("Content-Type", ""):
+        with warnings.catch_warnings():
+            if not verify:
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+            resp = requests.get(
+                url,
+                headers={"User-Agent": USER_AGENT},
+                timeout=REQUEST_TIMEOUT,
+                verify=verify,
+            )
+        if 200 <= resp.status_code < 300 and _is_html_response(resp):
             return resp
-    except requests.RequestException:
+    except SSLError as exc:
+        if verify:
+            logger.debug("SSL error for %s, retrying without certificate verify: %s", url, exc)
+            return _fetch_url(url, verify=False)
+    except RequestException:
         return None
     return None
+
+
+def _candidate_hosts(domain: str) -> list[str]:
+    host = (domain or "").strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return []
+    hosts = [host]
+    if not host.startswith("www."):
+        hosts.append(f"www.{host}")
+    return list(dict.fromkeys(hosts))
 
 
 def _html_to_text(html: str) -> str:
@@ -186,72 +226,133 @@ def find_imprint_url(base_html: str, base_url: str) -> Optional[str]:
     return None
 
 
-def _ensure_browser():
-    global _playwright, _browser
-    if _browser is not None:
-        return _browser
+def _get_browser_executor() -> ThreadPoolExecutor:
+    """Single-thread pool: Playwright sync API must not cross threads or asyncio."""
+    global _browser_executor
+    with _browser_executor_lock:
+        if _browser_executor is None:
+            _browser_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="playwright")
+        return _browser_executor
+
+
+def _browser_thread_ensure() -> Any:
+    if _browser_pw_state["browser"] is not None:
+        return _browser_pw_state["browser"]
     from playwright.sync_api import sync_playwright
 
-    _playwright = sync_playwright().start()
-    _browser = _playwright.chromium.launch(headless=True)
-    return _browser
+    pw = sync_playwright().start()
+    browser = pw.chromium.launch(headless=True)
+    _browser_pw_state["playwright"] = pw
+    _browser_pw_state["browser"] = browser
+    return browser
+
+
+def _browser_thread_close() -> None:
+    browser = _browser_pw_state.get("browser")
+    pw = _browser_pw_state.get("playwright")
+    if browser is not None:
+        try:
+            browser.close()
+        except Exception:
+            pass
+    if pw is not None:
+        try:
+            pw.stop()
+        except Exception:
+            pass
+    _browser_pw_state["browser"] = None
+    _browser_pw_state["playwright"] = None
+
+
+def _browser_thread_fetch(url: str, content_mode: str) -> Optional[str]:
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+    page = None
+    context = None
+    try:
+        browser = _browser_thread_ensure()
+        context = browser.new_context(
+            user_agent=USER_AGENT,
+            ignore_https_errors=True,
+        )
+        page = context.new_page()
+        page.goto(url, wait_until="domcontentloaded", timeout=BROWSER_GOTO_TIMEOUT_MS)
+        # Extra wait helps Cloudflare / SPA challenges settle.
+        page.wait_for_timeout(BROWSER_CLOUDFLARE_WAIT_MS)
+        if content_mode == "html":
+            html = page.content()
+            if len(html) > MAX_TEXT_CHARS:
+                html = html[:MAX_TEXT_CHARS]
+            return html
+        for selector in BROWSER_WAIT_SELECTORS:
+            try:
+                page.wait_for_selector(selector, timeout=BROWSER_SELECTOR_TIMEOUT_MS)
+                break
+            except PlaywrightTimeout:
+                continue
+        page.wait_for_timeout(500)
+        text = page.inner_text("body")
+        if len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS]
+        return text
+    finally:
+        if page is not None:
+            try:
+                page.close()
+            except Exception:
+                pass
+        if context is not None:
+            try:
+                context.close()
+            except Exception:
+                pass
 
 
 def close_browser_pool() -> None:
-    """Release shared Playwright browser resources (call after batch imprint scrape)."""
-    global _playwright, _browser
-    with _browser_lock:
-        if _browser is not None:
-            try:
-                _browser.close()
-            except Exception:
-                pass
-            _browser = None
-        if _playwright is not None:
-            try:
-                _playwright.stop()
-            except Exception:
-                pass
-            _playwright = None
+    """Release shared Playwright browser resources (call after batch scoring/imprint)."""
+    global _browser_executor
+    with _browser_executor_lock:
+        if _browser_executor is None:
+            return
+        try:
+            _browser_executor.submit(_browser_thread_close).result(timeout=30)
+        except Exception:
+            pass
+        _browser_executor.shutdown(wait=False, cancel_futures=True)
+        _browser_executor = None
 
 
-def _fetch_text_browser(url: str) -> Optional[str]:
+def _fetch_page_browser(url: str, *, content_mode: str = "text") -> Optional[str]:
+    """Fetch page via Playwright. content_mode: 'text' (body inner_text) or 'html' (full page HTML)."""
     try:
-        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+        import playwright  # noqa: F401
     except ImportError:
         logger.warning(
-            "Playwright not installed; skipping browser imprint fetch for %s. "
+            "Playwright not installed; skipping browser fetch for %s. "
             "Install with: pip install playwright && playwright install chromium",
             url,
         )
         return None
 
-    with _browser_lock:
-        page = None
-        try:
-            browser = _ensure_browser()
-            page = browser.new_page(user_agent=USER_AGENT)
-            page.goto(url, wait_until="domcontentloaded", timeout=BROWSER_GOTO_TIMEOUT_MS)
-            for selector in BROWSER_WAIT_SELECTORS:
-                try:
-                    page.wait_for_selector(selector, timeout=BROWSER_SELECTOR_TIMEOUT_MS)
-                    break
-                except PlaywrightTimeout:
-                    continue
-            page.wait_for_timeout(500)
-            text = page.inner_text("body")
-            if len(text) > MAX_TEXT_CHARS:
-                text = text[:MAX_TEXT_CHARS]
-            return text
-        except Exception as exc:
-            logger.warning("Browser imprint fetch failed for %s: %s", url, exc)
-            return None
-        finally:
-            if page is not None:
-                try:
-                    page.close()
-                except Exception:
-                    pass
+    executor = _get_browser_executor()
+    worker_timeout = (BROWSER_GOTO_TIMEOUT_MS / 1000) + BROWSER_CLOUDFLARE_WAIT_MS / 1000 + 30
+    try:
+        return executor.submit(_browser_thread_fetch, url, content_mode).result(timeout=worker_timeout)
+    except FuturesTimeout:
+        logger.warning("Browser fetch timed out for %s", url)
+        return None
+    except Exception as exc:
+        logger.warning("Browser fetch failed for %s: %s", url, exc)
+        return None
+
+
+def _fetch_text_browser(url: str) -> Optional[str]:
+    return _fetch_page_browser(url, content_mode="text")
+
+
+def fetch_page_html_browser(url: str) -> Optional[str]:
+    """Return full rendered HTML for scoring technical-signal extraction."""
+    return _fetch_page_browser(url, content_mode="html")
 
 
 def extract_text_from_url(url: str, *, home_text: str | None = None) -> Optional[str]:
@@ -278,11 +379,14 @@ def get_imprint_text_for_domain(domain: str) -> Optional[str]:
     if not base_url:
         return None
     home_resp = _fetch_url(base_url)
-    if not home_resp:
+    home_html = home_resp.text if home_resp else None
+    if not home_html:
+        home_html = fetch_page_html_browser(base_url)
+    if not home_html:
         return None
-    home_text = _html_to_text(home_resp.text)
+    home_text = _html_to_text(home_html)
 
-    imprint_url = find_imprint_url(home_resp.text, base_url)
+    imprint_url = find_imprint_url(home_html, base_url)
     if imprint_url:
         return extract_text_from_url(imprint_url, home_text=home_text)
 
@@ -298,17 +402,25 @@ def get_imprint_text_for_domain(domain: str) -> Optional[str]:
 
 
 def normalize_domain_to_base_url(domain: str) -> Optional[str]:
-    domain = (domain or "").strip()
-    if not domain:
+    raw = (domain or "").strip()
+    if not raw:
         return None
-    if domain.startswith("http://"):
-        domain = domain[len("http://") :]
-    elif domain.startswith("https://"):
-        domain = domain[len("https://") :]
-    domain = domain.split("/")[0].rstrip("/")
-    for scheme in ("https://", "http://"):
-        url = scheme + domain
-        resp = _fetch_url(url)
-        if resp:
-            return resp.url
+    if raw.lower().startswith("http://"):
+        raw = raw[7:]
+    elif raw.lower().startswith("https://"):
+        raw = raw[8:]
+    host = raw.split("/")[0].rstrip("/")
+    for candidate in _candidate_hosts(host):
+        for scheme in ("https://", "http://"):
+            resp = _fetch_url(scheme + candidate)
+            if resp:
+                return resp.url
+    cleaned = normalize_domain(host)
+    if cleaned:
+        logger.debug(
+            "HTTP probe failed for %s; using constructed base URL https://%s/",
+            domain,
+            cleaned,
+        )
+        return f"https://{cleaned}/"
     return None

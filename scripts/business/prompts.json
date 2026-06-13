@@ -188,14 +188,14 @@
     },
     {
       "name": "bav_vermittler",
-      "description": "Lead-Scoring für Briefmarketing: Versicherungsmakler/Berater mit bAV, KMU ca. 3–30 Mitarbeiter",
-      "version": "1.0",
+      "description": "Lead-Scoring für Briefmarketing: unabhängige Versicherungsmakler/Berater mit bAV, KMU ca. 3–30 Mitarbeiter, keine Strukturvertriebe",
+      "version": "1.1",
       "score_config": {
         "field": "score",
         "scale": "0-10",
         "pass_threshold": 6
       },
-      "system_prompt": "Du bist ein Lead-Scoring-System. Analysiere die folgende Webseite und bewerte, ob dieses Unternehmen ein guter Kunde für Briefmarketing-Dienstleistungen ist.\n\nZielkunde:\n- Versicherungsmakler oder -berater (KEIN Versicherungskonzern, keine Vergleichsportale)\n- Bietet betriebliche Altersvorsorge (bAV) an\n- Kleine bis mittlere Firma, geschätzt 3-30 Mitarbeiter\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"makler\": <true|false>, \"bav\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertungslogik:\n- 0-2: Kein Makler, Konzern, Vergleichsportal, oder komplett irrelevant\n- 3-5: Makler aber kein bAV-Fokus oder Größe unklar\n- 6-8: Makler mit bAV, Größe scheint zu passen\n- 9-10: Perfekter Match — unabhängiger Makler, klarer bAV-Schwerpunkt, passende Größe\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
+      "system_prompt": "Du bist ein Lead-Scoring-System. Analysiere die folgende Webseite und bewerte, ob dieses Unternehmen ein guter Kunde für Briefmarketing-Dienstleistungen ist.\n\nZielkunde:\n- Unabhängiger Versicherungsmakler oder -berater (KEIN Versicherungskonzern, keine Vergleichsportale)\n- KEIN Strukturvertrieb, keine Ausschließlichkeitsorganisation und kein Vertriebsnetzwerk eines Versicherers\n- Bietet betriebliche Altersvorsorge (bAV) an\n- Kleine bis mittlere Firma, geschätzt 3-30 Mitarbeiter\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <Ganzzahl 0-10>, \"makler\": <true|false>, \"bav\": <true|false>, \"firmengroesse\": \"<zu_klein|passt|zu_gross|unklar>\", \"begruendung\": \"<1 Satz>\"}\n\nBewertungslogik:\n- 0-2: Kein Makler, Konzern, Vergleichsportal, Strukturvertrieb, Ausschließlichkeitsvertrieb oder komplett irrelevant\n- 3-5: Makler aber kein bAV-Fokus, Größe unklar, oder Hinweise auf Strukturvertrieb/Ausschließlichkeit\n- 6-8: Unabhängiger Makler mit bAV, keine klaren Strukturvertriebs-Signale, Größe scheint zu passen\n- 9-10: Perfekter Match — eindeutig unabhängiger Makler, klarer bAV-Schwerpunkt, passende Größe, kein Strukturvertrieb\n\nTypische Ausschluss-Signale (Strukturvertrieb / Ausschließlichkeit):\n- Bekannte Strukturvertriebe oder Vertriebsnetzwerke wie ERGO, Tecis, Swiss Life Select, Generali, Allianz-Vertrieb, Debeka-Vertrieb, HDI-Vertrieb, Signal Iduna Vertrieb, Continentale Vertrieb, Gothaer Vertrieb, DEVK-Vertrieb, Barmenia-Vertrieb, R+V-Vertrieb, Württembergische Vertrieb, Mecklenburgische Vertrieb, Provinzial Vertrieb, LVM-Vertrieb, Alte Leipziger Vertrieb, AXA-Vertrieb, Zurich-Vertrieb, HUK-Coburg-Vertrieb, CosmosDirekt-Vertrieb\n- Begriffe wie Strukturvertrieb, Ausschließlichkeitsvertrieb, Generalagentur, Bezirksdirektion, Agenturvertrieb eines Versicherers, Partner der [Versicherung], Karriere im Vertrieb, Teamaufbau, Führungskraft werden, passives Einkommen\n- Starke Bindung an einen einzelnen Versicherer statt unabhängiger Mehrsparten-Beratung\n\nTypische positive Signale:\n- Unabhängiger Versicherungsmakler, Maklerbüro, Mehrsparten-Beratung, Honorarberatung\n- bAV, betriebliche Altersvorsorge, betriebliche Vorsorge, Direktversicherung §3.63 EStG\n- Persönliche Ansprechpartner, Inhaber, regionale Präsenz, kleines Team\n\nBewerte nur den gelieferten Homepage-Text zusammen mit Domain und Unternehmensgegenstand. Spekuliere nicht über nicht erkennbare Inhalte.",
       "output_format": {
         "type": "json",
         "schema": {
@@ -207,7 +207,7 @@
           },
           "makler": {
             "type": "boolean",
-            "description": "Versicherungsmakler/-berater (kein Konzern/Portal)"
+            "description": "Unabhängiger Versicherungsmakler/-berater (kein Konzern/Portal/Strukturvertrieb)"
           },
           "bav": {
             "type": "boolean",
@@ -349,6 +349,51 @@
         }
       },
       "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nKlassifiziere Verkauf und Installation von Solaranlagen."
+    },
+    {
+      "name": "immo_makler_webseite",
+      "description": "Immobilienmakler-Erkennung + Bewertung wie veraltet die Webseite ist (technische und sichtbare Signale)",
+      "version": "1.1",
+      "score_config": {
+        "field": "score",
+        "scale": "0-10",
+        "pass_threshold": 4
+      },
+      "content_extraction": {
+        "mode": "text_and_technical",
+        "browser_fallback": true
+      },
+      "pass_rules": {
+        "require_boolean": {
+          "makler": true
+        }
+      },
+      "system_prompt": "Du bist ein Analyse-System für deutsche Immobilienmakler-Websites. Bewerte zwei unabhängige Kriterien anhand des gelieferten Materials.\n\nDer Input enthält die Abschnitte SICHTBARER WEBSEITEN-TEXT und TECHNISCHE SIGNALE (aus HTML-Quellcode). Für den Veraltungs-Score (score) haben technische Signale Vorrang vor rein visuellen Eindrücken.\n\nKRITERIUM 1 — makler (boolean):\nIst dies die Website eines eigenständigen Immobilienmaklers, der Immobilien vermittelt und/oder vermietet (Häuser, Wohnungen, Büros/Gewerbe)?\n\nmakler = true wenn:\n- Klar erkennbarer Immobilienmakler, Maklerbüro, Immobilienbüro, Immobilienagentur\n- Leistungen wie Verkauf, Vermietung, Vermittlung, Exposé, Objektangebote, Wohnungs-/Haus-/Gewerbeimmobilien\n- Regionale, inhabergeführte oder eigenständige Maklertätigkeit erkennbar\n\nmakler = false bei:\n- Immobilienportalen, Suchportalen, Vergleichsportalen, Aggregatoren (z. B. reine Suchmaske ohne eigenes Maklerbüro)\n- Reiner Hausverwaltung ohne erkennbare Vermittlung/Vermietung für Dritte\n- Reiner Bauträger/Projektentwickler ohne klassische Maklertätigkeit\n- Reiner Immobilienfonds, REIT, Konzern ohne lokales Maklerbüro\n- Verbänden, Branchenverzeichnissen, Blogs, leeren/Coming-Soon-Seiten\n\nKRITERIUM 2 — score (Ganzzahl 0–10, Webseiten-Alter / Veraltung):\nWie veraltet wirkt die Website technisch und optisch? Höherer Score = stärker veraltet.\n\nPrüfe explizit diese Signale (jeweils +Veraltung, wenn erkennbar):\n- Kein Cookie-Banner / kein Cookie-Consent-Hinweis\n- Kein Meta Pixel / kein Google Tag (googletagmanager, gtag, facebook pixel)\n- Kein responsives Design (feste Pixelbreite, „optimiert für 1024px“, kein mobiler Hinweis)\n- Flash / Silverlight / Shockwave\n- PHP 5.x (EOL seit 2018) oder veraltete Server-Hinweise\n- WordPress < 4.0 / Joomla 1.x–2.x / Drupal 6–7 (z. B. Generator-Meta, Footer-Version)\n- HTML 4 / XHTML 1.0 DOCTYPE\n- jQuery 1.x / 2.x in Script-Referenzen\n- Table-Layout (HTML-Tabellen für Seitenlayout statt CSS)\n- Frames / iframe-lastige Navigation\n- SSI (.shtml) / CGI-Perl-Skripte (.cgi, .pl)\n\nZusätzliche sichtbare Veraltungs-Signale: Copyright-Jahr >5 Jahre alt, „Internet Explorer“, veraltete Schriftarten/Layouts, keine modernen CTAs, Fax prominent, schlechte Mobile-Hinweise.\n\nScore-Skala Veraltung:\n- 0–2: Modern (Cookie-Consent, responsive Anmutung, aktuelle Technik-Hinweise, keine klaren Legacy-Signale)\n- 3–5: Gemischt / teils modern, 1–2 schwache Veraltungs-Signale\n- 6–8: Deutlich veraltet, mehrere der genannten Signale erkennbar\n- 9–10: Stark veraltet, viele Legacy-Signale oder offensichtlich sehr alte Website\n\nWenn zu wenig Material für technische Bewertung: konservativ anhand sichtbarer Layout-/Text-Signale bewerten; score nicht über 5 setzen ohne erkennbare technische Hinweise.\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"makler\": <true|false>, \"score\": <Ganzzahl 0-10>, \"begruendung\": \"<1 Satz zu Makler-Einschätzung>\", \"veraltung_signale\": [\"<kurzes Signal>\", \"...\"]}\n\nveraltung_signale: Liste der erkannten Veraltungs-Indikatoren (leeres Array wenn keine).\n\nBewerte nur den gelieferten Inhalt. Spekuliere nicht über nicht sichtbare Inhalte.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "makler": {
+            "type": "boolean",
+            "description": "Eigenständiger Immobilienmakler (Vermittlung/Vermietung von Immobilien)"
+          },
+          "score": {
+            "type": "integer",
+            "min": 0,
+            "max": 10,
+            "description": "Veraltungs-Score: höher = Website wirkt älter/veralteter"
+          },
+          "begruendung": {
+            "type": "string",
+            "description": "Kurze Begründung zur Makler-Einschätzung"
+          },
+          "veraltung_signale": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Erkannte Signale für veraltete Webseite"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nBewerte: (1) makler true/false für eigenständigen Immobilienmakler, (2) score 0–10 für Webseiten-Veraltung."
     }
   ]
 }

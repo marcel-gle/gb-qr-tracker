@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backend", choices=["local", "openai"], default="local")
     p.add_argument("--pass-threshold", type=float, default=None)
     p.add_argument("--only-new", action="store_true")
+    p.add_argument(
+        "--only-missing",
+        action="store_true",
+        help="Score only rows without existing results in _scored.csv",
+    )
     return p
 
 
@@ -57,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.step == "dedupe-domain":
         print(pipe.dedupe_domain())
     elif args.step == "score":
-        print(pipe.score(only_new=args.only_new))
+        print(pipe.score(only_new=args.only_new, only_missing=args.only_missing))
     elif args.step == "imprint":
         print(pipe.imprint(only_new=args.only_new))
     elif args.step == "dedupe-address":

@@ -92,16 +92,18 @@ class CampaignPipeline:
         self,
         *,
         only_new: bool = False,
+        only_missing: bool = False,
         progress_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> dict:
         only_domains = None
-        if only_new:
+        if only_new and not only_missing:
             only_domains = {d for d, s in self.registry.domains.items() if s.stage == "raw"}
         _, stats = run_scoring(
             self.config,
             self.llm,
             registry=self.registry,
             only_domains=only_domains,
+            only_missing=only_missing,
             progress_callback=progress_callback,
         )
         self.save_registry()

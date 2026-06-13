@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from scripts.business.prompt_manager import Prompt
 
@@ -11,44 +11,17 @@ from list_processing.llm.base import LLMClient
 
 from ..config import ScoreConfig
 from ..models import BusinessRow, flatten_analysis
-from ..imprint.fetch import normalize_domain_to_base_url
-
-import requests
-from bs4 import BeautifulSoup
+from ..scoring.fetch import fetch_scoring_content
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0 Safari/537.36"
-)
-REQUEST_TIMEOUT = 10
-
-
-def _fetch_url(url: str) -> Optional[requests.Response]:
-    try:
-        resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=REQUEST_TIMEOUT)
-        if resp.status_code == 200 and "text/html" in resp.headers.get("Content-Type", ""):
-            return resp
-    except requests.RequestException:
-        return None
-    return None
-
 
 def extract_homepage_text(domain: str) -> Optional[str]:
-    base_url = normalize_domain_to_base_url(domain)
-    if not base_url:
+    """Backward-compatible wrapper: text-only extraction."""
+    content = fetch_scoring_content(domain, mode="text_only", browser_fallback=False)
+    if not content:
         return None
-    resp = _fetch_url(base_url)
-    if not resp:
-        return None
-    soup = BeautifulSoup(resp.text, "html.parser")
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-    text = soup.get_text(separator="\n")
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    return "\n".join(lines)[:20_000]
+    return content.for_llm("text_only") or None
 
 
 def _extract_json_from_response(content: str) -> Optional[Dict[str, object]]:
@@ -116,6 +89,39 @@ def extract_score_from_result(result: Dict[str, object], score_config: ScoreConf
     return normalize_score(raw, score_config)
 
 
+def _coerce_bool(value: object) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s in ("true", "yes", "1"):
+            return True
+        if s in ("false", "no", "0"):
+            return False
+    return None
+
+
+def evaluate_pass(
+    result: Dict[str, object],
+    score_config: ScoreConfig,
+    pass_rules: Mapping[str, Any] | None = None,
+) -> tuple[Optional[float], Optional[float], bool]:
+    normalized, raw, score_passed = extract_score_from_result(result, score_config)
+    if not score_passed:
+        return normalized, raw, False
+
+    require_boolean = (pass_rules or {}).get("require_boolean") if pass_rules else None
+    if isinstance(require_boolean, dict):
+        for field, expected in require_boolean.items():
+            actual = _coerce_bool(result.get(field))
+            if actual is None or actual is not expected:
+                return normalized, raw, False
+
+    return normalized, raw, True
+
+
 def analyze_domain_with_llm(
     domain: str,
     homepage_text: str,
@@ -149,15 +155,27 @@ class DomainScoringService:
         self._llm = llm
         self._prompt = prompt
         self._score_config = score_config
+        self._extraction_mode = prompt.content_extraction_mode
+        self._browser_fallback = prompt.content_extraction_browser_fallback
 
     def score_row(self, row: BusinessRow) -> bool:
-        homepage_text = extract_homepage_text(row.domain)
-        if not homepage_text:
-            logger.info("No homepage text for %s", row.domain)
+        page_content = fetch_scoring_content(
+            row.domain,
+            mode=self._extraction_mode,
+            browser_fallback=self._browser_fallback,
+        )
+        if not page_content:
+            logger.info("No homepage content for %s", row.domain)
             return False
+
+        llm_input = page_content.for_llm(self._extraction_mode)
+        if not llm_input.strip():
+            logger.info("Empty LLM input for %s", row.domain)
+            return False
+
         result = analyze_domain_with_llm(
             row.domain,
-            homepage_text,
+            llm_input,
             self._prompt,
             self._llm,
             gegenstand=row.gegenstand or "",
@@ -167,7 +185,7 @@ class DomainScoringService:
         row.domain_analysis_raw = result
         row.score_field = self._score_config.field
         row.score_scale = self._score_config.scale
-        normalized, raw, passed = extract_score_from_result(result, self._score_config)
+        normalized, raw, passed = evaluate_pass(result, self._score_config, self._prompt.pass_rules)
         row.match_score = normalized
         row.score_raw = raw
         row.passed_score_filter = passed

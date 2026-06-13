@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -21,27 +22,40 @@ def detect_delimiter(sample: str) -> str:
     return ";"
 
 
-def _read_text(path: Path) -> str:
-    last_error: Exception | None = None
+def _decode_bytes(raw: bytes) -> tuple[str, str]:
+    if raw.startswith(b"\xff\xfe") and not raw.startswith(b"\xff\xfe\x00\x00"):
+        return raw.decode("utf-16-le"), "utf-16-le"
+    if raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16-be"), "utf-16-be"
+    last_error: UnicodeDecodeError | None = None
     for enc in CSV_ENCODINGS:
         try:
-            return path.read_text(encoding=enc)
-        except (UnicodeDecodeError, LookupError) as exc:
+            return raw.decode(enc), enc
+        except UnicodeDecodeError as exc:
             last_error = exc
-    raise ValueError(f"Could not decode {path}: {last_error}")
+    if last_error is not None:
+        raise ValueError(f"Could not decode CSV bytes: {last_error}") from last_error
+    return "", "utf-8"
+
+
+def _read_text(path: Path) -> str:
+    text, _ = _decode_bytes(path.read_bytes())
+    return text
 
 
 def load_csv_rows(path: Path) -> Tuple[List[Dict[str, str]], List[str], str]:
-    content = _read_text(path)
+    raw = path.read_bytes()
+    content, encoding = _decode_bytes(raw)
     delim = detect_delimiter(content)
     rows: List[Dict[str, str]] = []
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f, delimiter=delim, restkey="_extra", restval="")
+    with io.TextIOWrapper(io.BytesIO(raw), encoding=encoding, newline="") as handle:
+        reader = csv.DictReader(handle, delimiter=delim, restkey="_extra", restval="")
         fieldnames = list(reader.fieldnames or [])
         for row in reader:
             row.pop("_extra", None)
             clean = {(k if k else ""): (v or "") for k, v in row.items()}
             rows.append(clean)
+    logger.debug("Loaded %d rows from %s (%s)", len(rows), path.name, encoding)
     return rows, fieldnames, delim
 
 

@@ -19,8 +19,8 @@ LEGAL_ENTITY_IN_NAME = re.compile(
 
 SECTION_START = re.compile(
     r"^(Kontakt|Telefon|Tel\.|Fax|E-?Mail|Register|Handelsregister|Amtsgericht|"
-    r"Umsatzsteuer|USt|UID|Steuernummer|Webseite|Internet|AGB|Datenschutz|Impressum|"
-    r"Registernummer|Registergericht)(\s|:|$)",
+    r"Umsatzsteuer|USt|UID|Steuernummer|Webseite|Internet|AGB|Datenschutz|"
+    r"Datenschutzbeauftragt\w*|Impressum|Registernummer|Registergericht)(\s|:|$)",
     re.IGNORECASE,
 )
 
@@ -29,7 +29,8 @@ META_MD_RE = re.compile(
     r"(?:Geschäftsführer(?:in)?|Inhaber(?:in)?|Vertreten\s+durch|Vertretungsberechtigt\w*)\s*:\s*"
     r"(?P<name>[^\n<]{2,120}?)"
     r"(?=\s*(?:Kontakt|Telefon|Tel\.|Fax|E-?Mail|Register|Umsatzsteuer|USt-?|Handelsregister|"
-    r"Amtsgericht|Datenschutz|Impressum|Vertretungsberechtigte|Geschäftsführer|Inhaber)\b|$)",
+    r"Amtsgericht|Datenschutz|Datenschutzbeauftragt\w*|Impressum|Vertretungsberechtigte|"
+    r"Geschäftsführer|Inhaber)\b|$)",
     re.IGNORECASE | re.DOTALL,
 )
 

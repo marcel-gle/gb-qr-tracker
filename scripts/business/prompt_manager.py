@@ -26,6 +26,24 @@ class Prompt:
         self.output_format = data.get("output_format", {})
         self.user_prompt_template = data.get("user_prompt_template", "")
         self._raw_data = data
+
+    @property
+    def content_extraction(self) -> Dict[str, Any]:
+        raw = self._raw_data.get("content_extraction")
+        return raw if isinstance(raw, dict) else {}
+
+    @property
+    def content_extraction_mode(self) -> str:
+        return str(self.content_extraction.get("mode", "text_only"))
+
+    @property
+    def content_extraction_browser_fallback(self) -> bool:
+        return bool(self.content_extraction.get("browser_fallback", False))
+
+    @property
+    def pass_rules(self) -> Dict[str, Any]:
+        raw = self._raw_data.get("pass_rules")
+        return raw if isinstance(raw, dict) else {}
     
     def format_user_prompt(self, **kwargs) -> str:
         """Format the user prompt template with provided variables."""

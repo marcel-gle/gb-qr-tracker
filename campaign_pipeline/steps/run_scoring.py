@@ -13,6 +13,7 @@ from ..config import CampaignConfig, ScoreConfig
 from ..io.readers import load_rows_as_business
 from ..io.writers import write_business_rows
 from ..naming import stage_path
+from ..imprint.fetch import close_browser_pool
 from ..registry import PipelineRegistry
 from .scoring import DomainScoringService, apply_analysis_flat
 
@@ -24,6 +25,25 @@ except Exception:  # pragma: no cover
 
     def tqdm(iterable, **kwargs):  # type: ignore[no-redef]
         return iterable
+
+
+def _default_scoring_input_path(config: CampaignConfig) -> Path:
+    deduped = stage_path(config.campaign_dir, config.base_name, "raw_deduped")
+    if deduped.exists():
+        return deduped
+    return stage_path(config.campaign_dir, config.base_name, "raw")
+
+
+def _resolve_scoring_input_path(config: CampaignConfig, *, only_missing: bool) -> Path:
+    if only_missing:
+        scored = stage_path(config.campaign_dir, config.base_name, "scored")
+        if scored.exists():
+            return scored
+        logger.warning(
+            "Score only missing: %s not found — falling back to raw input.",
+            scored.name,
+        )
+    return _default_scoring_input_path(config)
 
 
 def _load_score_config(prompt_name: str, override: ScoreConfig) -> ScoreConfig:
@@ -43,14 +63,12 @@ def run_scoring(
     *,
     registry: Optional[PipelineRegistry] = None,
     only_domains: set[str] | None = None,
+    only_missing: bool = False,
     progress_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> tuple[Path, dict]:
-    if input_path is None:
-        deduped = stage_path(config.campaign_dir, config.base_name, "raw_deduped")
-        path = deduped if deduped.exists() else stage_path(config.campaign_dir, config.base_name, "raw")
-    else:
-        path = input_path
+    path = input_path or _resolve_scoring_input_path(config, only_missing=only_missing)
     rows = load_rows_as_business(path, max_directors=config.max_directors)
+    missing_before = sum(1 for r in rows if not r.has_score_result())
 
     score_config = _load_score_config(config.scoring_prompt_name, config.score_config)
     config.score_config = score_config
@@ -61,12 +79,16 @@ def run_scoring(
 
     service = DomainScoringService(llm, prompt, score_config)
 
-    to_score = [
-        r
-        for r in rows
-        if (only_domains is None or r.domain in only_domains)
-        and (registry is None or registry.should_process(r.domain, "scored"))
-    ]
+    to_score: list = []
+    for row in rows:
+        if only_domains is not None and row.domain not in only_domains:
+            continue
+        if only_missing:
+            if not row.has_score_result():
+                to_score.append(row)
+            continue
+        if registry is None or registry.should_process(row.domain, "scored"):
+            to_score.append(row)
 
     total = len(to_score)
     if progress_callback and total == 0:
@@ -81,16 +103,20 @@ def run_scoring(
 
     started = time.monotonic()
     completed = 0
-    with ThreadPoolExecutor(max_workers=config.max_workers_http) as pool:
-        futures = {pool.submit(_worker, r): r for r in to_score}
-        iterator = as_completed(futures)
-        if progress_callback is None:
-            iterator = tqdm(iterator, total=total, desc="Scoring")
-        for fut in iterator:
-            row = futures[fut]
-            completed += 1
-            if progress_callback is not None:
-                progress_callback(completed, total, time.monotonic() - started, row.domain)
+    try:
+        with ThreadPoolExecutor(max_workers=config.max_workers_http) as pool:
+            futures = {pool.submit(_worker, r): r for r in to_score}
+            iterator = as_completed(futures)
+            if progress_callback is None:
+                iterator = tqdm(iterator, total=total, desc="Scoring")
+            for fut in iterator:
+                row = futures[fut]
+                completed += 1
+                if progress_callback is not None:
+                    progress_callback(completed, total, time.monotonic() - started, row.domain)
+    finally:
+        if prompt.content_extraction_browser_fallback:
+            close_browser_pool()
 
     output_rows: list = []
     passed = 0
@@ -109,12 +135,17 @@ def run_scoring(
 
     output = stage_path(config.campaign_dir, config.base_name, "scored")
     write_business_rows(output, output_rows, max_directors=config.max_directors)
+    missing_after = sum(1 for r in output_rows if not r.has_score_result())
     stats = {
         "input": len(rows),
         "scored": len(to_score),
         "output": len(output_rows),
         "passed": passed,
         "failed_filter": failed,
+        "missing_before": missing_before,
+        "missing_after": missing_after,
+        "only_missing": only_missing,
+        "input_path": str(path),
         "score_scale": score_config.scale,
         "pass_threshold": score_config.pass_threshold,
     }

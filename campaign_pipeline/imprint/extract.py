@@ -41,14 +41,87 @@ def _first_name_for_salutation(director: Dict[str, Optional[str]]) -> str:
     return ""
 
 
+_FAX_SEGMENT_RE = re.compile(
+    r"\b(?:fax|telefax|facsimile)\b\s*[.:]?\s*(?:\+?\d[\d\s()./\-]{5,})?",
+    re.IGNORECASE,
+)
+_FAX_ONLY_LINE_RE = re.compile(r"^\s*(?:fax|telefax|facsimile)\b", re.IGNORECASE)
+_PRIVACY_OFFICER_LINE_RE = re.compile(
+    r"^\s*(?:datenschutz(?:beauftragt\w*|koordinator\w*|verantwortlich\w*)|dsb)\b",
+    re.IGNORECASE,
+)
+_PHONE_FAX_LABEL_RE = re.compile(r"\b(?:fax|telefax|facsimile)\b", re.IGNORECASE)
+_PRIVACY_OFFICER_RE = re.compile(
+    r"datenschutz(?:beauftragt\w*|koordinator\w*|verantwortlich\w*)|"
+    r"\bdsb\b|privacy\s+officer|data\s+protection\s+officer",
+    re.IGNORECASE,
+)
+
+
+def sanitize_imprint_text_for_extraction(text: str) -> str:
+    """Remove fax and Datenschutzbeauftragter lines before LLM extraction."""
+    cleaned_lines: List[str] = []
+    for line in text.splitlines():
+        if _FAX_ONLY_LINE_RE.match(line) or _PRIVACY_OFFICER_LINE_RE.match(line):
+            continue
+        stripped = _FAX_SEGMENT_RE.sub("", line).strip()
+        if stripped:
+            cleaned_lines.append(stripped)
+    return "\n".join(cleaned_lines)
+
+
+def filter_company_phones(phones: object) -> List[str]:
+    """Keep telephone numbers only; drop fax / telefax entries."""
+    if not isinstance(phones, list):
+        return []
+    out: List[str] = []
+    for phone in phones:
+        if not isinstance(phone, str):
+            continue
+        value = phone.strip()
+        if not value or _PHONE_FAX_LABEL_RE.search(value):
+            continue
+        out.append(value)
+    return out
+
+
+def _director_text_blob(md: dict) -> str:
+    parts = [md.get("first_name"), md.get("last_name"), md.get("full_name")]
+    return " ".join(str(p).strip() for p in parts if p and str(p).strip())
+
+
+def is_privacy_officer_director(md: object) -> bool:
+    if not isinstance(md, dict):
+        return False
+    return bool(_PRIVACY_OFFICER_RE.search(_director_text_blob(md)))
+
+
+def filter_managing_directors(md_list: object) -> List[Dict[str, Any]]:
+    """Drop Datenschutzbeauftragte and similar non-management roles."""
+    if not isinstance(md_list, list):
+        return []
+    return [md for md in md_list if isinstance(md, dict) and not is_privacy_officer_director(md)]
+
+
+def normalize_llm_extraction(data: Dict[str, Any]) -> Dict[str, Any]:
+    data["generic_company_phones"] = filter_company_phones(data.get("generic_company_phones"))
+    data["managing_directors"] = filter_managing_directors(data.get("managing_directors"))
+    return data
+
+
 SYSTEM_PROMPT = """
 You are an assistant that extracts structured company data from German "Impressum" (imprint) pages.
 
 Extract:
 - full postal address split into street, house_number, postcode, city
-- managing_directors array with first_name, last_name, gender (Herr/Frau), full_name
+- managing_directors: only legal representatives / management (Geschäftsführer/in, Inhaber/in, Vorstand, vertretungsberechtigte Personen, Geschäftsleitung)
 - company_legal_name
-- generic_company_phones, generic_company_emails
+- generic_company_phones: only general company telephone numbers (Telefon, Tel., Hotline, Zentrale)
+- generic_company_emails
+
+Important exclusions:
+- Do NOT include fax, Telefax, or Facsimile numbers in generic_company_phones. If a line lists both phone and fax, extract only the phone number.
+- Do NOT include Datenschutzbeauftragte/r, Datenschutzkoordinatoren, Privacy Officers, or other data-protection contacts in managing_directors. These are not managing directors.
 
 Respond with a single JSON object only:
 {
@@ -99,6 +172,7 @@ class ImprintExtractor:
             pickle.dump(self._cache, f)
 
     def _call_llm(self, domain: str, company_name: str, imprint_text: str) -> Dict[str, Any]:
+        imprint_text = sanitize_imprint_text_for_extraction(imprint_text)
         user_prompt = f"""
 Extract company data from this website content.
 
@@ -109,6 +183,8 @@ Text from Impressum / Kontakt page:
 \"\"\"
 {imprint_text}
 \"\"\"
+
+Remember: exclude fax numbers from generic_company_phones and exclude Datenschutzbeauftragte from managing_directors.
 """.strip()
         content = self._llm.chat(
             system_prompt=SYSTEM_PROMPT,
@@ -117,7 +193,7 @@ Text from Impressum / Kontakt page:
             temperature=0.0,
         )
         try:
-            return json.loads(content)
+            return normalize_llm_extraction(json.loads(content))
         except json.JSONDecodeError:
             return {
                 "full_address": None,
@@ -190,8 +266,8 @@ Text from Impressum / Kontakt page:
                 row.company_name = str(legal)
             updated = True
 
-        phones = data.get("generic_company_phones") or []
-        if isinstance(phones, list) and phones and not row.phone:
+        phones = filter_company_phones(data.get("generic_company_phones"))
+        if phones and not row.phone:
             row.phone = str(phones[0])
             updated = True
 
@@ -200,26 +276,23 @@ Text from Impressum / Kontakt page:
             row.email = str(emails[0])
             updated = True
 
-        md_list = data.get("managing_directors") or []
+        md_list = filter_managing_directors(data.get("managing_directors"))
         directors: List[Dict[str, Optional[str]]] = []
-        if isinstance(md_list, list):
-            for md in md_list[:max_directors]:
-                if not isinstance(md, dict):
-                    continue
-                first = md.get("first_name")
-                last = md.get("last_name")
-                gender = md.get("gender")
-                full = md.get("full_name")
-                display = str(full or " ".join(p for p in [first, last] if p)).strip()
-                directors.append(
-                    {
-                        "first_name": str(first).strip() if first else None,
-                        "last_name": str(last).strip() if last else None,
-                        "salutation": gender_to_salutation(gender),
-                        "linkedin_profile_url": None,
-                        "imprint_managing_director": display or None,
-                    }
-                )
+        for md in md_list[:max_directors]:
+            first = md.get("first_name")
+            last = md.get("last_name")
+            gender = md.get("gender")
+            full = md.get("full_name")
+            display = str(full or " ".join(p for p in [first, last] if p)).strip()
+            directors.append(
+                {
+                    "first_name": str(first).strip() if first else None,
+                    "last_name": str(last).strip() if last else None,
+                    "salutation": gender_to_salutation(gender),
+                    "linkedin_profile_url": None,
+                    "imprint_managing_director": display or None,
+                }
+            )
         if directors:
             existing = row.directors or []
             for i, d in enumerate(directors):
