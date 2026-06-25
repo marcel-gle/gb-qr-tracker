@@ -5,6 +5,7 @@ from pathlib import Path
 from scripts.send_letter.send_letters_onlinebrief24 import (
     REQUIRED_CONTACT_FIELDS,
     _normalize_header,
+    _resolve_cmyk_color,
     load_contacts_csv,
 )
 
@@ -37,3 +38,10 @@ def test_load_contacts_csv_accepts_final_with_links_format(tmp_path: Path):
     assert row["Nachname"] == "Muster"
     assert row["Unternehmen"] == "Test GmbH"
     assert row["Template"] == "letter.pdf"
+
+
+def test_resolve_cmyk_color_presets_and_custom():
+    assert _resolve_cmyk_color({}) is not None
+    assert _resolve_cmyk_color({"color": "link_blue"}) is not None
+    custom = _resolve_cmyk_color({"color": {"cmyk": [1, 0.5, 0, 0]}})
+    assert custom is not None

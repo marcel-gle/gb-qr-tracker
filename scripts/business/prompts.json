@@ -323,41 +323,130 @@
     },
     {
       "name": "solaranlagen_verkauf_installation",
-      "description": "Einfache Klassifikation: Verkauft und/oder installiert das Unternehmen Solaranlagen (Photovoltaik)?",
-      "version": "1.1",
+      "description": "Binäre Klassifikation: Ist das Unternehmen PV-Installateur und/oder PV-Vertrieb (Verkauf)?",
+      "version": "2.0",
       "score_config": {
         "field": "score",
         "scale": "binary",
         "pass_threshold": 1
       },
-      "system_prompt": "Du klassifizierst deutsche Unternehmens-Websites anhand des sichtbaren Homepage-Inhalts (Text, Navigation, Überschriften, Leistungen).\n\nFrage: Bietet dieses Unternehmen Solaranlagen (Photovoltaik) für Endkunden oder Gewerbe an – im Sinne von VERKAUF und/oder INSTALLATION/MONTAGE vor Ort?\n\nDefinitionen:\n- verkauft = true: Solaranlagen, PV-Module, Komplettanlagen oder Photovoltaik-Produkte werden verkauft, angeboten oder konfiguriert (Shop, Angebot, Produktseiten, „Solaranlage kaufen“, Preisrechner für Anlagen).\n- installiert = true: Das Unternehmen montiert/installiert selbst Solaranlagen beim Kunden (Installateur, Montage, „wir installieren“, PV-Anlagenbau, Dachmontage, Inbetriebnahme vor Ort).\n\nBeide können true sein (Verkauf + Installation). Beide false, wenn weder Verkauf noch Installation erkennbar.\n\nSOFORT beide false bei: reiner Hersteller/Großhändler ohne Endkunden-Installation, reine Beratung/Software ohne Verkauf oder Montage, Verbände, Portale, Blogs, leere/Coming-Soon-Seiten, reine Speicher/Wechselrichter-Hersteller ohne erkennbaren PV-Anlagen-Verkauf oder -Montage für Kunden.\n\nBei zu wenig Text (<30 Wörter): beide false, es sei denn Domain/Firmenname enthält eindeutig „Solar“, „Photovoltaik“, „PV“ plus Installateur/Anlagenbau.\n\nAntworte NUR mit diesem JSON (kein Markdown, kein Text davor oder danach):\n{\"score\": <0|1>, \"verkauft\": <true|false>, \"installiert\": <true|false>}\n\nRegel für score:\n- score = 1 wenn verkauft true ODER installiert true\n- score = 0 wenn beide false",
+      "system_prompt": "Du klassifizierst eine deutsche Unternehmens-Website anhand des sichtbaren Homepage-Inhalts (Text, Navigation, Überschriften, Leistungen).\n\nAUFGABE: Entscheide, ob das Unternehmen Photovoltaik/Solaranlagen INSTALLIERT und/oder VERKAUFT.\n\n- installateur = true: montiert/installiert selbst PV-Anlagen beim Kunden (Montage, Dachmontage, Inbetriebnahme, „wir installieren“, PV-Anlagenbau, Solarteur, Fachbetrieb).\n- vertrieb = true: verkauft, vertreibt oder vermittelt PV-Anlagen, Module oder Komplettanlagen an Kunden (Angebot, Shop, Konfigurator, „Solaranlage kaufen“, Beratung mit Verkauf).\n\nEines, beides oder keines kann zutreffen.\n\nBeide false bei: reiner Hersteller/Großhandel ohne Endkunden-Bezug, reine Beratung/Planung/Software ohne Verkauf oder Montage, Energieversorger/Stromtarife, Verbände, Portale, Blogs, reine Speicher-/Wechselrichter-Hersteller, leere/Coming-Soon-Seiten.\n\nBei sehr wenig Text (<30 Wörter): beide false, außer Domain/Firmenname weist eindeutig auf PV-Installateur oder -Vertrieb hin.\n\nSCORE:\n- score = 1, wenn installateur ODER vertrieb (oder beide) true\n- score = 0, wenn beide false\n\nAntworte NUR mit diesem JSON (kein Markdown, kein Text davor oder danach):\n{\"score\": <0|1>, \"installateur\": <true|false>, \"vertrieb\": <true|false>}",
       "output_format": {
         "type": "json",
         "schema": {
           "score": {
             "type": "integer",
-            "description": "1 = verkauft oder installiert; 0 = weder noch"
+            "description": "1 = installateur oder vertrieb; 0 = weder noch"
           },
-          "verkauft": {
+          "installateur": {
             "type": "boolean",
-            "description": "Verkauft Solaranlagen/Photovoltaik-Produkte oder -Systeme"
+            "description": "Installiert/montiert PV-Anlagen beim Kunden"
           },
-          "installiert": {
+          "vertrieb": {
             "type": "boolean",
-            "description": "Installiert/montiert Solaranlagen beim Kunden"
+            "description": "Verkauft/vertreibt PV-Anlagen oder -Produkte an Kunden"
           }
         }
       },
-      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nKlassifiziere Verkauf und Installation von Solaranlagen."
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nIst das Unternehmen PV-Installateur und/oder PV-Vertrieb?"
+    },
+    {
+      "name": "immo_makler_klassifikation",
+      "description": "Immobilienmakler-Klassifikation (nur makler boolean)",
+      "version": "1.0",
+      "system_prompt": "Du klassifizierst deutsche Unternehmens-Websites anhand des sichtbaren Homepage-Textes.\n\nFrage: Ist dies die Website eines eigenständigen Immobilienmaklers, der Immobilien vermittelt und/oder vermietet (Häuser, Wohnungen, Büros/Gewerbe)?\n\nmakler = true wenn:\n- Klar erkennbarer Immobilienmakler, Maklerbüro, Immobilienbüro, Immobilienagentur\n- Leistungen wie Verkauf, Vermietung, Vermittlung, Exposé, Objektangebote\n- Regionale, inhabergeführte Maklertätigkeit erkennbar\n\nmakler = false bei:\n- Immobilienportalen, Suchportalen, Aggregatoren\n- Reiner Hausverwaltung ohne Vermittlung/Vermietung für Dritte\n- Reiner Bauträger/Projektentwickler ohne klassische Maklertätigkeit\n- Verbänden, Verzeichnissen, Blogs, leeren/Coming-Soon-Seiten\n\nAntworte NUR mit JSON (kein Markdown):\n{\"makler\": <true|false>, \"begruendung\": \"<1 Satz>\"}",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "makler": {"type": "boolean"},
+          "begruendung": {"type": "string"}
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nIst dies ein eigenständiger Immobilienmakler?"
+    },
+    {
+      "name": "immo_makler_visual_age",
+      "description": "Fuzzy visuelle Veraltungs-Bonus-Bewertung (0-3) aus sichtbarem Text",
+      "version": "1.0",
+      "system_prompt": "Du bewertest anhand des sichtbaren Homepage-Textes, wie veraltet die Website optisch/inhaltlich wirkt.\n\nGib NUR einen Bonus-Score visual_age_bonus (Ganzzahl 0–3):\n- 0: modern, aktuell, professionell\n- 1: leicht veraltet (z. B. altes Copyright, veraltete Formulierungen)\n- 2: deutlich veraltet (z. B. Copyright >5 Jahre alt, Fax prominent, IE-Hinweise, kein moderner CTA)\n- 3: stark veraltet (offensichtlich sehr alte Website)\n\nPrüfe NUR sichtbare Text-/Layout-Hinweise. KEINE technischen/HTML-Signale (Cookie-Banner, jQuery, DOCTYPE etc.) — die werden separat erkannt.\n\nvisuelle_signale: kurze Liste erkannter visueller Veraltungs-Hinweise (leeres Array wenn keine).\n\nAntworte NUR mit JSON:\n{\"visual_age_bonus\": <0-3>, \"visuelle_signale\": [\"...\"]}",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "visual_age_bonus": {"type": "integer", "min": 0, "max": 3},
+          "visuelle_signale": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nWie veraltet wirkt die Website visuell? Bonus 0-3."
     },
     {
       "name": "immo_makler_webseite",
-      "description": "Immobilienmakler-Erkennung + Bewertung wie veraltet die Webseite ist (technische und sichtbare Signale)",
-      "version": "1.1",
+      "description": "Immobilienmakler-Erkennung + deterministische Webseiten-Veraltungsbewertung",
+      "version": "2.0",
       "score_config": {
         "field": "score",
         "scale": "0-10",
         "pass_threshold": 4
+      },
+      "scoring_strategy": "weighted_signals",
+      "sub_prompts": {
+        "classification": "immo_makler_klassifikation",
+        "visual_age": "immo_makler_visual_age"
+      },
+      "signal_weights": {
+        "no_https": 2.0,
+        "mixed_content": 1.5,
+        "legacy_charset": 1.5,
+        "presentational_html": 2.0,
+        "ie_targeting": 1.5,
+        "inline_style_heavy": 1.5,
+        "no_social_meta": 0.5,
+        "no_cookie_banner": 1.0,
+        "no_modern_tracking": 1.0,
+        "no_viewport": 1.5,
+        "legacy_doctype": 1.0,
+        "jquery_legacy": 1.5,
+        "legacy_js_libs": 1.0,
+        "cms_outdated": 2.0,
+        "legacy_embed": 2.0,
+        "legacy_analytics": 1.0,
+        "php5_hint": 2.0,
+        "layout_tables": 1.0,
+        "frames": 1.5,
+        "heavy_iframes": 1.0,
+        "legacy_urls": 1.5,
+        "fixed_pixel_width": 1.0,
+        "favicon_only_ico": 0.5,
+        "retro_markers": 2.0,
+        "mailto_only_contact": 0.5,
+        "querystring_urls": 0.5
+      },
+      "llm_input": {
+        "max_chars": 6000,
+        "max_primary_lines": 80,
+        "max_chars_by_call": {
+          "classification": 6000,
+          "visual_age": 4000
+        },
+        "keywords": [
+          "immobilien",
+          "makler",
+          "vermittlung",
+          "vermietung",
+          "exposé",
+          "objekt",
+          "wohnung",
+          "haus",
+          "gewerbe",
+          "leistungen",
+          "verkauf",
+          "grundstück",
+          "büro",
+          "land",
+          "immobilienmakler",
+          "immobilienmaklerin",
+          "immobilienmaklerbüro",
+          ""
+        ]
       },
       "content_extraction": {
         "mode": "text_and_technical",
@@ -368,32 +457,17 @@
           "makler": true
         }
       },
-      "system_prompt": "Du bist ein Analyse-System für deutsche Immobilienmakler-Websites. Bewerte zwei unabhängige Kriterien anhand des gelieferten Materials.\n\nDer Input enthält die Abschnitte SICHTBARER WEBSEITEN-TEXT und TECHNISCHE SIGNALE (aus HTML-Quellcode). Für den Veraltungs-Score (score) haben technische Signale Vorrang vor rein visuellen Eindrücken.\n\nKRITERIUM 1 — makler (boolean):\nIst dies die Website eines eigenständigen Immobilienmaklers, der Immobilien vermittelt und/oder vermietet (Häuser, Wohnungen, Büros/Gewerbe)?\n\nmakler = true wenn:\n- Klar erkennbarer Immobilienmakler, Maklerbüro, Immobilienbüro, Immobilienagentur\n- Leistungen wie Verkauf, Vermietung, Vermittlung, Exposé, Objektangebote, Wohnungs-/Haus-/Gewerbeimmobilien\n- Regionale, inhabergeführte oder eigenständige Maklertätigkeit erkennbar\n\nmakler = false bei:\n- Immobilienportalen, Suchportalen, Vergleichsportalen, Aggregatoren (z. B. reine Suchmaske ohne eigenes Maklerbüro)\n- Reiner Hausverwaltung ohne erkennbare Vermittlung/Vermietung für Dritte\n- Reiner Bauträger/Projektentwickler ohne klassische Maklertätigkeit\n- Reiner Immobilienfonds, REIT, Konzern ohne lokales Maklerbüro\n- Verbänden, Branchenverzeichnissen, Blogs, leeren/Coming-Soon-Seiten\n\nKRITERIUM 2 — score (Ganzzahl 0–10, Webseiten-Alter / Veraltung):\nWie veraltet wirkt die Website technisch und optisch? Höherer Score = stärker veraltet.\n\nPrüfe explizit diese Signale (jeweils +Veraltung, wenn erkennbar):\n- Kein Cookie-Banner / kein Cookie-Consent-Hinweis\n- Kein Meta Pixel / kein Google Tag (googletagmanager, gtag, facebook pixel)\n- Kein responsives Design (feste Pixelbreite, „optimiert für 1024px“, kein mobiler Hinweis)\n- Flash / Silverlight / Shockwave\n- PHP 5.x (EOL seit 2018) oder veraltete Server-Hinweise\n- WordPress < 4.0 / Joomla 1.x–2.x / Drupal 6–7 (z. B. Generator-Meta, Footer-Version)\n- HTML 4 / XHTML 1.0 DOCTYPE\n- jQuery 1.x / 2.x in Script-Referenzen\n- Table-Layout (HTML-Tabellen für Seitenlayout statt CSS)\n- Frames / iframe-lastige Navigation\n- SSI (.shtml) / CGI-Perl-Skripte (.cgi, .pl)\n\nZusätzliche sichtbare Veraltungs-Signale: Copyright-Jahr >5 Jahre alt, „Internet Explorer“, veraltete Schriftarten/Layouts, keine modernen CTAs, Fax prominent, schlechte Mobile-Hinweise.\n\nScore-Skala Veraltung:\n- 0–2: Modern (Cookie-Consent, responsive Anmutung, aktuelle Technik-Hinweise, keine klaren Legacy-Signale)\n- 3–5: Gemischt / teils modern, 1–2 schwache Veraltungs-Signale\n- 6–8: Deutlich veraltet, mehrere der genannten Signale erkennbar\n- 9–10: Stark veraltet, viele Legacy-Signale oder offensichtlich sehr alte Website\n\nWenn zu wenig Material für technische Bewertung: konservativ anhand sichtbarer Layout-/Text-Signale bewerten; score nicht über 5 setzen ohne erkennbare technische Hinweise.\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"makler\": <true|false>, \"score\": <Ganzzahl 0-10>, \"begruendung\": \"<1 Satz zu Makler-Einschätzung>\", \"veraltung_signale\": [\"<kurzes Signal>\", \"...\"]}\n\nveraltung_signale: Liste der erkannten Veraltungs-Indikatoren (leeres Array wenn keine).\n\nBewerte nur den gelieferten Inhalt. Spekuliere nicht über nicht sichtbare Inhalte.",
+      "system_prompt": "Orchestrierungs-Prompt — Scoring läuft über weighted_signals mit Sub-Prompts.",
       "output_format": {
         "type": "json",
         "schema": {
-          "makler": {
-            "type": "boolean",
-            "description": "Eigenständiger Immobilienmakler (Vermittlung/Vermietung von Immobilien)"
-          },
-          "score": {
-            "type": "integer",
-            "min": 0,
-            "max": 10,
-            "description": "Veraltungs-Score: höher = Website wirkt älter/veralteter"
-          },
-          "begruendung": {
-            "type": "string",
-            "description": "Kurze Begründung zur Makler-Einschätzung"
-          },
-          "veraltung_signale": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Erkannte Signale für veraltete Webseite"
-          }
+          "makler": {"type": "boolean"},
+          "score": {"type": "integer", "min": 0, "max": 10},
+          "begruendung": {"type": "string"},
+          "veraltung_signale": {"type": "array", "items": {"type": "string"}}
         }
       },
-      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nBewerte: (1) makler true/false für eigenständigen Immobilienmakler, (2) score 0–10 für Webseiten-Veraltung."
+      "user_prompt_template": ""
     }
   ]
 }

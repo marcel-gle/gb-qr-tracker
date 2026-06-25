@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-StageName = Literal["raw", "raw_deduped", "scored", "imprint", "final"]
+StageName = Literal["raw", "raw_deduped", "scored", "imprint", "cleaned", "final"]
 
 CAMPAIGN_SUBFOLDERS = ("lists", "lists/incoming", "templates", "pdf_output")
 PIPELINE_DIR_NAME = ".pipeline"
@@ -43,3 +43,8 @@ def review_decisions_path(campaign_dir: Path, base: str) -> Path:
 
 def cache_path(campaign_dir: Path, name: str) -> Path:
     return pipeline_dir(campaign_dir) / f"{name}.cache.pkl"
+
+
+def scoring_cache_path(campaign_dir: Path) -> Path:
+    """Append-only JSONL cache of per-domain scoring results (crash-safe resume)."""
+    return pipeline_dir(campaign_dir) / "scoring.cache.jsonl"

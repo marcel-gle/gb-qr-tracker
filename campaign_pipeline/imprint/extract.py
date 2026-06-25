@@ -331,6 +331,7 @@ def run_imprint_scrape(
     *,
     max_workers: int = 10,
     progress_callback: Callable[[int, int, float, str], None] | None = None,
+    checkpoint_callback: Callable[[BusinessRow, int, int, float], None] | None = None,
 ) -> None:
     def _worker(row: BusinessRow) -> None:
         try:
@@ -351,8 +352,11 @@ def run_imprint_scrape(
                 row = futures[fut]
                 fut.result()
                 completed += 1
+                elapsed = time.monotonic() - started
+                if checkpoint_callback is not None:
+                    checkpoint_callback(row, completed, total, elapsed)
                 if progress_callback is not None:
-                    progress_callback(completed, total, time.monotonic() - started, row.domain)
+                    progress_callback(completed, total, elapsed, row.domain)
         extractor.save_cache()
     finally:
         close_browser_pool()

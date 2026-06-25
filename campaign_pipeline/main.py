@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Score only rows without existing results in _scored.csv",
     )
+    p.add_argument(
+        "--score-limit",
+        type=int,
+        default=0,
+        help="For testing: score at most N domains (0 = all)",
+    )
     return p
 
 
@@ -62,7 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.step == "dedupe-domain":
         print(pipe.dedupe_domain())
     elif args.step == "score":
-        print(pipe.score(only_new=args.only_new, only_missing=args.only_missing))
+        limit = args.score_limit if args.score_limit > 0 else None
+        print(pipe.score(only_new=args.only_new, only_missing=args.only_missing, limit=limit))
     elif args.step == "imprint":
         print(pipe.imprint(only_new=args.only_new))
     elif args.step == "dedupe-address":

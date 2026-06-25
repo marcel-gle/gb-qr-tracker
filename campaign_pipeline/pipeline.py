@@ -93,6 +93,7 @@ class CampaignPipeline:
         *,
         only_new: bool = False,
         only_missing: bool = False,
+        limit: int | None = None,
         progress_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> dict:
         only_domains = None
@@ -104,6 +105,7 @@ class CampaignPipeline:
             registry=self.registry,
             only_domains=only_domains,
             only_missing=only_missing,
+            limit=limit,
             progress_callback=progress_callback,
         )
         self.save_registry()
@@ -150,16 +152,35 @@ class CampaignPipeline:
         )
         return stats
 
+    def build_clean_list(self, *, drop_missing_address: bool = True) -> dict:
+        """Build {base}_cleaned.csv from the imprint file (imprint left untouched)."""
+        from .steps.final_review import build_clean_list
+
+        _, stats = build_clean_list(
+            self.config,
+            drop_missing_address=drop_missing_address,
+        )
+        return stats
+
     def run_llm_quality_check(
         self,
         *,
+        drop_missing_address: bool = True,
         progress_callback: Callable[[int, int, float], None] | None = None,
     ) -> dict:
         from .io.readers import load_rows_as_business
         from .steps.final_llm_review import run_final_llm_review
+        from .steps.final_review import build_clean_list
 
-        path = stage_path(self.config.campaign_dir, self.config.base_name, "imprint")
-        rows = load_rows_as_business(path, max_directors=self.config.max_directors)
+        # Build the cleaned intermediate list first (normalize + drop empty addresses)
+        # so those rows never reach the LLM or the manual review list. The original
+        # imprint CSV is left unchanged.
+        cleaned_path, clean_stats = build_clean_list(
+            self.config,
+            drop_missing_address=drop_missing_address,
+        )
+        rows = load_rows_as_business(cleaned_path, max_directors=self.config.max_directors)
+
         issues_path = review_issues_path(self.config.campaign_dir, self.config.base_name)
         stats = run_final_llm_review(
             rows,
@@ -167,6 +188,7 @@ class CampaignPipeline:
             issues_path,
             progress_callback=progress_callback,
         )
+        stats["clean"] = clean_stats
         save_review_decisions(review_decisions_path(self.config.campaign_dir, self.config.base_name), {})
         return stats
 
@@ -184,13 +206,35 @@ class CampaignPipeline:
             decisions,
         )
 
-    def final_review(self, *, min_score: float | None = None) -> dict:
+    def preview_final_review(
+        self,
+        *,
+        min_score: float | None = None,
+        drop_missing_address: bool = False,
+        review_decisions: dict[int, str] | None = None,
+    ) -> dict:
+        from .steps.final_review import preview_final_review
+
+        return preview_final_review(
+            self.config,
+            min_score=min_score,
+            drop_missing_address=drop_missing_address,
+            review_decisions=review_decisions,
+        )
+
+    def final_review(
+        self,
+        *,
+        min_score: float | None = None,
+        drop_missing_address: bool = False,
+    ) -> dict:
         from .io.readers import load_rows_as_business
 
         _, stats = run_final_review(
             self.config,
             registry=self.registry,
             min_score=min_score,
+            drop_missing_address=drop_missing_address,
         )
         final_path = stage_path(self.config.campaign_dir, self.config.base_name, "final")
         check = output_check_stats(

@@ -1,0 +1,52 @@
+{
+  "_comment": "Template config for campaign 009-20260604-koenig-makler. Coordinates are in PostScript points (1/72 inch), origin is bottom-left.",
+  "koenig-studios-makler.pdf": {
+    "pdf_filename": "koenig-studios-makler.pdf",
+    "qr_positions": [
+      {
+        "page": 8,
+        "x": 420,
+        "y": 101,
+        "size": 95
+      }
+    ],
+    "tracking_text_positions": [
+      {
+        "page": 8,
+        "x": 252,
+        "y": 83,
+        "font_size": 14,
+        "align": "left",
+        "color": "link_blue",
+        "underline": true
+      },
+      {
+        "page": 7,
+        "x": 298,
+        "y": 312,
+        "font_size": 20,
+        "align": "center",
+        "color": "link_blue",
+        "underline": true
+      }
+    ],
+    "date_positions": [
+      { "page": 1, "x": 488, "y": 625, "font_size": 10 }
+    ],
+    "business_name_positions": [
+      { "page": 1, "x": 72, "y": 658, "font_size": 11, "max_width": 200 }
+    ],
+    "full_name_positions": [
+      { "page": 1, "x": 72, "y": 643, "font_size": 11 }
+    ],
+    "street_positions": [
+      { "page": 1, "x": 72, "y": 628, "font_size": 11 }
+    ],
+    "city_positions": [
+      { "page": 1, "x": 72, "y": 613, "font_size": 11 }
+    ],
+    "salutation_positions": [
+      { "page": 1, "x": 99, "y": 422, "font_size": 11 }
+    ]
+  }
+}

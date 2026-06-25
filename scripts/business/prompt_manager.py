@@ -11,6 +11,11 @@ from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
+try:
+    from campaign_pipeline.scoring.indicators.registry import INDICATOR_REGISTRY
+except ImportError:  # pragma: no cover
+    INDICATOR_REGISTRY = {}
+
 # Default prompts file (relative to this script)
 PROMPTS_FILE = Path(__file__).parent / "prompts.json"
 
@@ -43,6 +48,38 @@ class Prompt:
     @property
     def pass_rules(self) -> Dict[str, Any]:
         raw = self._raw_data.get("pass_rules")
+        return raw if isinstance(raw, dict) else {}
+
+    @property
+    def scoring_strategy(self) -> str:
+        return str(self._raw_data.get("scoring_strategy", ""))
+
+    @property
+    def sub_prompts(self) -> Dict[str, str]:
+        raw = self._raw_data.get("sub_prompts")
+        if not isinstance(raw, dict):
+            return {}
+        return {str(k): str(v) for k, v in raw.items()}
+
+    @property
+    def signal_weights(self) -> Dict[str, float]:
+        raw = self._raw_data.get("signal_weights")
+        if not isinstance(raw, dict):
+            return {}
+        weights: Dict[str, float] = {}
+        for key, value in raw.items():
+            key_str = str(key)
+            if INDICATOR_REGISTRY and key_str not in INDICATOR_REGISTRY:
+                logger.warning("Unknown signal_weights key '%s' in prompt '%s'", key_str, self.name)
+            try:
+                weights[key_str] = float(value)
+            except (TypeError, ValueError):
+                logger.warning("Invalid weight for '%s' in prompt '%s': %r", key_str, self.name, value)
+        return weights
+
+    @property
+    def llm_input(self) -> Dict[str, Any]:
+        raw = self._raw_data.get("llm_input")
         return raw if isinstance(raw, dict) else {}
     
     def format_user_prompt(self, **kwargs) -> str:

@@ -41,8 +41,6 @@ def format_business_row_for_llm(idx: int, row: BusinessRow) -> str:
         f"legal_name={row.legal_name or ''!r}, "
         f"address={address!r}, "
         f"director={director!r}, "
-        f"email={row.email or ''!r}, "
-        f"phone={row.phone or ''!r}, "
         f"template={row.template or ''!r}, "
         f"match_score={row.match_score!r}"
     )

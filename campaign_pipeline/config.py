@@ -42,6 +42,7 @@ class CampaignConfig:
     pass_score_filter: bool = True
     enable_final_llm_review: bool = True
     resume: bool = True
+    checkpoint_every_rows: int = 25
 
     max_directors: int = 3
     target_final_count: Optional[int] = None

@@ -529,6 +529,36 @@ def generate_qr_image(qr_url: str) -> Image.Image:
 
 # CMYK solid black for print (0, 0, 0, 100% K) – no CMY to avoid registration issues
 _PRINT_BLACK_CMYK = CMYKColor(0, 0, 0, 1)
+# CMYK link blue (~#0066CC) for tracking URLs
+_PRINT_LINK_BLUE_CMYK = CMYKColor(1, 0.5, 0, 0)
+
+_TEXT_COLOR_PRESETS: Dict[str, CMYKColor] = {
+    "black": _PRINT_BLACK_CMYK,
+    "link_blue": _PRINT_LINK_BLUE_CMYK,
+}
+
+
+def _resolve_cmyk_color(cfg: Dict[str, Any], *, default: CMYKColor = _PRINT_BLACK_CMYK) -> CMYKColor:
+    color = cfg.get("color")
+    if color is None:
+        return default
+    if isinstance(color, str):
+        preset = color.strip().lower().replace("-", "_")
+        if preset in _TEXT_COLOR_PRESETS:
+            return _TEXT_COLOR_PRESETS[preset]
+        raise ValueError(f"Unknown color preset '{color}'")
+    if isinstance(color, dict) and "cmyk" in color:
+        parts = color["cmyk"]
+        if not isinstance(parts, list) or len(parts) != 4:
+            raise ValueError("cmyk color must be a list of 4 values")
+        return CMYKColor(*(float(v) for v in parts))
+    raise ValueError(f"Invalid color config: {color!r}")
+
+
+def _cfg_bool(cfg: Dict[str, Any], key: str, *, default: bool = False) -> bool:
+    if key not in cfg:
+        return default
+    return bool(cfg[key])
 
 
 def compose_letter_pdf(
@@ -629,8 +659,18 @@ def compose_letter_pdf(
                     mask="auto",
                 )
 
-            # All text in CMYK black for print
-            c.setFillColor(_PRINT_BLACK_CMYK)
+            def _text_x_draw(
+                text: str,
+                x: float,
+                font_size: float,
+                align: str,
+            ) -> Tuple[float, float]:
+                text_width = c.stringWidth(text, "Helvetica", font_size)
+                if align == "center":
+                    return x - text_width / 2.0, text_width
+                if align == "right":
+                    return x - text_width, text_width
+                return x, text_width
 
             def _draw_text(text: str, cfg: Dict[str, Any], y_offset: float = 0.0) -> None:
                 x = float(cfg.get("x", 0))
@@ -638,16 +678,29 @@ def compose_letter_pdf(
                 y = base_y - y_offset
                 font_size = float(cfg.get("font_size", 10))
                 align = str(cfg.get("align", "left")).lower()
+                c.setFillColor(_PRINT_BLACK_CMYK)
                 c.setFont("Helvetica", font_size)
-                if align in {"center", "right"}:
-                    text_width = c.stringWidth(text, "Helvetica", font_size)
-                    if align == "center":
-                        x_draw = x - text_width / 2.0
-                    else:  # right
-                        x_draw = x - text_width
-                else:
-                    x_draw = x
+                x_draw, _ = _text_x_draw(text, x, font_size, align)
                 c.drawString(x_draw, y, text)
+
+            def _draw_tracking_text(text: str, cfg: Dict[str, Any]) -> None:
+                x = float(cfg.get("x", 0))
+                y = float(cfg.get("y", 0))
+                font_size = float(cfg.get("font_size", 10))
+                align = str(cfg.get("align", "left")).lower()
+                color = _resolve_cmyk_color(cfg)
+                underline = _cfg_bool(cfg, "underline")
+                c.setFillColor(color)
+                c.setFont("Helvetica", font_size)
+                x_draw, text_width = _text_x_draw(text, x, font_size, align)
+                c.drawString(x_draw, y, text)
+                if underline:
+                    c.setStrokeColor(color)
+                    underline_y = y - max(1.0, font_size * 0.08)
+                    c.setLineWidth(max(0.5, font_size * 0.05))
+                    c.line(x_draw, underline_y, x_draw + text_width, underline_y)
+                c.setFillColor(_PRINT_BLACK_CMYK)
+                c.setStrokeColor(_PRINT_BLACK_CMYK)
 
             def _split_business_name(
                 text: str,
@@ -717,7 +770,7 @@ def compose_letter_pdf(
 
             # Static tracking text (typically the URL)
             for cfg in txt_by_page.get(i, []):
-                _draw_text(tracking_url, cfg)
+                _draw_tracking_text(tracking_url, cfg)
 
             # Dynamic text fields above the address block
             for cfg in date_by_page.get(i, []):

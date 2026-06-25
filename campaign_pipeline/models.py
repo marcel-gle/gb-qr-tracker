@@ -100,6 +100,7 @@ def director_field_names(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str
 def final_csv_fieldnames(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str]:
     """Column order for {base}_final.csv (letter-ready export)."""
     fields = [
+        "domain",
         "company_name",
         "full_address",
         "street",

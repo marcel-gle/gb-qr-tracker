@@ -347,7 +347,14 @@ def render_scoring() -> None:
     browser_fallback = bool(prompt_meta.get("content_extraction", {}).get("browser_fallback", False))
     if extraction_mode == "text_and_technical":
         fallback_note = " (mit Browser-Fallback)" if browser_fallback else ""
-        st.caption(f"Extraktion: sichtbarer Text + technische HTML-Signale{fallback_note}")
+        scoring_strategy = prompt_meta.get("scoring_strategy", "")
+        if scoring_strategy == "weighted_signals":
+            st.caption(
+                f"Extraktion: sichtbarer Text + technische HTML-Signale{fallback_note} | "
+                "Scoring: 2 LLM-Aufrufe + deterministischer Score"
+            )
+        else:
+            st.caption(f"Extraktion: sichtbarer Text + technische HTML-Signale{fallback_note}")
     else:
         st.caption("Extraktion: nur sichtbarer Webseiten-Text")
     require_boolean = prompt_meta.get("pass_rules", {}).get("require_boolean")
@@ -375,6 +382,30 @@ def render_scoring() -> None:
         disabled=only_missing,
         help="Uses the pipeline registry (raw stage). Ignored when scoring only missing results.",
     )
+    score_limit = st.number_input(
+        "Limit (0 = all)",
+        min_value=0,
+        value=0,
+        key="score_limit",
+        help="For testing: score at most this many domains from the selected input.",
+    )
+
+    auto_imprint = st.checkbox(
+        "Nach dem Scoring automatisch Impressum-Scrape starten",
+        value=False,
+        key="auto_imprint_after_scoring",
+        help=(
+            "Für Über-Nacht-Läufe: sobald das Scoring fertig ist, startet automatisch "
+            "der Impressum-Scrape (Schritt 4) – ohne dass du erneut klicken musst."
+        ),
+    )
+    auto_imprint_only_new = st.checkbox(
+        "Impressum nur für neue Domains scrapen",
+        value=False,
+        key="auto_imprint_only_new",
+        disabled=not auto_imprint,
+        help="Scrapt nur Domains im Stage 'scored'. Ignoriert, wenn der Auto-Scrape deaktiviert ist.",
+    )
 
     if st.button("Run scoring"):
         pipe = _pipeline()
@@ -398,6 +429,7 @@ def render_scoring() -> None:
             stats = pipe.score(
                 only_new=only_new,
                 only_missing=only_missing,
+                limit=int(score_limit) if score_limit else None,
                 progress_callback=on_scoring_progress,
             )
             progress_bar.progress(1.0)
@@ -417,6 +449,41 @@ def render_scoring() -> None:
             maybe_push_active_campaign()
             st.success("Done")
             st.json(stats)
+
+            if auto_imprint:
+                st.markdown("---")
+                st.subheader("Impressum-Scrape (automatisch)")
+                imprint_progress = st.progress(0.0)
+                imprint_status = st.empty()
+
+                def on_auto_imprint_progress(done: int, total: int, elapsed: float, domain: str) -> None:
+                    if total == 0:
+                        imprint_status.caption("No domains to scrape.")
+                        return
+                    frac = done / total
+                    imprint_progress.progress(min(frac, 1.0))
+                    eta = (elapsed / done) * (total - done) if done else 0.0
+                    imprint_status.markdown(
+                        f"Scraped **{done}/{total}** ({frac * 100:.0f}%) · "
+                        f"elapsed **{_format_duration(elapsed)}** · "
+                        f"ETA **~{_format_duration(eta)}** · last `{domain}`"
+                    )
+
+                imprint_stats = pipe.imprint(
+                    only_new=auto_imprint_only_new,
+                    progress_callback=on_auto_imprint_progress,
+                )
+                imprint_progress.progress(1.0)
+                if imprint_stats.get("scraped", 0) == 0:
+                    imprint_status.caption("No domains to scrape.")
+                else:
+                    imprint_status.markdown(
+                        f"Finished imprint scrape for **{imprint_stats.get('scraped', 0)}** domains · "
+                        f"**{imprint_stats.get('output', 0)}** rows in output"
+                    )
+                maybe_push_active_campaign()
+                st.success("Impressum-Scrape abgeschlossen")
+                st.json(imprint_stats)
 
 
 def render_imprint() -> None:
@@ -516,9 +583,20 @@ def render_final() -> None:
     issues_path = review_issues_path(pipe.config.campaign_dir, pipe.config.base_name)
     decisions_path = review_decisions_path(pipe.config.campaign_dir, pipe.config.base_name)
 
+    drop_missing_address = st.checkbox(
+        "Drop rows with missing address",
+        value=True,
+        help=(
+            "Removes rows with missing street/city or invalid postcode while building the cleaned "
+            "list — before the LLM check and the final CSV — so they never reach manual review. "
+            "The original imprint CSV is left untouched."
+        ),
+    )
+
     st.markdown("#### 1. LLM quality check")
     st.caption(
-        "Flags suspicious rows (non-German address, invalid address, odd data). "
+        "First builds a cleaned working list (normalizes house numbers, optionally drops rows with "
+        "missing addresses) from the imprint, then flags suspicious rows on it. "
         f"Issues file: `{issues_path.name}`"
     )
     if st.button("Run LLM quality check", key="run_llm_quality_check"):
@@ -533,9 +611,16 @@ def render_final() -> None:
             progress_bar.progress(min(frac, 1.0))
             status.markdown(f"LLM review chunk **{done}/{total}** ({frac * 100:.0f}%)")
 
-        stats = pipe.run_llm_quality_check(progress_callback=on_llm_progress)
+        stats = pipe.run_llm_quality_check(
+            drop_missing_address=drop_missing_address,
+            progress_callback=on_llm_progress,
+        )
         progress_bar.progress(1.0)
+        clean = stats.get("clean", {})
         status.markdown(
+            f"Cleaned list: kept **{clean.get('kept', 0)}** of **{clean.get('input', 0)}** "
+            f"(dropped **{clean.get('dropped_missing_address', 0)}** missing-address, "
+            f"normalized **{clean.get('normalized', 0)}**). "
             f"Flagged **{stats.get('flagged_rows', 0)}** of **{stats.get('records_total', 0)}** rows for manual review."
         )
         maybe_push_active_campaign()
@@ -544,27 +629,39 @@ def render_final() -> None:
 
     issues = pipe.get_review_issues()
     decisions = pipe.get_review_decisions()
+    active_decisions: dict[int, str] = dict(decisions)
 
     st.markdown("#### 2. Manual review of flagged rows")
     if not issues:
         st.info("No flagged rows yet. Run the LLM quality check first.")
     else:
         st.caption(f"{len(issues)} flagged row(s). Default action is **Discard** unless you choose Keep.")
-        new_decisions: dict[int, str] = dict(decisions)
+
+        # Group issues by row index so that each row gets exactly one decision widget.
+        grouped_issues: dict[int, list[dict]] = {}
         for issue in issues:
             raw_idx = (issue.get("row_index") or "").strip()
             if not raw_idx.isdigit():
                 continue
             idx = int(raw_idx)
+            grouped_issues.setdefault(idx, []).append(issue)
+
+        for idx in sorted(grouped_issues.keys()):
+            row_issues = grouped_issues[idx]
+            # Use the first issue for the expander title; list all inside.
+            first_issue = row_issues[0]
             default_choice = decisions.get(idx, "discard")
             with st.expander(
-                f"Row {idx}: {issue.get('domain') or issue.get('company_name') or '?'} — "
-                f"{issue.get('issue') or 'flagged'} ({issue.get('severity') or '?'})",
+                f"Row {idx}: {first_issue.get('domain') or first_issue.get('company_name') or '?'} — "
+                f"{first_issue.get('issue') or 'flagged'} ({first_issue.get('severity') or '?'})",
                 expanded=(default_choice == "discard"),
             ):
-                st.write(f"**Address:** {issue.get('address') or '—'}")
-                if issue.get("details"):
-                    st.write(f"**Details:** {issue.get('details')}")
+                for issue in row_issues:
+                    st.write(f"**Address:** {issue.get('address') or '—'}")
+                    if issue.get("details"):
+                        st.write(f"**Details:** {issue.get('details')}")
+                    st.markdown("---")
+
                 choice = st.radio(
                     "Decision",
                     ["Keep", "Discard"],
@@ -572,19 +669,54 @@ def render_final() -> None:
                     key=f"review_decision_{idx}",
                     horizontal=True,
                 )
-                new_decisions[idx] = "keep" if choice == "Keep" else "discard"
+                active_decisions[idx] = "keep" if choice == "Keep" else "discard"
 
         if st.button("Save review decisions", key="save_review_decisions"):
-            pipe.save_review_decisions(new_decisions)
+            pipe.save_review_decisions(active_decisions)
             maybe_push_active_campaign()
             st.success(f"Saved decisions to `{decisions_path}`")
 
     st.markdown("#### 3. Build final CSV")
     st.caption(
-        "Applies min score, required fields, PLZ validation, and removes flagged rows you marked Discard."
+        "Built from the cleaned list. Applies min score, required fields, PLZ validation, "
+        "and removes flagged rows you marked Discard."
     )
+
+    preview = pipe.preview_final_review(
+        min_score=min_score,
+        drop_missing_address=drop_missing_address,
+        review_decisions=active_decisions,
+    )
+    if preview.get("missing_imprint"):
+        st.warning("Imprint CSV not found yet. Complete earlier pipeline steps first.")
+    else:
+        st.markdown("**Preview (current settings)**")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Input rows", preview.get("input", 0))
+        c2.metric("Would keep", preview.get("kept", 0))
+        c3.metric("Address fixes", preview.get("normalized_address_rows", 0))
+        removed_total = (
+            preview.get("removed_score", 0)
+            + preview.get("removed_missing_address", 0)
+            + preview.get("removed_required", 0)
+            + preview.get("removed_postcode", 0)
+            + preview.get("removed_issues", 0)
+        )
+        c4.metric("Would remove", removed_total)
+        breakdown_parts = [
+            f"score: {preview.get('removed_score', 0)}",
+            f"missing address: {preview.get('removed_missing_address', 0)}",
+            f"required fields: {preview.get('removed_required', 0)}",
+            f"invalid PLZ: {preview.get('removed_postcode', 0)}",
+            f"flagged (discard): {preview.get('removed_issues', 0)}",
+        ]
+        st.caption("Removals by reason — " + ", ".join(breakdown_parts))
+
     if st.button("Build final CSV", key="build_final_csv"):
-        stats = pipe.final_review(min_score=min_score)
+        stats = pipe.final_review(
+            min_score=min_score,
+            drop_missing_address=drop_missing_address,
+        )
         maybe_push_active_campaign()
         st.success("Done")
         st.json(stats)

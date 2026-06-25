@@ -1,5 +1,5 @@
 {
-    "_comment": "Example template configuration for send_letters_onlinebrief24.py. Adjust PDF filenames and coordinates to match your real templates. Coordinates are in PostScript points (1/72 inch), origin is bottom-left of the page.",
+    "_comment": "Example template configuration for send_letters_onlinebrief24.py. Adjust PDF filenames and coordinates to match your real templates. Coordinates are in PostScript points (1/72 inch), origin is bottom-left of the page. tracking_text_positions supports optional color (black, link_blue, or {\"cmyk\": [c,m,y,k]}) and underline (true/false).",
     "rocket-letter-2-1-rl.pdf": {
       "pdf_filename": "rocket-letter-2-1-rl.pdf",
       "qr_positions": [
