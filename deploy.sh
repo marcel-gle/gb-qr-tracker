@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENVIRONMENT="${1:?Usage: ./deploy.sh <dev|prod> <function_dir>}"
-FUNC_DIR="${2:?Usage: ./deploy.sh <dev|prod> <function_dir>}"
+ENVIRONMENT="${1:?Usage: ./deploy.sh <dev|prod> <function_dir> [config_variant]}"
+FUNC_DIR="${2:?Usage: ./deploy.sh <dev|prod> <function_dir> [config_variant]}"
+# Optional 3rd arg selects a config variant for dirs that deploy several
+# functions, e.g. `./deploy.sh dev typesense_sync businesses` ->
+# config.businesses.dev.sh. Omitted -> config.<env>.sh (unchanged behaviour).
+CONFIG_VARIANT="${3:-}"
 
 # 1) Load env (PROJECT_ID, REGION, SA, etc.)
 if [[ -f ".env.${ENVIRONMENT}" ]]; then
@@ -10,7 +14,12 @@ if [[ -f ".env.${ENVIRONMENT}" ]]; then
 fi
 
 # 2) Load function config
-source "functions/${FUNC_DIR}/config.${ENVIRONMENT}.sh"
+CONFIG_FILE="functions/${FUNC_DIR}/config.${CONFIG_VARIANT:+${CONFIG_VARIANT}.}${ENVIRONMENT}.sh"
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  echo "ERROR: config file not found: ${CONFIG_FILE}"
+  exit 1
+fi
+source "${CONFIG_FILE}"
 
 # Ensure optional arrays/vars exist (avoids unset errors with `set -u`)
 declare -a ENV_VARS SECRETS TRIGGER_ARGS
