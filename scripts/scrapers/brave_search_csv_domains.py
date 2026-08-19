@@ -3,8 +3,9 @@
 Brave Search: Domains aus CSV-Zeilen ermitteln
 ==============================================
 Liest eine CSV, baut pro Zeile einen Suchbegriff (z. B. Name + Stadt),
-fragt die Brave Search API ab und schreibt die beste Treffer-Domain
-(standardmäßig Rank 1) in eine erweiterte CSV.
+fragt die Brave Search API ab und wählt unter den ersten Treffern die
+wahrscheinlichste Unternehmens-Website (Verzeichnisse/Social werden
+übersprungen).
 
 Basiert auf dem API-Client in brave_search_api.py.
 
@@ -28,6 +29,7 @@ Nutzung (Projektroot):
         --api-key KEY \\
         --input leads.csv \\
         --query-template "{name} {city} photovoltaik" \\
+        --num-results 8 \\
         --resume
 
 Kosten/Quota: siehe brave_search_api.py (1 API-Call pro Zeile bei --num-results <= 20).
@@ -62,7 +64,57 @@ from brave_search_api import (  # noqa: E402
 
 DEFAULT_QUERY_TEMPLATE = "{name} {city}"
 DEFAULT_DOMAIN_COLUMN = "domain"
-DEFAULT_NUM_RESULTS = 1
+DEFAULT_NUM_RESULTS = 8
+
+# Domains that are almost never the company's own site (directories, social, …).
+# Matching is suffix-aware: "linkedin.com" also blocks "de.linkedin.com".
+DEFAULT_SKIP_DOMAINS = frozenset({
+    "agenturmarkt.de",
+    "linkedin.com",
+    "xing.com",
+    "kununu.com",
+    "glassdoor.com",
+    "glassdoor.de",
+    "trustpilot.com",
+    "provenexpert.com",
+    "facebook.com",
+    "instagram.com",
+    "twitter.com",
+    "x.com",
+    "youtube.com",
+    "youtu.be",
+    "wikipedia.org",
+    "yelp.com",
+    "yelp.de",
+    "gelbeseiten.de",
+    "dasoertliche.de",
+    "11880.com",
+    "indeed.com",
+    "stepstone.de",
+    "stepstone.com",
+    "northdata.de",
+    "crunchbase.com",
+    "google.com",
+    "google.de",
+    "maps.google.com",
+    "goo.gl",
+    "bing.com",
+    "apple.com",
+    "apps.apple.com",
+    "play.google.com",
+    "amazon.de",
+    "amazon.com",
+    "ebay.de",
+    "ebay.com",
+    "firmenwissen.de",
+    "unternehmensregister.de",
+    "handelsregister.de",
+    "creditreform.de",
+    "kompass.com",
+    "wlw.de",
+    "europages.de",
+    "europages.com",
+})
 
 ENRICHMENT_COLUMNS = [
     "brave_query",
@@ -93,6 +145,7 @@ class CsvDomainConfig:
     extra_columns: List[str]
     domain_column: str
     num_results: int
+    skip_domains: Set[str]
     search_lang: str
     country: str
     ui_lang: str
@@ -149,6 +202,41 @@ def domain_from_result(item: Dict[str, Any]) -> str:
     if netloc:
         return normalize_domain(netloc)
     return normalize_domain(item.get("url", "") or "")
+
+
+def is_skipped_domain(domain: str, skip_domains: Set[str]) -> bool:
+    """True if domain is exactly a blocked host or a subdomain of one."""
+    d = normalize_domain(domain)
+    if not d:
+        return True
+    for blocked in skip_domains:
+        b = normalize_domain(blocked)
+        if not b:
+            continue
+        if d == b or d.endswith("." + b):
+            return True
+    return False
+
+
+def pick_best_result(
+    items: List[Dict[str, Any]],
+    skip_domains: Set[str],
+) -> tuple[Optional[Dict[str, Any]], int, int]:
+    """
+    Pick the first organic result whose domain is not a directory/social host.
+
+    Returns (item_or_None, 1-based_rank, skipped_count).
+    Falls back to rank-1 if every result was skipped (caller may still want
+    something; we return None so the caller can mark 'only_directories').
+    """
+    skipped = 0
+    for idx, item in enumerate(items, 1):
+        domain = domain_from_result(item)
+        if is_skipped_domain(domain, skip_domains):
+            skipped += 1
+            continue
+        return item, idx, skipped
+    return None, 0, skipped
 
 
 def build_query_from_template(template: str, row: Dict[str, str]) -> str:
@@ -357,7 +445,24 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_NUM_RESULTS,
         metavar="N",
-        help=f"Max. Treffer pro Zeile; Domain aus Rank 1 (default: {DEFAULT_NUM_RESULTS})",
+        help=(
+            f"Max. Treffer pro Zeile; erstes nicht-blockiertes Ergebnis gewinnt "
+            f"(default: {DEFAULT_NUM_RESULTS})"
+        ),
+    )
+    p.add_argument(
+        "--skip-domains",
+        default="",
+        metavar="D1,D2,...",
+        help=(
+            "Zusätzliche Domains überspringen (kommasepariert), z.B. "
+            "kununu.com,trustpilot.com. Default-Blocklist bleibt aktiv."
+        ),
+    )
+    p.add_argument(
+        "--no-default-skip",
+        action="store_true",
+        help="Default-Blocklist (LinkedIn, Xing, Agenturmarkt, …) deaktivieren",
     )
     p.add_argument(
         "--search-lang",
@@ -441,6 +546,14 @@ def _build_config(args: argparse.Namespace) -> CsvDomainConfig:
 
     extra_columns = [c.strip() for c in args.extra_columns.split(",") if c.strip()]
 
+    skip_domains: Set[str] = set()
+    if not args.no_default_skip:
+        skip_domains.update(DEFAULT_SKIP_DOMAINS)
+    for part in (args.skip_domains or "").split(","):
+        host = normalize_domain(part.strip())
+        if host:
+            skip_domains.add(host)
+
     query_template: Optional[str] = None
     query_column: Optional[str] = None
     if args.query_column:
@@ -460,6 +573,7 @@ def _build_config(args: argparse.Namespace) -> CsvDomainConfig:
         extra_columns=extra_columns,
         domain_column=args.domain_column.strip(),
         num_results=max(1, int(args.num_results)),
+        skip_domains=skip_domains,
         search_lang=args.search_lang.strip(),
         country=args.country.strip(),
         ui_lang=args.ui_lang.strip(),
@@ -538,7 +652,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Query:   column {cfg.query_column!r}")
     else:
         print(f"Query:   template {cfg.query_template!r}")
-    print(f"Domain:  rank 1 of up to {cfg.num_results} result(s) → column {cfg.domain_column!r}")
+    print(f"Domain:  first non-blocked of up to {cfg.num_results} result(s) "
+          f"→ column {cfg.domain_column!r}")
+    print(f"Skip:    {len(cfg.skip_domains)} blocked host(s) "
+          f"(linkedin, xing, agenturmarkt, …)")
     est_calls = len(rows) - len(resume_keys) if cfg.resume else len(rows)
     print(f"Est. API calls: ~{est_calls} (~${est_calls * COST_PER_REQUEST_USD:.2f})")
     if cfg.resume and resume_keys:
@@ -591,9 +708,31 @@ def main(argv: Optional[List[str]] = None) -> int:
                 fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
                 if items:
-                    enrichment = enrichment_from_result(query, items[0], 1, fetched_at)
-                    found += 1
-                    print(f"→ {enrichment['brave_domain'] or '?'} ({pages} page(s))")
+                    best, rank, skipped_dirs = pick_best_result(
+                        items, cfg.skip_domains
+                    )
+                    if best is not None:
+                        enrichment = enrichment_from_result(
+                            query, best, rank, fetched_at
+                        )
+                        found += 1
+                        suffix = (
+                            f", skipped {skipped_dirs} dir/social"
+                            if skipped_dirs else ""
+                        )
+                        print(
+                            f"→ {enrichment['brave_domain'] or '?'} "
+                            f"(rank {rank}/{len(items)}{suffix}, {pages} page(s))"
+                        )
+                    else:
+                        enrichment = empty_enrichment(
+                            query, "only_directories"
+                        )
+                        errors += 1
+                        print(
+                            f"→ (only directories/social in top {len(items)}; "
+                            f"skipped {skipped_dirs})"
+                        )
                 else:
                     enrichment = empty_enrichment(query, "no_results")
                     errors += 1

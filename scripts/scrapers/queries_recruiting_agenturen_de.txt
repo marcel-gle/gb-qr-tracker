@@ -1,0 +1,90 @@
+# Brave Search: Recruiting-Agenturen / Personalberatungen nach Stadt (DE)
+# Nutzung: siehe brave_search_api.py --queries-file
+
+# --- Top-Städte ---
+Recruiting Agentur Berlin
+Recruiting Agentur Hamburg
+Recruiting Agentur München
+Recruiting Agentur Köln
+Recruiting Agentur Frankfurt
+Recruiting Agentur Stuttgart
+Recruiting Agentur Düsseldorf
+Recruiting Agentur Dortmund
+Recruiting Agentur Essen
+Recruiting Agentur Leipzig
+Recruiting Agentur Bremen
+Recruiting Agentur Dresden
+Recruiting Agentur Hannover
+Recruiting Agentur Nürnberg
+Recruiting Agentur Duisburg
+Recruiting Agentur Bochum
+Recruiting Agentur Wuppertal
+Recruiting Agentur Bielefeld
+Recruiting Agentur Bonn
+Recruiting Agentur Münster
+Recruiting Agentur Karlsruhe
+Recruiting Agentur Mannheim
+Recruiting Agentur Augsburg
+Recruiting Agentur Wiesbaden
+Recruiting Agentur Mönchengladbach
+Recruiting Agentur Gelsenkirchen
+Recruiting Agentur Braunschweig
+Recruiting Agentur Kiel
+Recruiting Agentur Aachen
+Recruiting Agentur Chemnitz
+Recruiting Agentur Halle
+Recruiting Agentur Magdeburg
+Recruiting Agentur Freiburg
+Recruiting Agentur Krefeld
+Recruiting Agentur Lübeck
+Recruiting Agentur Erfurt
+Recruiting Agentur Mainz
+Recruiting Agentur Rostock
+Recruiting Agentur Kassel
+Recruiting Agentur Hagen
+Recruiting Agentur Hamm
+Recruiting Agentur Saarbrücken
+Recruiting Agentur Mülheim
+Recruiting Agentur Potsdam
+Recruiting Agentur Ludwigshafen
+Recruiting Agentur Oldenburg
+Recruiting Agentur Leverkusen
+Recruiting Agentur Osnabrück
+Recruiting Agentur Solingen
+Recruiting Agentur Heidelberg
+Recruiting Agentur Darmstadt
+Recruiting Agentur Regensburg
+Recruiting Agentur Würzburg
+Recruiting Agentur Ingolstadt
+Recruiting Agentur Ulm
+Recruiting Agentur Heilbronn
+Recruiting Agentur Paderborn
+Recruiting Agentur Offenbach
+Recruiting Agentur Fürth
+Recruiting Agentur Reutlingen
+Recruiting Agentur Göttingen
+Recruiting Agentur Koblenz
+Recruiting Agentur Erlangen
+Recruiting Agentur Trier
+Recruiting Agentur Jena
+Recruiting Agentur Siegen
+Recruiting Agentur Hildesheim
+Recruiting Agentur Cottbus
+Recruiting Agentur Konstanz
+
+# --- Synonyme (größere Städte) ---
+Personalberatung Berlin
+Personalberatung Hamburg
+Personalberatung München
+Personalberatung Köln
+Personalberatung Frankfurt
+Personalberatung Stuttgart
+Personalberatung Düsseldorf
+Personalberatung Leipzig
+Personalberatung Hannover
+Personalberatung Nürnberg
+Headhunter Berlin
+Headhunter München
+Headhunter Hamburg
+Headhunter Frankfurt
+Headhunter Köln
