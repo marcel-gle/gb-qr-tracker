@@ -27,6 +27,9 @@ USER_AGENT = (
 )
 REQUEST_TIMEOUT = 10
 MAX_TEXT_CHARS = 15_000
+# Below this many characters a homepage response is treated as effectively empty
+# (e.g. a bare-domain 200 with no body served behind a www-only certificate).
+MIN_USABLE_HTML_CHARS = 200
 BROWSER_GOTO_TIMEOUT_MS = 20_000
 BROWSER_SELECTOR_TIMEOUT_MS = 5_000
 BROWSER_CLOUDFLARE_WAIT_MS = 3_000
@@ -78,6 +81,43 @@ _browser_executor_lock = Lock()
 _browser_pw_state: dict[str, Any] = {"playwright": None, "browser": None}
 
 
+_META_CHARSET_RE = re.compile(
+    rb"""<meta[^>]+charset\s*=\s*["']?\s*([a-zA-Z0-9_\-]+)""",
+    re.IGNORECASE,
+)
+
+
+def _response_html(resp: requests.Response) -> str:
+    """Return response body decoded with the correct charset.
+
+    ``requests`` falls back to ISO-8859-1 whenever a ``text/*`` response omits a
+    charset in the ``Content-Type`` header (per RFC 2616). Many German sites are
+    actually UTF-8 and only declare the charset via a ``<meta>`` tag, which leads
+    to mojibake (e.g. ``GeschÃ¤ftsfÃ¼hrer``). Prefer the ``<meta>`` charset, then
+    the byte-sniffed encoding, before falling back to whatever requests picked.
+    """
+    try:
+        headers = resp.headers or {}
+        content_type = str(headers.get("Content-Type", "") or "").lower()
+        content = resp.content
+        if "charset=" not in content_type and isinstance(content, (bytes, bytearray)):
+            detected: Optional[str] = None
+            match = _META_CHARSET_RE.search(bytes(content[:4096]))
+            if match:
+                detected = match.group(1).decode("ascii", "ignore").strip() or None
+            if not detected:
+                detected = resp.apparent_encoding
+            if detected:
+                try:
+                    resp.encoding = detected
+                except (LookupError, TypeError):
+                    pass
+    except (AttributeError, TypeError):
+        # Non-standard/mocked response objects: fall back to raw text.
+        pass
+    return resp.text
+
+
 def _is_html_response(resp: requests.Response) -> bool:
     content_type = resp.headers.get("Content-Type", "").lower()
     if "text/html" in content_type or "application/xhtml" in content_type:
@@ -124,7 +164,15 @@ def _candidate_hosts(domain: str) -> list[str]:
 
 def _html_to_text(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
     text = soup.get_text(separator="\n")
+    # Collapse trailing spaces and runs of blank lines so the meaningful
+    # Impressum content is not pushed past MAX_TEXT_CHARS by navigation
+    # whitespace (common on template sites with many empty layout rows).
+    text = re.sub(r"[ \t\u00a0]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if len(text) > MAX_TEXT_CHARS:
         text = text[:MAX_TEXT_CHARS]
     return text
@@ -223,6 +271,75 @@ def find_imprint_url(base_html: str, base_url: str) -> Optional[str]:
         resp = _fetch_url(url)
         if resp:
             return resp.url
+    return None
+
+
+def _collect_internal_links(base_html: str, base_url: str, *, limit: int = 8) -> list[str]:
+    """Return same-host page links from ``base_html``, best candidates first.
+
+    Used to crawl one level deeper when the homepage has no Impressum link
+    (e.g. HTTrack mirrors whose root is just an index page, or sites whose
+    navigation lives on an inner landing page rather than the domain root).
+    """
+    soup = BeautifulSoup(base_html, "html.parser")
+    base_host = urlparse(base_url).netloc.lower().lstrip("www.")
+    scored: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        url = urljoin(base_url, href)
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        if parsed.netloc.lower().lstrip("www.") != base_host:
+            continue
+        clean = url.split("#", 1)[0]
+        if clean in seen or clean.rstrip("/") == base_url.rstrip("/"):
+            continue
+        seen.add(clean)
+        path_lower = parsed.path.lower()
+        text_lower = (a.get_text() or "").strip().lower()
+        score = 0
+        # Landing/index pages are the most likely to expose the real navigation.
+        if any(k in path_lower for k in ("index", "home", "start")):
+            score += 40
+        if any(k in text_lower for k in ("kontakt", "impressum", "über", "ueber", "datenschutz")):
+            score += 25
+        # Prefer shallow pages over deep sub-sections.
+        score -= path_lower.count("/") * 2
+        scored.append((score, clean))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [url for _, url in scored[:limit]]
+
+
+def find_imprint_url_deep(
+    base_html: str, base_url: str, *, max_pages: int = 5
+) -> Optional[str]:
+    """Find an Impressum URL by crawling one level past the homepage.
+
+    First tries the homepage directly (:func:`find_imprint_url`). If nothing is
+    found, follows a handful of internal links and searches those pages for an
+    Impressum link.
+    """
+    direct = find_imprint_url(base_html, base_url)
+    if direct:
+        return direct
+
+    visited: set[str] = set()
+    for link in _collect_internal_links(base_html, base_url):
+        if link in visited:
+            continue
+        visited.add(link)
+        resp = _fetch_url(link)
+        if not resp:
+            continue
+        found = find_imprint_url(_response_html(resp), resp.url)
+        if found:
+            return found
+        if len(visited) >= max_pages:
+            break
     return None
 
 
@@ -357,7 +474,7 @@ def fetch_page_html_browser(url: str) -> Optional[str]:
 
 def extract_text_from_url(url: str, *, home_text: str | None = None) -> Optional[str]:
     resp = _fetch_url(url)
-    static_text = _html_to_text(resp.text) if resp else None
+    static_text = _html_to_text(_response_html(resp)) if resp else None
 
     if static_text and looks_like_imprint(static_text, home_text=home_text):
         logger.debug("Imprint static fetch OK: %s", url)
@@ -379,14 +496,14 @@ def get_imprint_text_for_domain(domain: str) -> Optional[str]:
     if not base_url:
         return None
     home_resp = _fetch_url(base_url)
-    home_html = home_resp.text if home_resp else None
+    home_html = _response_html(home_resp) if home_resp else None
     if not home_html:
         home_html = fetch_page_html_browser(base_url)
     if not home_html:
         return None
     home_text = _html_to_text(home_html)
 
-    imprint_url = find_imprint_url(home_html, base_url)
+    imprint_url = find_imprint_url_deep(home_html, base_url)
     if imprint_url:
         return extract_text_from_url(imprint_url, home_text=home_text)
 
@@ -401,6 +518,21 @@ def get_imprint_text_for_domain(domain: str) -> Optional[str]:
     return extract_text_from_url(base_url, home_text=home_text)
 
 
+def _has_usable_body(resp: requests.Response) -> bool:
+    """True when a response carries a non-trivial HTML body.
+
+    Some hosts answer the "bare" (non-``www``) domain with an HTTP 200 but an
+    empty body — often when the TLS certificate only covers the ``www`` host and
+    we retried with verification disabled. Such a response is useless for
+    Impressum discovery, so we must keep probing the other candidate hosts.
+    """
+    try:
+        html = _response_html(resp)
+    except Exception:
+        return False
+    return bool(html) and len(html.strip()) >= MIN_USABLE_HTML_CHARS
+
+
 def normalize_domain_to_base_url(domain: str) -> Optional[str]:
     raw = (domain or "").strip()
     if not raw:
@@ -410,11 +542,21 @@ def normalize_domain_to_base_url(domain: str) -> Optional[str]:
     elif raw.lower().startswith("https://"):
         raw = raw[8:]
     host = raw.split("/")[0].rstrip("/")
+    # Track the first responding URL so we can still return *something* when no
+    # candidate serves a usable body, but prefer a candidate that actually
+    # returns HTML content (e.g. www. when the bare host serves an empty page).
+    fallback_url: Optional[str] = None
     for candidate in _candidate_hosts(host):
         for scheme in ("https://", "http://"):
             resp = _fetch_url(scheme + candidate)
-            if resp:
+            if not resp:
+                continue
+            if fallback_url is None:
+                fallback_url = resp.url
+            if _has_usable_body(resp):
                 return resp.url
+    if fallback_url:
+        return fallback_url
     cleaned = normalize_domain(host)
     if cleaned:
         logger.debug(

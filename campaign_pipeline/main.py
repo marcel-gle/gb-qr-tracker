@@ -38,6 +38,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Score only rows without existing results in _scored.csv",
     )
+    p.add_argument(
+        "--skip-score-filter",
+        action="store_true",
+        help="Imprint/final: do not filter by score (needed when scoring was skipped)",
+    )
+    p.add_argument(
+        "--no-northdata",
+        action="store_true",
+        help="Imprint: disable the North Data managing-director fallback",
+    )
+    p.add_argument(
+        "--only-missing-fields",
+        action="store_true",
+        help=(
+            "Imprint: re-scrape only rows in the existing _imprint.csv that are "
+            "missing a street or managing-director name (forces a fresh fetch)"
+        ),
+    )
     return p
 
 
@@ -52,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=args.backend,
         scoring_prompt_name=args.scoring_prompt,
         score_config=score_cfg,
+        enable_northdata_fallback=not args.no_northdata,
     )
     pipe = CampaignPipeline(config)
     pipe.ensure_campaign_dirs()
@@ -64,11 +83,17 @@ def main(argv: list[str] | None = None) -> int:
     elif args.step == "score":
         print(pipe.score(only_new=args.only_new, only_missing=args.only_missing))
     elif args.step == "imprint":
-        print(pipe.imprint(only_new=args.only_new))
+        print(
+            pipe.imprint(
+                only_new=args.only_new,
+                skip_score_filter=args.skip_score_filter,
+                only_missing_fields=args.only_missing_fields,
+            )
+        )
     elif args.step == "dedupe-address":
         print(pipe.dedupe_address())
     elif args.step == "final":
-        print(pipe.final_review())
+        print(pipe.final_review(skip_score_filter=args.skip_score_filter))
     elif args.step == "status":
         print(pipe.funnel_status())
     return 0

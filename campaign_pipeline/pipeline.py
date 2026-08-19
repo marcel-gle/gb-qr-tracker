@@ -113,16 +113,25 @@ class CampaignPipeline:
         self,
         *,
         only_new: bool = False,
+        skip_score_filter: bool = False,
+        only_missing_fields: bool = False,
         progress_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> dict:
         only_domains = None
-        if only_new:
-            only_domains = {d for d, s in self.registry.domains.items() if s.stage == "scored"}
+        if only_new and not only_missing_fields:
+            # Include raw domains so imprint works when scoring was skipped.
+            only_domains = {
+                d
+                for d, s in self.registry.domains.items()
+                if s.stage in ("raw", "scored")
+            }
         _, stats = run_imprint_step(
             self.config,
             self.llm,
             registry=self.registry,
             only_domains=only_domains,
+            skip_score_filter=skip_score_filter,
+            only_missing_fields=only_missing_fields,
             progress_callback=progress_callback,
         )
         self.save_registry()
@@ -184,13 +193,19 @@ class CampaignPipeline:
             decisions,
         )
 
-    def final_review(self, *, min_score: float | None = None) -> dict:
+    def final_review(
+        self,
+        *,
+        min_score: float | None = None,
+        skip_score_filter: bool = False,
+    ) -> dict:
         from .io.readers import load_rows_as_business
 
         _, stats = run_final_review(
             self.config,
             registry=self.registry,
             min_score=min_score,
+            skip_score_filter=skip_score_filter,
         )
         final_path = stage_path(self.config.campaign_dir, self.config.base_name, "final")
         check = output_check_stats(

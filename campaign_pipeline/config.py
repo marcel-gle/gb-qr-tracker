@@ -41,6 +41,7 @@ class CampaignConfig:
 
     pass_score_filter: bool = True
     enable_final_llm_review: bool = True
+    enable_northdata_fallback: bool = True
     resume: bool = True
 
     max_directors: int = 3

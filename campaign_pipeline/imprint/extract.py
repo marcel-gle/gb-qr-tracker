@@ -142,12 +142,20 @@ Respond with a single JSON object only:
 
 
 class ImprintExtractor:
-    def __init__(self, llm: LLMClient, cache_path: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        cache_path: Optional[Path] = None,
+        *,
+        enable_northdata: bool = True,
+    ) -> None:
         self._llm = llm
         self._cache_path = cache_path
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._lock = Lock()
         self._salutation_service: Any = None
+        self._enable_northdata = enable_northdata
+        self._northdata_cache: Dict[str, List[Dict[str, Any]]] = {}
         if cache_path and cache_path.exists():
             try:
                 with cache_path.open("rb") as f:
@@ -163,6 +171,28 @@ class ImprintExtractor:
 
             self._salutation_service = SalutationService(self._llm)
         return self._salutation_service.infer_salutation(first_name)
+
+    def _northdata_directors(
+        self, company_name: str, city: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Look up current managing directors on North Data (cached)."""
+        if not self._enable_northdata:
+            return []
+        key = f"{(company_name or '').strip().lower()}|{(city or '').strip().lower()}"
+        with self._lock:
+            cached = self._northdata_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            from .northdata import lookup_managing_directors
+
+            result = lookup_managing_directors(company_name, city)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("North Data lookup crashed for %s: %s", company_name, exc)
+            result = []
+        with self._lock:
+            self._northdata_cache[key] = result
+        return result
 
     def save_cache(self) -> None:
         if not self._cache_path:
@@ -208,11 +238,14 @@ Remember: exclude fax numbers from generic_company_phones and exclude Datenschut
                 "confidence": 0.0,
             }
 
-    def extract_for_domain(self, domain: str, company_name: str = "") -> Dict[str, Any]:
-        with self._lock:
-            cached = self._cache.get(domain)
-        if cached is not None:
-            return cached
+    def extract_for_domain(
+        self, domain: str, company_name: str = "", *, force: bool = False
+    ) -> Dict[str, Any]:
+        if not force:
+            with self._lock:
+                cached = self._cache.get(domain)
+            if cached is not None:
+                return cached
         imprint_text = get_imprint_text_for_domain(domain)
         if not imprint_text:
             data: Dict[str, Any] = {
@@ -233,8 +266,14 @@ Remember: exclude fax numbers from generic_company_phones and exclude Datenschut
             self._cache[domain] = data
         return data
 
-    def apply_to_row(self, row: BusinessRow, max_directors: int = MAX_DIRECTORS_DEFAULT) -> bool:
-        data = self.extract_for_domain(row.domain, row.company_name or "")
+    def apply_to_row(
+        self,
+        row: BusinessRow,
+        max_directors: int = MAX_DIRECTORS_DEFAULT,
+        *,
+        force: bool = False,
+    ) -> bool:
+        data = self.extract_for_domain(row.domain, row.company_name or "", force=force)
         updated = False
 
         full_addr = data.get("full_address")
@@ -277,6 +316,29 @@ Remember: exclude fax numbers from generic_company_phones and exclude Datenschut
             updated = True
 
         md_list = filter_managing_directors(data.get("managing_directors"))
+
+        existing_named = any(
+            (d or {}).get("first_name") or (d or {}).get("last_name")
+            for d in (row.directors or [])
+        )
+        # Only trust the North Data fallback when the imprint page was actually
+        # reached and yielded an address. If the whole fetch failed (no address
+        # at all) we must NOT guess a director from a same-named company — that
+        # is how a wrong managing director gets written to the row.
+        imprint_reached = bool(
+            data.get("full_address")
+            or data.get("address_street")
+            or data.get("address_postcode")
+            or data.get("address_city")
+        )
+        if not md_list and not existing_named and imprint_reached:
+            # Imprint had no managing directors (e.g. only a postal address).
+            # Fall back to North Data's published legal representatives.
+            company = row.legal_name or row.company_name or data.get("company_legal_name")
+            if company:
+                city = row.city or data.get("address_city")
+                md_list = self._northdata_directors(str(company), city)
+
         directors: List[Dict[str, Optional[str]]] = []
         for md in md_list[:max_directors]:
             first = md.get("first_name")
@@ -330,11 +392,12 @@ def run_imprint_scrape(
     extractor: ImprintExtractor,
     *,
     max_workers: int = 10,
+    force: bool = False,
     progress_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> None:
     def _worker(row: BusinessRow) -> None:
         try:
-            extractor.apply_to_row(row)
+            extractor.apply_to_row(row, force=force)
         except Exception as exc:
             logger.warning("Imprint failed for %s: %s", row.domain, exc)
 

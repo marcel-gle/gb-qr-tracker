@@ -88,8 +88,28 @@ def extract_technical_signals(html: str) -> str:
             lines.append("- cms_joomla: detected")
         if "drupal" in gen_lower:
             lines.append("- cms_drupal: detected")
+        if "typo3" in gen_lower:
+            lines.append("- cms_typo3: generator meta detected")
+        if "webflow" in gen_lower:
+            lines.append("- cms_webflow: generator meta detected")
+        if "onepage" in gen_lower:
+            lines.append("- cms_onepage: generator meta detected")
     else:
         lines.append("- meta_generator: (not found)")
+
+    if "wp-content" in html_lower or "wp-includes" in html_lower:
+        lines.append("- cms_wordpress: path detected (wp-content/wp-includes)")
+    if "typo3" in html_lower or "typo3temp" in html_lower:
+        lines.append("- cms_typo3: path or markup detected")
+    if (
+        "webflow.io" in html_lower
+        or "data-wf-page" in html_lower
+        or "data-wf-site" in html_lower
+        or re.search(r'data-wf-[a-z]+=', html_lower)
+    ):
+        lines.append("- cms_webflow: detected (webflow.io or data-wf attributes)")
+    if "onepage.io" in html_lower or "onepage.com" in html_lower:
+        lines.append("- cms_onepage: detected (onepage domain reference)")
 
     viewport = soup.find("meta", attrs={"name": re.compile(r"^viewport$", re.I)})
     if viewport and viewport.get("content"):

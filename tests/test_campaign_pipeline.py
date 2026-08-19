@@ -275,3 +275,132 @@ def test_run_scoring_only_missing_preserves_existing(tmp_path: Path, monkeypatch
     assert by_domain["done.de"].match_score == 7.0
     assert by_domain["pending.de"].match_score == 5.0
     assert by_domain["pending.de"].domain_analysis_raw == {"score": 5, "makler": True}
+
+
+def test_resolve_imprint_input_falls_back_to_raw(tmp_path: Path):
+    from campaign_pipeline.steps.imprint_scrape import resolve_imprint_input_path
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test")
+
+    raw = stage_path(campaign, "test", "raw")
+    deduped = stage_path(campaign, "test", "raw_deduped")
+    scored = stage_path(campaign, "test", "scored")
+
+    raw.write_text("domain\na.de\n", encoding="utf-8")
+    assert resolve_imprint_input_path(cfg) == raw
+
+    deduped.write_text("domain\nb.de\n", encoding="utf-8")
+    assert resolve_imprint_input_path(cfg) == deduped
+
+    scored.write_text("domain\nc.de\n", encoding="utf-8")
+    assert resolve_imprint_input_path(cfg) == scored
+
+
+def test_row_is_missing_core_fields():
+    from campaign_pipeline.steps.imprint_scrape import row_is_missing_core_fields
+
+    complete = BusinessRow.from_dict(
+        {"domain": "a.de", "street": "Hauptstr.", "first_name_1": "Max", "last_name_1": "Muster"}
+    )
+    assert row_is_missing_core_fields(complete) is False
+
+    no_street = BusinessRow.from_dict(
+        {"domain": "b.de", "first_name_1": "Max", "last_name_1": "Muster"}
+    )
+    assert row_is_missing_core_fields(no_street) is True
+
+    no_director = BusinessRow.from_dict({"domain": "c.de", "street": "Hauptstr."})
+    assert row_is_missing_core_fields(no_director) is True
+
+
+def test_imprint_only_missing_fields_targets_incomplete_rows(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.imprint_scrape import run_imprint_step
+    from campaign_pipeline.imprint import extract as extract_mod
+    from unittest.mock import MagicMock
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    (campaign / ".pipeline").mkdir(parents=True)
+    cfg = CampaignConfig(
+        campaign_dir=campaign, base_name="test", enable_northdata_fallback=False
+    )
+
+    rows = [
+        BusinessRow.from_dict(
+            {
+                "domain": "complete.de",
+                "street": "Hauptstr.",
+                "house_number": "1",
+                "first_name_1": "Max",
+                "last_name_1": "Muster",
+            }
+        ),
+        BusinessRow.from_dict({"domain": "missing.de", "company_name": "Missing GmbH"}),
+    ]
+    write_business_rows(stage_path(campaign, "test", "imprint"), rows)
+
+    scraped_domains: list[str] = []
+    forced_flags: list[bool] = []
+
+    def fake_apply(self, row, max_directors=3, *, force=False):
+        scraped_domains.append(row.domain)
+        forced_flags.append(force)
+        row.street = "Neue Str."
+        row.directors = [{"first_name": "Erika", "last_name": "Neu"}]
+        return True
+
+    monkeypatch.setattr(extract_mod.ImprintExtractor, "apply_to_row", fake_apply)
+
+    _, stats = run_imprint_step(cfg, MagicMock(), only_missing_fields=True)
+
+    assert scraped_domains == ["missing.de"]
+    assert forced_flags == [True]
+    assert stats["only_missing_fields"] is True
+    assert stats["scraped"] == 1
+
+    reloaded = {r.domain: r for r in load_rows_as_business(stage_path(campaign, "test", "imprint"))}
+    assert reloaded["complete.de"].directors[0]["first_name"] == "Max"
+    assert reloaded["missing.de"].street == "Neue Str."
+    assert reloaded["missing.de"].directors[0]["first_name"] == "Erika"
+
+
+def test_final_review_skip_score_filter_keeps_unscored(tmp_path: Path):
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.final_review import run_final_review
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(
+        campaign_dir=campaign,
+        base_name="test",
+        score_config=ScoreConfig(scale="0-5", pass_threshold=4),
+    )
+    rows = [
+        BusinessRow.from_dict(
+            {
+                "domain": "a.de",
+                "first_name_1": "Max",
+                "last_name_1": "Muster",
+                "salutation_1": "Herr",
+                "street": "Hauptstr.",
+                "house_number": "1",
+                "postcode": "10115",
+                "city": "Berlin",
+                "template": "t.pdf",
+            }
+        ),
+    ]
+    write_business_rows(stage_path(campaign, "test", "imprint"), rows)
+
+    _, filtered = run_final_review(cfg)
+    assert filtered["kept"] == 0
+    assert filtered["removed_score"] == 1
+
+    _, kept = run_final_review(cfg, skip_score_filter=True)
+    assert kept["kept"] == 1
+    assert kept["removed_score"] == 0
+    assert kept["score_filter_applied"] is False

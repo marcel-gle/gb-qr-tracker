@@ -96,6 +96,7 @@ def run_final_review(
     input_path: Path | None = None,
     *,
     min_score: float | None = None,
+    skip_score_filter: bool = False,
     registry: Optional[PipelineRegistry] = None,
 ) -> tuple[Path, dict]:
     path = input_path or stage_path(config.campaign_dir, config.base_name, "imprint")
@@ -118,11 +119,12 @@ def run_final_review(
         "kept": 0,
         "flagged_for_review": len(flagged_indices),
         "kept_despite_flag": 0,
+        "score_filter_applied": not skip_score_filter,
     }
 
     for idx, row in enumerate(rows, start=1):
         score = row.match_score
-        if score is None or score < threshold:
+        if not skip_score_filter and (score is None or score < threshold):
             stats["removed_score"] += 1
             if registry:
                 registry.record_drop(row.domain, "failed_final_score")

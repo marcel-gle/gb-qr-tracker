@@ -157,6 +157,7 @@ def _pipeline() -> CampaignPipeline | None:
         max_workers_http=int(st.session_state.get("max_workers_http", 10)),
         max_workers_llm=int(st.session_state.get("max_workers_llm", 5)),
         target_final_count=target,
+        enable_northdata_fallback=bool(st.session_state.get("imprint_enable_northdata", True)),
     )
     return CampaignPipeline(cfg)
 
@@ -332,6 +333,46 @@ def render_merge() -> None:
         st.caption(f"CSV files in `lists/`: {', '.join(csv_files)}")
 
 
+def _run_imprint_with_progress(
+    pipe: CampaignPipeline,
+    *,
+    only_new: bool,
+    skip_score_filter: bool,
+    only_missing_fields: bool,
+) -> dict:
+    progress_bar = st.progress(0.0)
+    status = st.empty()
+
+    def on_imprint_progress(done: int, total: int, elapsed: float, domain: str) -> None:
+        if total == 0:
+            status.caption("No domains to scrape.")
+            return
+        frac = done / total
+        progress_bar.progress(min(frac, 1.0))
+        eta = (elapsed / done) * (total - done) if done else 0.0
+        status.markdown(
+            f"Scraped **{done}/{total}** ({frac * 100:.0f}%) · "
+            f"elapsed **{_format_duration(elapsed)}** · "
+            f"ETA **~{_format_duration(eta)}** · last `{domain}`"
+        )
+
+    stats = pipe.imprint(
+        only_new=only_new,
+        skip_score_filter=skip_score_filter,
+        only_missing_fields=only_missing_fields,
+        progress_callback=on_imprint_progress,
+    )
+    progress_bar.progress(1.0)
+    if stats.get("scraped", 0) == 0:
+        status.caption("No domains to scrape.")
+    else:
+        status.markdown(
+            f"Finished imprint scrape for **{stats.get('scraped', 0)}** domains · "
+            f"**{stats.get('output', 0)}** rows in output"
+        )
+    return stats
+
+
 def render_scoring() -> None:
     st.subheader("Scoring")
     pipe = _pipeline()
@@ -375,6 +416,15 @@ def render_scoring() -> None:
         disabled=only_missing,
         help="Uses the pipeline registry (raw stage). Ignored when scoring only missing results.",
     )
+    auto_imprint = st.checkbox(
+        "Automatically continue to imprint scrape",
+        value=False,
+        key="score_auto_imprint",
+        help=(
+            "After scoring finishes, scrape Impressum pages for rows that passed the score filter. "
+            "Uses the imprint-step options (skip score filter, North Data) if you already set them."
+        ),
+    )
 
     if st.button("Run scoring"):
         pipe = _pipeline()
@@ -414,9 +464,36 @@ def render_scoring() -> None:
                     f"Finished scoring **{stats.get('scored', 0)}** domains · "
                     f"**{stats.get('passed', 0)}** passed filter"
                 )
+
+            imprint_stats = None
+            if auto_imprint:
+                st.markdown("#### Imprint scrape")
+                imprint_stats = _run_imprint_with_progress(
+                    pipe,
+                    only_new=only_new,
+                    skip_score_filter=bool(
+                        st.session_state.get("imprint_skip_score_filter", False)
+                    ),
+                    only_missing_fields=False,
+                )
+
             maybe_push_active_campaign()
-            st.success("Done")
-            st.json(stats)
+            st.success("Scoring and imprint scrape done" if auto_imprint else "Done")
+            if imprint_stats is not None:
+                st.json({"scoring": stats, "imprint": imprint_stats})
+            else:
+                st.json(stats)
+
+
+def _resolve_imprint_input_path(config: CampaignConfig) -> Path:
+    """Prefer scored; fall back to raw_deduped / raw when scoring was skipped."""
+    scored = stage_path(config.campaign_dir, config.base_name, "scored")
+    if scored.exists():
+        return scored
+    deduped = stage_path(config.campaign_dir, config.base_name, "raw_deduped")
+    if deduped.exists():
+        return deduped
+    return stage_path(config.campaign_dir, config.base_name, "raw")
 
 
 def render_imprint() -> None:
@@ -425,33 +502,74 @@ def render_imprint() -> None:
     if not pipe:
         st.warning("Configure campaign in step 1.")
         return
+
+    input_path = _resolve_imprint_input_path(pipe.config)
+    scored_path = stage_path(pipe.config.campaign_dir, pipe.config.base_name, "scored")
+    using_scored = input_path.exists() and scored_path.exists() and (
+        input_path.resolve() == scored_path.resolve()
+    )
+    if not input_path.exists():
+        st.warning(
+            f"No imprint input found yet (`{scored_path.name}`, "
+            f"`{pipe.config.base_name}_raw_deduped.csv`, or `{pipe.config.base_name}_raw.csv`)."
+        )
+    elif using_scored:
+        st.caption(f"Input: `{input_path.name}` (scored). Scoring pass-filter applies unless disabled below.")
+    else:
+        st.info(
+            f"No `_scored.csv` — will use `{input_path.name}` and scrape all rows "
+            "(scoring step can be skipped)."
+        )
+
     only_new = st.checkbox("Scrape only new domains", value=False, key="imprint_only_new")
+    skip_score_filter = st.checkbox(
+        "Ignore score pass filter (scrape all rows)",
+        value=not using_scored,
+        key="imprint_skip_score_filter",
+        help=(
+            "When unchecked and `_scored.csv` exists, only rows with passed_score_filter=True are scraped. "
+            "Enable this to scrape every row, or skip scoring entirely."
+        ),
+    )
+    st.checkbox(
+        "North Data fallback for missing directors",
+        value=True,
+        key="imprint_enable_northdata",
+        help=(
+            "When the imprint has an address but no managing director, look up the "
+            "current legal representative(s) on North Data."
+        ),
+    )
+    imprint_path = stage_path(pipe.config.campaign_dir, pipe.config.base_name, "imprint")
+    only_missing_fields = st.checkbox(
+        "Re-scrape only rows missing street/name",
+        value=False,
+        key="imprint_only_missing_fields",
+        disabled=not imprint_path.exists(),
+        help=(
+            "Re-runs only the rows in the existing `_imprint.csv` that still lack a "
+            "street or a managing-director name. Forces a fresh fetch (ignores the "
+            "cache) so improved scraping/North Data can fill the gaps. Other rows "
+            "are left untouched."
+        ),
+    )
+    if only_missing_fields and imprint_path.exists():
+        try:
+            from campaign_pipeline.io.readers import load_rows_as_business
+            from campaign_pipeline.steps.imprint_scrape import row_is_missing_core_fields
+
+            _existing = load_rows_as_business(imprint_path, max_directors=pipe.config.max_directors)
+            _missing = sum(1 for r in _existing if row_is_missing_core_fields(r))
+            st.caption(f"{_missing} of {len(_existing)} rows are missing street/name.")
+        except Exception:
+            pass
     if st.button("Run imprint scrape"):
-        progress_bar = st.progress(0.0)
-        status = st.empty()
-
-        def on_imprint_progress(done: int, total: int, elapsed: float, domain: str) -> None:
-            if total == 0:
-                status.caption("No domains to scrape.")
-                return
-            frac = done / total
-            progress_bar.progress(min(frac, 1.0))
-            eta = (elapsed / done) * (total - done) if done else 0.0
-            status.markdown(
-                f"Scraped **{done}/{total}** ({frac * 100:.0f}%) · "
-                f"elapsed **{_format_duration(elapsed)}** · "
-                f"ETA **~{_format_duration(eta)}** · last `{domain}`"
-            )
-
-        stats = pipe.imprint(only_new=only_new, progress_callback=on_imprint_progress)
-        progress_bar.progress(1.0)
-        if stats.get("scraped", 0) == 0:
-            status.caption("No domains to scrape.")
-        else:
-            status.markdown(
-                f"Finished imprint scrape for **{stats.get('scraped', 0)}** domains · "
-                f"**{stats.get('output', 0)}** rows in output"
-            )
+        stats = _run_imprint_with_progress(
+            pipe,
+            only_new=only_new,
+            skip_score_filter=skip_score_filter,
+            only_missing_fields=only_missing_fields,
+        )
         maybe_push_active_campaign()
         st.success("Done")
         st.json(stats)
@@ -513,6 +631,12 @@ def render_final() -> None:
 
     default_min = float(pipe.config.score_config.pass_threshold)
     min_score = st.number_input("Min score", value=default_min, step=0.5)
+    skip_score_filter = st.checkbox(
+        "Skip min-score filter",
+        value=False,
+        key="final_skip_score_filter",
+        help="Keep rows even when match_score is missing or below the threshold (e.g. after skipping scoring).",
+    )
     issues_path = review_issues_path(pipe.config.campaign_dir, pipe.config.base_name)
     decisions_path = review_decisions_path(pipe.config.campaign_dir, pipe.config.base_name)
 
@@ -581,10 +705,10 @@ def render_final() -> None:
 
     st.markdown("#### 3. Build final CSV")
     st.caption(
-        "Applies min score, required fields, PLZ validation, and removes flagged rows you marked Discard."
+        "Applies min score (unless skipped), required fields, PLZ validation, and removes flagged rows you marked Discard."
     )
     if st.button("Build final CSV", key="build_final_csv"):
-        stats = pipe.final_review(min_score=min_score)
+        stats = pipe.final_review(min_score=min_score, skip_score_filter=skip_score_filter)
         maybe_push_active_campaign()
         st.success("Done")
         st.json(stats)
