@@ -554,35 +554,43 @@ class GooglePlacesClient:
     
     BASE_URL = "https://places.googleapis.com/v1/places:searchText"
     
-    def __init__(self, api_key):
+    def __init__(self, api_key, field_mask=FIELD_MASK):
         self.api_key = api_key
+        self.field_mask = field_mask
         self.session = requests.Session()
         self.request_count = 0
         self.total_cost_estimate = 0.0
     
-    def text_search(self, query, lat, lon, radius_m, page_token=None):
+    def text_search(self, query, lat=None, lon=None, radius_m=None, page_token=None):
         """
         Führt eine Text Search (New) Anfrage durch.
         Gibt (places_list, next_page_token) zurück.
+
+        ``lat``/``lon``/``radius_m`` sind optional: nur wenn beide Koordinaten
+        gesetzt sind, wird ein ``locationBias``-Kreis mitgeschickt. Für die
+        Einzel-Lookup-Pipeline (Name + Stadt) genügt der ``textQuery`` mit
+        ``regionCode=DE``.
         """
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": FIELD_MASK,
+            "X-Goog-FieldMask": self.field_mask,
         }
         
         body = {
             "textQuery": query,
             "languageCode": "de",
             "regionCode": "DE",
-            "locationBias": {
-                "circle": {
-                    "center": {"latitude": lat, "longitude": lon},
-                    "radius": radius_m,
-                }
-            },
             "maxResultCount": 20,
         }
+
+        if lat is not None and lon is not None:
+            body["locationBias"] = {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lon},
+                    "radius": radius_m if radius_m is not None else DEFAULT_REGION_RADIUS_M,
+                }
+            }
         
         if page_token:
             body["pageToken"] = page_token
