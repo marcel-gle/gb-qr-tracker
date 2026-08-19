@@ -49,6 +49,169 @@ EMAIL_FALLBACK_RE = re.compile(
 )
 HRB_RE = re.compile(r"\b(?:HRB|HRA|PR|GnR)\s*[\d/]+\b", re.IGNORECASE)
 
+# Agenturmarkt exposes SEO landing pages per category at
+# https://www.agenturmarkt.de/agenturen/<slug>. These paginate reliably via
+# ?page=N over plain HTTP, so we prefer them over the JS/Livewire filter flow.
+# Mapping: Agenturmarkt category_id -> landing page slug (verified to return 200).
+CATEGORY_LANDING_SLUGS: Dict[int, str] = {
+    1: "werbeagentur",
+    3: "marketing-agentur",
+    4: "seo-agentur",
+    5: "webdesign-agentur",
+    6: "social-media-agentur",
+    7: "content-marketing-agentur",
+    8: "eventagentur",
+    9: "branding-agentur",
+    10: "kreativagentur",
+    11: "full-service-agentur",
+    12: "media-agentur",
+    13: "digital-agentur",
+    14: "e-commerce-agentur",
+    15: "app-agentur",
+    16: "beratungsagentur",
+    17: "software-agentur",
+    18: "saas-agentur",
+    19: "grafikdesign-agentur",
+    22: "performance-marketing-agentur",
+    24: "filmproduktion-agentur",
+    28: "webentwicklung-agentur",
+    29: "online-marketing-agentur",
+    30: "it-sicherheitsagentur",
+    34: "influencer-agentur",
+    35: "ppc-agentur",
+    36: "e-mail-marketing-agentur",
+    38: "ki-agentur",
+    40: "employer-branding-agentur",
+    41: "recruiting-agentur",
+    44: "kommunikationsagentur",
+    47: "consulting-agentur",
+    53: "coaching-agentur",
+    381: "pr-agentur",
+}
+
+# Landing-page slugs without a verified Livewire category_id (HTTP scrape only).
+# Verified 200 responses on agenturmarkt.de/agenturen/<slug>.
+EXTRA_CATEGORY_SLUGS: Tuple[str, ...] = (
+    "casting-agentur",
+    "sprecheragentur",
+    "vertrieb-agentur",
+    "uiux-design-agentur",
+    "model-agentur",
+    "crm-agentur",
+)
+
+# Marketing / SEO / advertising categories to skip when --exclude-marketing is set.
+MARKETING_SEO_EXCLUDE_SLUGS: Tuple[str, ...] = (
+    "marketing-agentur",
+    "online-marketing-agentur",
+    "seo-agentur",
+    "performance-marketing-agentur",
+    "ppc-agentur",
+    "content-marketing-agentur",
+    "e-mail-marketing-agentur",
+    "social-media-agentur",
+    "influencer-agentur",
+    "werbeagentur",
+    "media-agentur",
+    "branding-agentur",
+    "employer-branding-agentur",
+    "pr-agentur",
+    "kommunikationsagentur",
+    "digital-agentur",
+    "full-service-agentur",
+    "kreativagentur",
+)
+
+# Friendly names / aliases that resolve to a category_id.
+CATEGORY_NAME_ALIASES: Dict[str, int] = {
+    "webdesign": 5,
+    "webdesigner": 5,
+    "webdesign-agentur": 5,
+    "webentwicklung": 28,
+    "webentwickler": 28,
+    "grafikdesign": 19,
+    "seo": 4,
+    "werbung": 1,
+    "werbeagentur": 1,
+    "marketing": 3,
+    "socialmedia": 6,
+    "social-media": 6,
+    "onlinemarketing": 29,
+    "online-marketing": 29,
+    "fullservice": 11,
+    "full-service": 11,
+    "kreativ": 10,
+    "digital": 13,
+    "ecommerce": 14,
+    "e-commerce": 14,
+    "pr": 381,
+    "ki": 38,
+    "ai": 38,
+}
+
+# Slug aliases that map to EXTRA_CATEGORY_SLUGS (or known landing slugs).
+CATEGORY_SLUG_ALIASES: Dict[str, str] = {
+    "casting": "casting-agentur",
+    "sprecher": "sprecheragentur",
+    "vertrieb": "vertrieb-agentur",
+    "uiux": "uiux-design-agentur",
+    "ui-ux": "uiux-design-agentur",
+    "ui-ux-design": "uiux-design-agentur",
+    "ui-ux-design-agentur": "uiux-design-agentur",
+    "model": "model-agentur",
+    "crm": "crm-agentur",
+}
+
+
+def slugify_category(value: str) -> str:
+    """Best-effort slug from a category name, matching Agenturmarkt's convention."""
+    text = value.strip().lower()
+    replacements = {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+def all_known_category_slugs() -> List[str]:
+    """Stable sorted list of all scrapeable category landing slugs."""
+    slugs = set(CATEGORY_LANDING_SLUGS.values())
+    slugs.update(EXTRA_CATEGORY_SLUGS)
+    return sorted(slugs)
+
+
+def resolve_category_id(category: Optional[str], category_id: Optional[int]) -> Optional[int]:
+    """Resolve an effective category_id from a name/alias/slug or explicit id."""
+    if category_id is not None:
+        return category_id
+    if not category:
+        return None
+    key = category.strip().lower()
+    if key in CATEGORY_NAME_ALIASES:
+        return CATEGORY_NAME_ALIASES[key]
+    slug = slugify_category(category)
+    slug = CATEGORY_SLUG_ALIASES.get(slug, slug)
+    for cid, known_slug in CATEGORY_LANDING_SLUGS.items():
+        if known_slug == slug:
+            return cid
+    return None
+
+
+def resolve_category_landing_slug(
+    category: Optional[str], category_id: Optional[int]
+) -> Optional[str]:
+    """Return the landing-page slug for a category name/alias/slug or id, if known."""
+    cid = resolve_category_id(category, category_id)
+    if cid is not None and cid in CATEGORY_LANDING_SLUGS:
+        return CATEGORY_LANDING_SLUGS[cid]
+    if category:
+        slug = slugify_category(category)
+        slug = CATEGORY_SLUG_ALIASES.get(slug, slug)
+        known = set(CATEGORY_LANDING_SLUGS.values()) | set(EXTRA_CATEGORY_SLUGS)
+        if slug in known:
+            return slug
+    return None
+
 
 LLM_SYSTEM_PROMPT = """
 You extract legal imprint data from German company text.
@@ -80,6 +243,7 @@ class AgenturmarktRow:
     agenturmarkt_url: str
     email: str
     domain: str
+    category: str = ""
 
 
 @dataclass
@@ -351,6 +515,66 @@ def _apply_agenturmarkt_filters_livewire(
     )
 
 
+def _first_card_key(page: Any) -> str:
+    anchor = page.locator("div.company-list-item a.item-link").first
+    if anchor.count() == 0:
+        return ""
+    return anchor.get_attribute("href") or ""
+
+
+def _advance_to_next_page_livewire(
+    page: Any,
+    prev_first_key: str,
+    timeout: float,
+    debug: bool,
+) -> bool:
+    """Advance to the next result page via Livewire and wait for the list to change.
+
+    Returns False when there is no next page or the list did not update in time,
+    which the caller uses as a natural stop condition.
+    """
+    root = page.locator("div[wire\\:name='pages.website.page-search-results']").first
+    if root.count() == 0:
+        return False
+    component_id = root.get_attribute("wire:id")
+    if not component_id:
+        return False
+    called = bool(
+        page.evaluate(
+            """
+            async ({ componentId }) => {
+                if (!window.Livewire || !window.Livewire.find) return false;
+                const component = window.Livewire.find(componentId);
+                if (!component) return false;
+                await component.call('nextPage', 'page');
+                return true;
+            }
+            """,
+            {"componentId": component_id},
+        )
+    )
+    if not called:
+        if debug:
+            LOGGER.debug("Livewire nextPage call did not execute.")
+        return False
+    try:
+        page.wait_for_function(
+            """
+            (prevKey) => {
+                const a = document.querySelector('div.company-list-item a.item-link');
+                return a && a.getAttribute('href') !== prevKey;
+            }
+            """,
+            arg=prev_first_key,
+            timeout=int(timeout * 1000),
+        )
+    except Exception:
+        if debug:
+            LOGGER.debug("Result list did not change after nextPage (likely last page).")
+        return False
+    return True
+
+
 def scrape_agenturmarkt_rows_browser(
     start_url: str,
     max_results: int,
@@ -389,17 +613,31 @@ def scrape_agenturmarkt_rows_browser(
                     agentur_score=agentur_score,
                     debug=debug,
                 )
-                if not ok and debug:
-                    LOGGER.debug("Could not apply filters through Livewire state.")
-                page.wait_for_timeout(1000)
+                if not ok:
+                    LOGGER.warning(
+                        "Could not apply filters through Livewire state; "
+                        "results may be unfiltered."
+                    )
+                # Wait for the filtered result list to settle before reading it.
+                try:
+                    page.wait_for_load_state("networkidle", timeout=int(timeout * 1000))
+                except Exception:
+                    page.wait_for_timeout(1000)
 
+            page_index = 0
             while len(collected) < max_results:
                 html = page.content()
                 page_rows = extract_rows_from_page(html)
+                page_index += 1
                 if debug:
-                    LOGGER.debug("Browser page extracted %s cards", len(page_rows))
+                    LOGGER.debug(
+                        "Browser page %s extracted %s cards", page_index, len(page_rows)
+                    )
                 if not page_rows:
+                    LOGGER.info("Stopping pagination: no cards on page %s", page_index)
                     break
+
+                first_key_before = page_rows[0].agenturmarkt_url or _first_card_key(page)
 
                 added_this_page = 0
                 for row in page_rows:
@@ -413,17 +651,27 @@ def scrape_agenturmarkt_rows_browser(
                     if len(collected) >= max_results:
                         break
 
+                if debug:
+                    LOGGER.debug(
+                        "Browser page %s added %s new rows", page_index, added_this_page
+                    )
+                if len(collected) >= max_results:
+                    break
                 if added_this_page == 0:
+                    LOGGER.warning(
+                        "Stopping pagination: only duplicate rows on page %s "
+                        "(next page did not load new results)",
+                        page_index,
+                    )
                     break
 
-                next_button = page.locator("button[wire\\:click*='nextPage']").first
-                if next_button.count() == 0:
+                if not _advance_to_next_page_livewire(
+                    page, first_key_before, timeout, debug
+                ):
+                    LOGGER.info(
+                        "Stopping pagination: no further pages after page %s", page_index
+                    )
                     break
-                if next_button.is_disabled():
-                    break
-                next_button.click()
-                page.wait_for_timeout(500)
-                page.wait_for_load_state("networkidle", timeout=int(timeout * 1000))
                 if delay > 0:
                     time.sleep(delay)
 
@@ -667,6 +915,9 @@ def write_csv(output_csv: str, enriched_rows: Iterable[Tuple[AgenturmarktRow, Im
         "agenturmarkt_url",
         "email",
         "domain",
+        "category",
+        "company_name",
+        "gegenstand",
         "geschaeftsfuehrer_name",
         "geschaeftsfuehrer_anrede",
         "telefon",
@@ -677,6 +928,7 @@ def write_csv(output_csv: str, enriched_rows: Iterable[Tuple[AgenturmarktRow, Im
         "hrb_handelsregister_nummer",
     ]
     count = 0
+    Path(output_csv).parent.mkdir(parents=True, exist_ok=True)
     with open(output_csv, "w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, delimiter=";")
         writer.writeheader()
@@ -688,6 +940,9 @@ def write_csv(output_csv: str, enriched_rows: Iterable[Tuple[AgenturmarktRow, Im
                     "agenturmarkt_url": base.agenturmarkt_url,
                     "email": base.email,
                     "domain": base.domain,
+                    "category": base.category,
+                    "company_name": base.business_name,
+                    "gegenstand": base.category,
                     "geschaeftsfuehrer_name": imp.geschaeftsfuehrer_name,
                     "geschaeftsfuehrer_anrede": imp.geschaeftsfuehrer_anrede,
                     "telefon": imp.telefon,
@@ -736,12 +991,61 @@ def parse_args() -> argparse.Namespace:
         description="Scrape agenturmarkt list pages and enrich with impressum data via local ML Studio."
     )
     parser.add_argument("--start-url", default=DEFAULT_START_URL, help="Agenturmarkt search/list URL")
-    parser.add_argument("--max-results", type=int, required=True, help="Maximum number of rows to scrape")
-    parser.add_argument("--output-csv", required=True, help="Output CSV file path")
+    parser.add_argument(
+        "--max-results",
+        type=int,
+        default=None,
+        help="Maximum number of rows to scrape (required unless --list-categories)",
+    )
+    parser.add_argument(
+        "--output-csv",
+        default=None,
+        help="Output CSV file path (required unless --list-categories)",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--request-timeout", type=float, default=10.0, help="HTTP request timeout in seconds")
     parser.add_argument("--delay", type=float, default=0.0, help="Delay between requests in seconds")
     parser.add_argument("--max-workers-impressum", type=int, default=5, help="Worker count for impressum stage")
+    parser.add_argument(
+        "--category",
+        default=None,
+        help=(
+            "Kategorie als Name/Alias oder Slug (z. B. 'webdesign' oder "
+            "'webdesign-agentur'). Nutzt die zuverlaessige Kategorie-Landingpage "
+            "mit HTTP-Pagination."
+        ),
+    )
+    parser.add_argument(
+        "--categories",
+        default=None,
+        help=(
+            "Komma-getrennte Kategorien (Name/Alias/Slug). "
+            "max-results wird gleichmaessig aufgeteilt und global dedupliziert."
+        ),
+    )
+    parser.add_argument(
+        "--all-categories",
+        action="store_true",
+        help="Alle bekannten Kategorie-Landingpages scrapen (siehe --list-categories).",
+    )
+    parser.add_argument(
+        "--exclude-categories",
+        default=None,
+        help="Komma-getrennte Kategorien die ausgelassen werden (Name/Alias/Slug).",
+    )
+    parser.add_argument(
+        "--exclude-marketing",
+        action="store_true",
+        help=(
+            "Marketing-/SEO-/Werbe-Kategorien auslassen "
+            "(marketing, seo, ppc, social-media, werbung, branding, PR, …)."
+        ),
+    )
+    parser.add_argument(
+        "--list-categories",
+        action="store_true",
+        help="Bekannte Kategorie-Slugs ausgeben und beenden.",
+    )
     parser.add_argument("--category-id", type=int, default=None, help="Agenturmarkt Kategorie filter ID")
     parser.add_argument("--service-id", type=int, default=None, help="Agenturmarkt Dienstleistung filter ID")
     parser.add_argument("--agentur-score", type=float, default=None, help="Agenturmarkt Agentur-Score filter")
@@ -750,6 +1054,11 @@ def parse_args() -> argparse.Namespace:
         choices=["auto", "http", "browser"],
         default="auto",
         help="How to apply list filters (browser required when filters are set).",
+    )
+    parser.add_argument(
+        "--skip-impressum",
+        action="store_true",
+        help="Nur Agenturmarkt-Listen scrapen (kein ML-Studio / kein Domain-Impressum).",
     )
     parser.add_argument(
         "--mlstudio-base-url",
@@ -765,56 +1074,219 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    configure_logging(args.debug)
+def _parse_category_tokens(raw: str) -> List[str]:
+    slugs: List[str] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        slug = resolve_category_landing_slug(token, None)
+        if not slug:
+            raise ValueError(f"Unbekannte Kategorie: {token!r}")
+        if slug not in slugs:
+            slugs.append(slug)
+    return slugs
 
-    if args.max_results <= 0:
-        raise ValueError("--max-results must be > 0")
 
-    LOGGER.info("Starting Agenturmarkt scrape (max_results=%s)", args.max_results)
-    has_filters = any(
-        value is not None for value in (args.category_id, args.service_id, args.agentur_score)
+def _resolve_requested_category_slugs(args: argparse.Namespace) -> List[str]:
+    if args.all_categories:
+        slugs = all_known_category_slugs()
+    elif args.categories:
+        slugs = _parse_category_tokens(args.categories)
+        if not slugs:
+            raise ValueError("--categories ist leer")
+    elif args.category or args.category_id is not None:
+        slug = resolve_category_landing_slug(args.category, args.category_id)
+        if slug:
+            slugs = [slug]
+        else:
+            # Fall back to single-category browser path via category_id.
+            return []
+    else:
+        return []
+
+    exclude: set[str] = set()
+    if args.exclude_marketing:
+        exclude.update(MARKETING_SEO_EXCLUDE_SLUGS)
+    if args.exclude_categories:
+        exclude.update(_parse_category_tokens(args.exclude_categories))
+    if exclude:
+        before = len(slugs)
+        slugs = [s for s in slugs if s not in exclude]
+        LOGGER.info(
+            "Excluded %s categories (%s remaining): %s",
+            before - len(slugs),
+            len(slugs),
+            ", ".join(sorted(exclude)),
+        )
+    return slugs
+
+
+def _scrape_one_category(
+    *,
+    slug: Optional[str],
+    category_id: Optional[int],
+    args: argparse.Namespace,
+    max_results: int,
+    session: Optional[requests.Session],
+) -> List[AgenturmarktRow]:
+    has_browser_only_filters = (
+        args.service_id is not None or args.agentur_score is not None
     )
-    use_browser = args.filter_mode == "browser" or (args.filter_mode == "auto" and has_filters)
+    custom_start_url = args.start_url != DEFAULT_START_URL
+    start_url = args.start_url
+    effective_category_id = category_id
+
+    if args.filter_mode == "browser":
+        use_browser = True
+    elif args.filter_mode == "http":
+        use_browser = False
+        if slug and not custom_start_url:
+            start_url = f"{DEFAULT_START_URL}/{slug}"
+        if has_browser_only_filters:
+            LOGGER.warning(
+                "--service-id/--agentur-score erfordern den Browser-Modus und "
+                "werden bei --filter-mode http ignoriert."
+            )
+    else:  # auto
+        if has_browser_only_filters:
+            use_browser = True
+        elif slug and not custom_start_url:
+            use_browser = False
+            start_url = f"{DEFAULT_START_URL}/{slug}"
+            LOGGER.info(
+                "Nutze Kategorie-Landingpage fuer zuverlaessige HTTP-Pagination: %s",
+                start_url,
+            )
+        elif effective_category_id is not None:
+            use_browser = True
+        else:
+            use_browser = False
+
     if use_browser:
         rows = scrape_agenturmarkt_rows_browser(
-            start_url=args.start_url,
-            max_results=args.max_results,
+            start_url=start_url,
+            max_results=max_results,
             timeout=args.request_timeout,
             delay=args.delay,
             debug=args.debug,
             user_agent=args.user_agent,
-            category_id=args.category_id,
+            category_id=effective_category_id,
             service_id=args.service_id,
             agentur_score=args.agentur_score,
         )
     else:
-        session = make_session(args.user_agent)
+        assert session is not None
         rows = scrape_agenturmarkt_rows(
             session=session,
-            start_url=args.start_url,
-            max_results=args.max_results,
+            start_url=start_url,
+            max_results=max_results,
             timeout=args.request_timeout,
             delay=args.delay,
             debug=args.debug,
         )
+
+    if slug:
+        for row in rows:
+            row.category = slug
+    return rows
+
+
+def main() -> None:
+    args = parse_args()
+    configure_logging(args.debug)
+
+    if args.list_categories:
+        for slug in all_known_category_slugs():
+            print(slug)
+        return
+
+    if args.max_results is None:
+        raise ValueError("--max-results is required")
+    if not args.output_csv:
+        raise ValueError("--output-csv is required")
+    if args.max_results <= 0:
+        raise ValueError("--max-results must be > 0")
+
+    LOGGER.info("Starting Agenturmarkt scrape (max_results=%s)", args.max_results)
+
+    category_slugs = _resolve_requested_category_slugs(args)
+    if args.category and not category_slugs and args.category_id is None:
+        LOGGER.warning(
+            "Kategorie '%s' konnte keiner bekannten Landingpage zugeordnet werden.",
+            args.category,
+        )
+
+    collected: List[AgenturmarktRow] = []
+    seen_keys: set[str] = set()
+    session = make_session(args.user_agent)
+
+    if category_slugs:
+        per_category = max(1, args.max_results // len(category_slugs))
+        remainder = args.max_results % len(category_slugs)
+        LOGGER.info(
+            "Scraping %s categories (~%s rows each, total cap %s)",
+            len(category_slugs),
+            per_category,
+            args.max_results,
+        )
+        for idx, slug in enumerate(category_slugs):
+            if len(collected) >= args.max_results:
+                break
+            quota = per_category + (1 if idx < remainder else 0)
+            remaining = args.max_results - len(collected)
+            quota = min(quota, remaining)
+            LOGGER.info("Category %s/%s: %s (quota=%s)", idx + 1, len(category_slugs), slug, quota)
+            cid = resolve_category_id(slug, None)
+            batch = _scrape_one_category(
+                slug=slug,
+                category_id=cid,
+                args=args,
+                max_results=quota,
+                session=session,
+            )
+            added = 0
+            for row in batch:
+                dedupe_key = row.agenturmarkt_url or f"{row.business_name}|{row.domain}"
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
+                collected.append(row)
+                added += 1
+                if len(collected) >= args.max_results:
+                    break
+            LOGGER.info("Category %s added %s new rows (total=%s)", slug, added, len(collected))
+    else:
+        # Single run without category landing pages (optional browser Livewire filters).
+        collected = _scrape_one_category(
+            slug=None,
+            category_id=resolve_category_id(args.category, args.category_id),
+            args=args,
+            max_results=args.max_results,
+            session=session,
+        )
+
+    rows = collected[: args.max_results]
     LOGGER.info("Collected %s rows from Agenturmarkt", len(rows))
 
-    client = LocalMLStudioClient(
-        base_url=args.mlstudio_base_url,
-        model=args.local_model,
-        max_concurrent_requests=max(1, args.max_workers_impressum),
-    )
-    enriched = enrich_rows_with_impressum(
-        rows=rows,
-        client=client,
-        max_workers=max(1, args.max_workers_impressum),
-        timeout=args.request_timeout,
-        delay=args.delay,
-        debug=args.debug,
-        user_agent=args.user_agent,
-    )
+    if args.skip_impressum:
+        enriched = [(row, ImpressumResult()) for row in rows]
+        LOGGER.info("Skipping impressum enrichment (--skip-impressum)")
+    else:
+        client = LocalMLStudioClient(
+            base_url=args.mlstudio_base_url,
+            model=args.local_model,
+            max_concurrent_requests=max(1, args.max_workers_impressum),
+        )
+        enriched = enrich_rows_with_impressum(
+            rows=rows,
+            client=client,
+            max_workers=max(1, args.max_workers_impressum),
+            timeout=args.request_timeout,
+            delay=args.delay,
+            debug=args.debug,
+            user_agent=args.user_agent,
+        )
 
     written = write_csv(args.output_csv, enriched)
     LOGGER.info("Wrote %s rows to %s", written, args.output_csv)
