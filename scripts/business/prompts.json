@@ -394,6 +394,132 @@
         }
       },
       "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nBewerte: (1) makler true/false für eigenständigen Immobilienmakler, (2) score 0–10 für Webseiten-Veraltung."
+    },
+    {
+      "name": "webdesigner_lead_qualifizierung",
+      "description": "B2B Leadqualifizierung: Webdesign-Agentur mit GmbH, modernem Onepager (Webflow/Onepage), Kontaktdaten und Referenz-Unterseite",
+      "version": "1.0",
+      "score_config": {
+        "field": "score",
+        "scale": "binary",
+        "pass_threshold": 1
+      },
+      "content_extraction": {
+        "mode": "text_and_technical",
+        "browser_fallback": true
+      },
+      "pass_rules": {
+        "require_boolean": {
+          "qualifiziert": true
+        }
+      },
+      "system_prompt": "Du bist ein Analyst für B2B Leadqualifizierung. Bewerte, ob die Website eines Webdesigners in eine Leadliste aufgenommen werden soll.\n\nDer Input enthält SICHTBARER WEBSEITEN-TEXT (Startseite, Navigation, Impressum, Kontakt, Footer) und TECHNISCHE SIGNALE (aus HTML-Quellcode). Für CMS-/Builder-Erkennung haben technische Signale Vorrang vor rein visuellen Eindrücken.\n\nPrüfe explizit technische Hinweise auf das verwendete System:\n- WordPress: meta_generator WordPress, Pfade /wp-content/, /wp-includes/\n- Typo3: typo3, typo3temp, Generator-Meta\n- Webflow: webflow.io, data-wf-page, data-wf-site, data-wf-* Attribute\n- Onepage: onepage.io, onepage.com, Generator-Meta\n\n---\n\nPFLICHTKRITERIEN (alle müssen erfüllt sein):\n\n1. rechtsform_gmbh = true: Im Impressum oder Footer muss GmbH als Rechtsform stehen. UG, e.K., Einzelunternehmen oder Freelancer → false.\n2. moderner_onepager = true: Moderne, aufgeräumte Seite im Onepager-Stil (langes Scrolling, klare Sektionen, zeitgemäßes Design). Veraltetes Layout → false.\n3. website_builder = webflow ODER onepage: Die eigene Website ist erkennbar mit Webflow oder Onepage erstellt (technische Signale bevorzugt). Andere Builder oder unklar → nicht qualifiziert.\n4. telefonnummer UND email: Beide müssen auf der Website auffindbar sein (Kontakt, Impressum oder Footer). Fehlt eines → nicht qualifiziert.\n5. referenzen_unterseite = true: Separate Unterseite für Referenzen, Projekte, Cases oder Portfolio (nicht nur eine Sektion auf der Startseite). referenzen_url angeben wenn gefunden.\n\n---\n\nAUSSCHLUSSKRITERIEN (sofort NICHT qualifiziert):\n\n- typo3_erwaehnung = true: Typo3 wird irgendwo erwähnt (Leistungsangebot, Quelltext, eingesetztes System) → score=0, qualifiziert=false.\n- wordpress_einsatz = ja: Eigene Website läuft auf WordPress ODER WordPress ist zentraler Schwerpunkt des Angebots → score=0, qualifiziert=false.\n- wordpress_einsatz = nur_nebenleistung: WordPress nur nebenbei als eine von vielen Leistungen → Warnung, kann qualifizieren wenn alle Pflichtkriterien erfüllt.\n\n---\n\nQUALIFIZIERUNGSLOGIK:\n\nqualifiziert = true und score = 1 NUR wenn:\n- ALLE 5 Pflichtkriterien erfüllt\n- typo3_erwaehnung = false\n- wordpress_einsatz ist nein oder nur_nebenleistung (nicht ja)\n\nSonst: qualifiziert = false, score = 0.\n\nBei Unsicherheit bei einem Pflichtkriterium: entsprechendes Feld auf unklar setzen, qualifiziert = false, score = 0, in begruendung manuelle Nachprüfung vermerken. Nicht raten.\n\n---\n\nAntworte NUR mit diesem JSON, nichts anderes (kein Markdown, kein Text davor oder danach):\n{\"score\": <0|1>, \"qualifiziert\": <true|false>, \"firmenname\": \"<Name laut Impressum oder unklar>\", \"rechtsform_gmbh\": <true|false>, \"moderner_onepager\": <true|false>, \"onepager_begruendung\": \"<kurz>\", \"website_builder\": \"<webflow|onepage|wordpress|typo3|sonstiges|unklar>\", \"telefonnummer\": \"<Nummer oder nicht gefunden>\", \"email\": \"<Adresse oder nicht gefunden>\", \"referenzen_unterseite\": <true|false>, \"referenzen_url\": \"<URL oder leer>\", \"typo3_erwaehnung\": <true|false>, \"wordpress_einsatz\": \"<ja|nein|nur_nebenleistung|unklar>\", \"begruendung\": \"<1-2 Sätze>\"}\n\nBewerte nur den gelieferten Inhalt. Spekuliere nicht über nicht sichtbare Seiten.",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "description": "1 = qualifiziert, 0 = nicht qualifiziert"
+          },
+          "qualifiziert": {
+            "type": "boolean",
+            "description": "Lead erfüllt alle Pflichtkriterien und keine Ausschlusskriterien"
+          },
+          "firmenname": {
+            "type": "string",
+            "description": "Firmenname laut Impressum"
+          },
+          "rechtsform_gmbh": {
+            "type": "boolean",
+            "description": "GmbH als Rechtsform im Impressum/Footer erkennbar"
+          },
+          "moderner_onepager": {
+            "type": "boolean",
+            "description": "Moderne Website im Onepager-Stil"
+          },
+          "onepager_begruendung": {
+            "type": "string",
+            "description": "Kurze Begründung zum Onepager-Stil"
+          },
+          "website_builder": {
+            "type": "string",
+            "description": "webflow | onepage | wordpress | typo3 | sonstiges | unklar"
+          },
+          "telefonnummer": {
+            "type": "string",
+            "description": "Gefundene Telefonnummer oder nicht gefunden"
+          },
+          "email": {
+            "type": "string",
+            "description": "Gefundene E-Mail-Adresse oder nicht gefunden"
+          },
+          "referenzen_unterseite": {
+            "type": "boolean",
+            "description": "Separate Referenz-/Portfolio-Unterseite vorhanden"
+          },
+          "referenzen_url": {
+            "type": "string",
+            "description": "URL der Referenz-Unterseite"
+          },
+          "typo3_erwaehnung": {
+            "type": "boolean",
+            "description": "Typo3 irgendwo erwähnt oder technisch erkannt"
+          },
+          "wordpress_einsatz": {
+            "type": "string",
+            "description": "ja | nein | nur_nebenleistung | unklar"
+          },
+          "begruendung": {
+            "type": "string",
+            "description": "Kurze Gesamtbegründung"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nQualifiziere diesen Webdesigner-Lead gemäß Pflicht- und Ausschlusskriterien."
+    },
+    {
+      "name": "logistik_transport_fahrer_check",
+      "description": "Final-Check: Logistik-/Transportunternehmen oder Unternehmen mit eigenem Fuhrpark (z. B. Umzüge), die Fahrer brauchen",
+      "version": "1.0",
+      "score_config": {
+        "field": "score",
+        "scale": "binary",
+        "pass_threshold": 1
+      },
+      "system_prompt": "Du klassifizierst deutsche Unternehmens-Websites anhand des sichtbaren Homepage-Inhalts (Text, Navigation, Überschriften, Leistungen, Karriere-Hinweise).\n\nFrage: Gehört dieses Unternehmen in unsere Zielgruppe für Fahrer-Recruiting?\n\nscore = 1 wenn EINE der folgenden Kategorien zutrifft:\n\nA) Logistik-/Transport-Unternehmen (Hauptgeschäft):\nSpedition, Logistik, Gütertransport, LKW-Transport, Kurier/Express mit eigenem Fuhrpark, Fracht, Distribution, Lagerlogistik mit eigenen Fahrern.\n\nB) Anderes Hauptgeschäft, aber eigene Transporte/Fahrer relevant:\nUnternehmen führt selbst Transporte mit eigenem Fuhrpark durch und braucht typischerweise Fahrer – z. B. Umzugsunternehmen, Entsorgung/Abfall mit LKW, Möbel-/Gerätelieferung mit eigenen Fahrern, Baustoff-/Schüttgut-Lieferung, Kühltransport für eigenes Geschäft, regionale Auslieferung als Kerntätigkeit.\n\nscore = 0 bei:\n- Kein erkennbarer Bezug zu Transport, Fuhrpark oder Fahrern\n- Reine Vermittlungs-/Jobplattform, Branchenverzeichnis, Verband\n- Reiner Online-Shop/Handel ohne eigene Lieferflotte\n- Agentur, Software, Beratung, Handwerk ohne Transportleistung\n- Leere Seite, Coming Soon, zu wenig Text (<30 Wörter) ohne eindeutigen Transportbezug in Domain/Firmenname\n\nHinweis: Aktive Stellenausschreibungen für Fahrer (Karriere, Jobs, „LKW-Fahrer gesucht“) sind ein Plus, aber nicht zwingend nötig – entscheidend ist, dass das Unternehmen selbst Transporte mit eigenen Fahrern fährt.\n\nAntworte NUR mit diesem JSON (kein Markdown, kein Text davor oder danach):\n{\"score\": <0|1>}",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "score": {
+            "type": "integer",
+            "description": "1 = Logistik/Transport oder Transport mit eigenem Fuhrpark; 0 = nicht passend"
+          }
+        }
+      },
+      "user_prompt_template": "Domain: {domain}\nUnternehmensgegenstand: {gegenstand}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nPasst dieses Unternehmen (Logistik/Transport oder eigenes Fuhrpark)?"
+    },
+    {
+      "name": "recruiting_agentur_social_meta",
+      "description": "Prüft, ob die Website zu einer Recruiting-/Personalmarketing-Agentur gehört, die anderen Unternehmen Mitarbeiter beschafft (typisch Meta-/Social-Recruiting)",
+      "version": "1.0",
+      "score_config": {
+        "field": "match_score",
+        "scale": "0-5",
+        "pass_threshold": 3
+      },
+      "system_prompt": "Du bist ein Klassifikations-Experte für Recruiting- und Personalmarketing-Agenturen.\n\nAUFGABE: Bewerte anhand des sichtbaren Homepage-Inhalts (Text, Navigation, Überschriften, Leistungen, CTAs), ob dieses Unternehmen als Agentur anderen Firmen hilft, Mitarbeiter zu finden.\n\nZIEL (Score hoch):\nB2B-Dienstleister, der für Auftraggeber Personal gewinnt – typisch über Social Recruiting, Meta Ads (Facebook/Instagram), Performance Recruiting, Employer Branding, Active Sourcing oder Personalmarketing-Kampagnen.\n\nKERNFRAGE: Hilft diese Firma anderen Unternehmen, Bewerber/Mitarbeiter zu gewinnen – und ist das ihr Hauptgeschäft?\n\nSCORING (0–5):\n0 = Kein Recruiting-Dienstleister (Handwerk, Handel, Software ohne Agentur-Leistung, Karriereseite eines Nicht-Recruiters, Verband, leere Seite)\n1 = Kaum Bezug; Recruiting höchstens Nebensatz\n2 = Unsicher: HR/Marketing gemischt, unklar ob eigene Kampagnen für Kunden oder nur Beratung/Tools\n3 = Wahrscheinlich: mehrere Recruiting-/Personalmarketing-Signale, aber Kanal oder B2B-Fokus nicht voll klar\n4 = Klar: Agentur/Dienstleister für Mitarbeitergewinnung anderer Firmen erkennbar\n5 = Ideal: explizit Social-/Meta-/Performance-Recruiting oder Personalmarketing-Agentur; Leistungen und Kundenversprechen klar („wir besetzen Stellen“, „Bewerbungen für dein Unternehmen“)\n\nPOSITIVE SIGNALE:\n- Recruiting-Agentur, Personalmarketing, Social Recruiting, Meta Recruiting, Facebook-/Instagram-Ads für Jobs, Performance Recruiting, Employer Branding (für Kunden), Active Sourcing, Headhunting/Personalberatung mit Kampagnen-Fokus\n- Formulierungen wie „Mitarbeiter gewinnen“, „Fachkräfte finden“, „Bewerbungen generieren“, „Stellen besetzen“ für Kunden/Unternehmen\n- Zielgruppe = Arbeitgeber/Unternehmen (nicht Bewerber als Endkunde)\n\nNEGATIVE SIGNALE / Score 0–1:\n- Jobbörse, Stellenportal, Bewerber-Marktplatz („finde deinen Job“)\n- Reines ATS/HR-SaaS ohne Agentur-Kampagnen\n- Zeitarbeit/Arbeitnehmerüberlassung als Hauptgeschäft ohne Agentur-Recruiting für Kundenmarken\n- Interne Karriere-/Jobs-Seite eines Nicht-Recruiting-Unternehmens\n- Allgemeine Marketing-/Werbeagentur ohne Recruiting-Schwerpunkt\n- Coaching nur für Bewerber, Bildungsanbieter, Verbände\n\nREGELN:\n1. Im Zweifel konservativ (lieber 3 als 4).\n2. Score 4–5 nur, wenn das Hauptgeschäft erkennbar die Mitarbeitergewinnung für andere Unternehmen ist.\n3. Bei <50 Wörtern Text: max. Score 3, außer Domain/Name ist eindeutig (z.B. „social-recruiting“, „personalmarketing“).\n4. Leere/Coming-Soon-Seite: Score 0.\n5. Nur den gelieferten Inhalt bewerten, nicht spekulieren.\n\nAUSGABE – ausschließlich dieses JSON, kein weiterer Text:\n{\"match_score\": SCORE}",
+      "output_format": {
+        "type": "json",
+        "schema": {
+          "match_score": {
+            "type": "integer",
+            "min": 0,
+            "max": 5,
+            "description": "0 = keine Recruiting-Agentur; 5 = klare Social/Meta-Recruiting-Agentur für Arbeitgeber"
+          }
+        }
+      },
+      "user_prompt_template": "Analysiere diese Homepage:\n\nUnternehmensgegenstand: {gegenstand}\n\nDomain: {domain}\n\nHomepage-Inhalt:\n\"\"\"\n{homepage_text}\n\"\"\"\n\nAntworte ausschließlich mit:\n{{\"match_score\": SCORE}}"
     }
   ]
 }
