@@ -81,6 +81,47 @@ def test_scoring_page_content_for_llm_modes():
     assert "doctype: HTML 4" in full
 
 
+def test_for_llm_respects_char_budget():
+    content = ScoringPageContent(visible_text="x" * 10_000)
+    assert len(content.for_llm("text_only")) == 10_000
+    assert len(content.for_llm("text_only", max_visible_chars=4_000)) == 4_000
+
+
+def test_score_row_retries_shorter_input_on_context_overflow(monkeypatch):
+    from scripts.business.prompt_manager import Prompt
+    from campaign_pipeline.models import BusinessRow
+    from campaign_pipeline.steps import scoring
+
+    monkeypatch.setattr(
+        scoring,
+        "fetch_scoring_content",
+        lambda *a, **k: ScoringPageContent(visible_text="x" * 20_000),
+    )
+
+    class FakeLLM:
+        def __init__(self):
+            self.input_lengths = []
+
+        def chat(self, *, system_prompt, user_prompt, response_format=None, temperature=0.3):
+            self.input_lengths.append(len(user_prompt))
+            if len(user_prompt) > 5_000:
+                raise RuntimeError(
+                    "Error code: 400 - {'error': 'The number of tokens to keep from the "
+                    "initial prompt is greater than the context length.'}"
+                )
+            return '{"match_score": 4}'
+
+    llm = FakeLLM()
+    prompt = Prompt({"name": "t", "system_prompt": "sys", "user_prompt_template": "{homepage_text}"})
+    cfg = ScoreConfig(field="match_score", scale="0-5", pass_threshold=3)
+    service = scoring.DomainScoringService(llm, prompt, cfg)
+    row = BusinessRow(domain="example.de")
+
+    assert service.score_row(row)
+    assert row.match_score == 4.0
+    assert llm.input_lengths == [20_000, 8_000, 4_000]
+
+
 def test_evaluate_pass_requires_makler_boolean():
     cfg = ScoreConfig(field="score", scale="0-10", pass_threshold=6)
 

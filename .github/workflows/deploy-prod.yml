@@ -30,21 +30,31 @@ jobs:
               - 'functions/delete_campaign/**'
             health_monitor:
               - 'functions/health_monitor/**'
+            search_key:
+              - 'functions/search_key/**'
+            hit_webhook_delivery:
+              - 'functions/hit_webhook/**'
+            hit_webhook_config:
+              - 'functions/hit_webhook/**'
             shared:
               - 'deploy.sh'
               - '.env.prod'
               - 'functions/**/config.prod.sh'
+              - 'functions/**/config.*.prod.sh'
 
       - id: set-matrix
         run: |
           if [[ "${{ steps.filters.outputs.shared }}" == 'true' ]]; then
-            echo "matrix={\"function\":[\"redirector\",\"upload_processor\",\"delete_campaign\",\"health_monitor\"]}" >> $GITHUB_OUTPUT
+            echo "matrix={\"function\":[\"redirector\",\"upload_processor\",\"delete_campaign\",\"health_monitor\",\"search_key\",\"hit_webhook_delivery\",\"hit_webhook_config\"]}" >> $GITHUB_OUTPUT
           else
             list=()
             [[ "${{ steps.filters.outputs.redirector }}" == 'true' ]] && list+=('"redirector"')
             [[ "${{ steps.filters.outputs.upload_processor }}" == 'true' ]] && list+=('"upload_processor"')
             [[ "${{ steps.filters.outputs.delete_campaign }}" == 'true' ]] && list+=('"delete_campaign"')
             [[ "${{ steps.filters.outputs.health_monitor }}" == 'true' ]] && list+=('"health_monitor"')
+            [[ "${{ steps.filters.outputs.search_key }}" == 'true' ]] && list+=('"search_key"')
+            [[ "${{ steps.filters.outputs.hit_webhook_delivery }}" == 'true' ]] && list+=('"hit_webhook_delivery"')
+            [[ "${{ steps.filters.outputs.hit_webhook_config }}" == 'true' ]] && list+=('"hit_webhook_config"')
             if [[ ${#list[@]} -eq 0 ]]; then
               echo 'matrix={"function":[]}' >> $GITHUB_OUTPUT
             else
@@ -75,12 +85,24 @@ jobs:
 
       - name: Prepare .env.prod for deploy.sh
         run: |
-            cat > .env.prod <<'EOF'
+            cat > .env.prod <<EOF
             PROJECT_ID=${{ secrets.PROD_GCP_PROJECT_ID }}
             REGION=europe-west3
             SA_NAME=cf-campaign-importer
             SA=cf-campaign-importer@${{ secrets.PROD_GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            TYPESENSE_HOST=${{ secrets.TYPESENSE_HOST }}
             EOF
 
       - name: Deploy via script
-        run: ./deploy.sh prod ${{ matrix.function }}
+        run: |
+          case "${{ matrix.function }}" in
+            hit_webhook_delivery)
+              ./deploy.sh prod hit_webhook delivery
+              ;;
+            hit_webhook_config)
+              ./deploy.sh prod hit_webhook config
+              ;;
+            *)
+              ./deploy.sh prod ${{ matrix.function }}
+              ;;
+          esac

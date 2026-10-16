@@ -12,8 +12,9 @@ class ScoringPageContent:
     technical_signals: str | None = None
     fetch_source: str = "http"
 
-    def for_llm(self, mode: str) -> str:
-        visible = (self.visible_text or "")[:MAX_VISIBLE_TEXT_CHARS]
+    def for_llm(self, mode: str, max_visible_chars: int | None = None) -> str:
+        limit = min(max_visible_chars or MAX_VISIBLE_TEXT_CHARS, MAX_VISIBLE_TEXT_CHARS)
+        visible = (self.visible_text or "")[:limit]
         if mode != "text_and_technical" or not self.technical_signals:
             return visible
         tech = self.technical_signals[:MAX_TECHNICAL_SIGNALS_CHARS]

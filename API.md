@@ -11,6 +11,7 @@ Complete API reference for all GB QR Tracker endpoints and functions.
 5. [List Campaign Files API](#list-campaign-files-api)
 6. [Delete Campaign API](#delete-campaign-api)
 7. [Cloudflare Worker API](#cloudflare-worker-api)
+8. [Hit Webhook API](#hit-webhook-api)
 
 ## Redirector API
 
@@ -844,6 +845,174 @@ Falsche oder fehlende persönliche ID. Zugang nur mit Einladung. Bitte geben Sie
 ```
 
 (German: "Invalid or missing personal ID. Access only by invitation. Please enter your personal ID.")
+
+## Hit Webhook API
+
+Per-customer outbound webhooks that push scan hits to Zapier, Make, or N8N Catch Hooks. Delivery is scoped strictly by `hit.owner_id` → `customers/{owner_id}` so one customer never receives another’s hits.
+
+Source: `functions/hit_webhook/`
+
+| Deployed function | Trigger | Entry point |
+|-------------------|---------|-------------|
+| `hit_webhook_delivery` | Firestore `hits/{id}` created | `deliver_hit` |
+| `hit_webhook_config` | HTTP | `manage_config` |
+
+Deploy:
+
+```bash
+./deploy.sh dev hit_webhook delivery
+./deploy.sh dev hit_webhook config
+```
+
+### Customer config (Firestore)
+
+Stored on `customers/{uid}.integrations.hits_webhook`:
+
+| Field | Description |
+|-------|-------------|
+| `enabled` | When `true`, hits are POSTed to `url` |
+| `url` | HTTPS Catch Hook URL (Zapier / Make / N8N) |
+| `secret` | Per-customer HMAC signing secret |
+| `last_success_at` / `last_error_at` / `last_error` | Delivery status |
+
+### Hit Webhook Config API
+
+#### Endpoint
+
+```
+https://{region}-{project}.cloudfunctions.net/hit_webhook_config
+```
+
+#### Auth
+
+`Authorization: Bearer <Firebase ID token>`
+
+The function verifies the token and only reads/writes `customers/{uid}` for that user.
+
+#### GET — read config
+
+```bash
+curl -H "Authorization: Bearer $ID_TOKEN" \
+  "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/hit_webhook_config"
+```
+
+Response:
+
+```json
+{
+  "webhook": {
+    "enabled": true,
+    "url": "https://hooks.zapier.com/hooks/catch/...",
+    "secret_masked": "••••a1b2",
+    "created_at": "...",
+    "updated_at": "...",
+    "last_success_at": "...",
+    "last_error_at": null,
+    "last_error": null
+  }
+}
+```
+
+#### PUT — set URL / enabled
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://hooks.zapier.com/hooks/catch/...","enabled":true}' \
+  "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/hit_webhook_config"
+```
+
+- `url` must be `https://` (or empty to clear).
+- On first save, a signing `secret` is generated and returned **once** in the response as `webhook.secret`.
+
+#### POST — rotate secret
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"rotate_secret"}' \
+  "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/hit_webhook_config"
+```
+
+Returns the new `webhook.secret` once. Update any Make/N8N signature verification with the new value.
+
+#### POST — test delivery
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"test"}' \
+  "https://europe-west3-gb-qr-tracker-dev.cloudfunctions.net/hit_webhook_config"
+```
+
+Sends a sample `hit.created` payload to the configured URL (webhook must be enabled with url + secret).
+
+### Hit delivery (automatic)
+
+When a document is created in `hits/`, `hit_webhook_delivery`:
+
+1. Skips bots (`suspected_bot`), monitor-test links, and demo hits
+2. Loads `customers/{hit.owner_id}.integrations.hits_webhook`
+3. If enabled with URL + secret, POSTs the payload to that URL only
+4. Updates `last_success_at` or `last_error*` on the customer webhook config
+5. Retries on network / 5xx / 429 / 408 via Eventarc; does not retry other 4xx
+
+### Outbound payload
+
+```json
+{
+  "event": "hit.created",
+  "hit_id": "...",
+  "ts": "2026-07-29T10:00:00Z",
+  "owner_id": "...",
+  "link_id": "...",
+  "campaign_id": "...",
+  "campaign_name": "...",
+  "target_id": "...",
+  "business_id": "...",
+  "business_name": "...",
+  "source": "...",
+  "device_type": "mobile",
+  "ua_browser": "...",
+  "ua_os": "...",
+  "geo_city": "Berlin",
+  "geo_country": "DE",
+  "hit_origin": "cloudflare_worker"
+}
+```
+
+Raw IP addresses are **not** included. Fields that are absent on the hit are omitted from the payload rather than sent as `null`.
+
+`link_id`, `target_id` and `business_id` are the join keys for the inbound CRM API. Store them on the CRM record so call events can be paired back to the letter that produced them. `link_id` matches the `tracking_id` column in the `_with_links` export.
+
+### Outbound headers
+
+| Header | Value |
+|--------|--------|
+| `Content-Type` | `application/json` |
+| `User-Agent` | `GB-QR-Tracker-Webhook/1.0` |
+| `X-GB-Timestamp` | Unix seconds |
+| `X-GB-Signature` | `sha256=<hex>` |
+
+Signature is HMAC-SHA256 of `{timestamp}.{raw_body}` using the customer’s `secret`:
+
+```text
+message = f"{X-GB-Timestamp}.".encode() + request_body_bytes
+X-GB-Signature = "sha256=" + hmac_sha256_hex(secret, message)
+```
+
+### Zapier / Make / N8N setup
+
+1. Create a workflow with a **Catch Hook** / **Webhook** trigger; copy the HTTPS URL.
+2. Call `PUT` on `hit_webhook_config` with that URL and `enabled: true` (or use the app settings UI when available).
+3. Optionally store `webhook.secret` and verify `X-GB-Signature` in the automation.
+4. Call `POST` with `{"action":"test"}` and confirm the sample event arrives.
+5. Map payload fields to your CRM (HubSpot, Salesforce, etc.).
+
+Each customer’s Catch Hook URL is unique. Delivery always looks up the webhook from `hit.owner_id`, so hits cannot be routed to another customer’s automation.
 
 
 

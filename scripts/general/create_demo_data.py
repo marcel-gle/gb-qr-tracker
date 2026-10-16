@@ -732,23 +732,23 @@ def generate_hits(
     used_ip_hashes: set = set()
 
     for link_ref, business_ref, target_ref, campaign_ref in links:
-        # Realistic low conversion distribution: only ~2% of links receive any hits.
+        # Low conversion distribution: ~3.5% of links receive any hits.
         # Approximate distribution (per link):
-        # - 98.0% chance of 0 hits
-        # - 1.5% chance of 1 hit
-        # - 0.3% chance of 2 hits
-        # - 0.15% chance of 3 hits
-        # - 0.05% chance of 4 hits (absolute maximum, extremely rare)
-        # This yields ~2% of links with ≥1 hit and an average of ~0.02–0.03 hits/link,
-        # i.e. a 1.6–2.4% conversion range when interpreted as hits per mailed link.
+        # - 96.5% chance of 0 hits
+        # - 2.6% chance of 1 hit
+        # - 0.55% chance of 2 hits
+        # - 0.25% chance of 3 hits
+        # - 0.1% chance of 4 hits (absolute maximum, extremely rare)
+        # This yields ~3.5% of links with ≥1 hit and an average of ~0.05 hits/link,
+        # i.e. a 3–4% conversion range when interpreted as hits per mailed link.
         rand = random.random()
-        if rand < 0.98:
+        if rand < 0.965:
             num_hits = 0
-        elif rand < 0.995:
+        elif rand < 0.991:
             num_hits = 1
-        elif rand < 0.998:
+        elif rand < 0.9965:
             num_hits = 2
-        elif rand < 0.9995:
+        elif rand < 0.999:
             num_hits = 3
         else:
             num_hits = 4  # Absolute maximum, extremely rare

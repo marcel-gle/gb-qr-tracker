@@ -15,6 +15,10 @@ from ..scoring.fetch import fetch_scoring_content
 
 logger = logging.getLogger(__name__)
 
+# Local models are often loaded with a small context window (LM Studio defaults
+# to 4096 tokens), so on overflow the homepage text is retried at these sizes.
+FALLBACK_VISIBLE_CHAR_BUDGETS = (8_000, 4_000, 2_000)
+
 
 def extract_homepage_text(domain: str) -> Optional[str]:
     """Backward-compatible wrapper: text-only extraction."""
@@ -150,6 +154,11 @@ def analyze_domain_with_llm(
     return _extract_json_from_response(content)
 
 
+def _is_context_overflow(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "context length" in msg or "context_length" in msg or "context window" in msg
+
+
 class DomainScoringService:
     def __init__(self, llm: LLMClient, prompt: Prompt, score_config: ScoreConfig) -> None:
         self._llm = llm
@@ -173,13 +182,23 @@ class DomainScoringService:
             logger.info("Empty LLM input for %s", row.domain)
             return False
 
-        result = analyze_domain_with_llm(
-            row.domain,
-            llm_input,
-            self._prompt,
-            self._llm,
-            gegenstand=row.gegenstand or "",
-        )
+        budgets = [b for b in FALLBACK_VISIBLE_CHAR_BUDGETS if b < len(page_content.visible_text or "")]
+        while True:
+            try:
+                result = analyze_domain_with_llm(
+                    row.domain,
+                    llm_input,
+                    self._prompt,
+                    self._llm,
+                    gegenstand=row.gegenstand or "",
+                )
+                break
+            except Exception as exc:
+                if not budgets or not _is_context_overflow(exc):
+                    raise
+                budget = budgets.pop(0)
+                logger.info("Prompt too long for %s, retrying with %d chars of homepage text", row.domain, budget)
+                llm_input = page_content.for_llm(self._extraction_mode, max_visible_chars=budget)
         if not result:
             return False
         row.domain_analysis_raw = result

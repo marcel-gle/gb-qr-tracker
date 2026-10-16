@@ -46,23 +46,75 @@ _FAX_SEGMENT_RE = re.compile(
     re.IGNORECASE,
 )
 _FAX_ONLY_LINE_RE = re.compile(r"^\s*(?:fax|telefax|facsimile)\b", re.IGNORECASE)
-_PRIVACY_OFFICER_LINE_RE = re.compile(
-    r"^\s*(?:datenschutz(?:beauftragt\w*|koordinator\w*|verantwortlich\w*)|dsb)\b",
-    re.IGNORECASE,
-)
 _PHONE_FAX_LABEL_RE = re.compile(r"\b(?:fax|telefax|facsimile)\b", re.IGNORECASE)
 _PRIVACY_OFFICER_RE = re.compile(
     r"datenschutz(?:beauftragt\w*|koordinator\w*|verantwortlich\w*)|"
     r"\bdsb\b|privacy\s+officer|data\s+protection\s+officer",
     re.IGNORECASE,
 )
+# A line naming a managing role as well ("Geschäftsführer und Datenschutzbeauftragter")
+# must stay, otherwise the real director is lost.
+_MANAGEMENT_ROLE_RE = re.compile(
+    r"gesch[äa]ftsf[üu]hr|inhaber|vorstand|vertretungsberechtigt",
+    re.IGNORECASE,
+)
+_SECTION_HEADING_RE = re.compile(
+    r"^\s*(?:impressum|gesch[äa]ftsf[üu]hr\w*|inhaber\w*|vorstand|vertreten\w*|"
+    r"vertretungsberechtigt\w*|registergericht|handelsregister|registernummer|"
+    r"amtsgericht|umsatzsteuer\w*|ust\.?-?id\w*|steuernummer|verantwortlich\w*|"
+    r"haftung\w*|urheberrecht\w*|streitschlichtung|streitbeilegung|"
+    r"aufsichtsbeh[öo]rde|berufsbezeichnung|bildnachweis\w*|bildquellen)\b",
+    re.IGNORECASE,
+)
+_PRIVACY_BLOCK_MAX_LINES = 8
+_PHONE_IN_TEXT_RE = re.compile(r"(?<![\w@])\+?\(?\d[\d \t()./\-]{4,}\d")
+_EMAIL_IN_TEXT_RE = re.compile(r"[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+")
+_PRIVACY_EMAIL_LOCAL_RE = re.compile(
+    r"^(?:datenschutz|dsb|privacy|dataprotection|data-protection|gdpr|dsgvo)\b",
+    re.IGNORECASE,
+)
+_MIN_PHONE_KEY_DIGITS = 6
+
+
+def _privacy_block_mask(lines: List[str]) -> List[bool]:
+    """Mark lines belonging to a Datenschutzbeauftragter block.
+
+    A block starts at the line mentioning the privacy officer and runs until a
+    blank line (once content was seen), a new Impressum section heading, or
+    ``_PRIVACY_BLOCK_MAX_LINES`` lines.
+    """
+    mask = [False] * len(lines)
+    remaining = 0
+    seen_content = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if remaining:
+            if not stripped:
+                if seen_content:
+                    remaining = 0
+                continue
+            if _SECTION_HEADING_RE.match(stripped):
+                remaining = 0
+            else:
+                mask[i] = True
+                remaining -= 1
+                seen_content = True
+                continue
+        match = _PRIVACY_OFFICER_RE.search(line)
+        if match and not _MANAGEMENT_ROLE_RE.search(line):
+            mask[i] = True
+            remaining = _PRIVACY_BLOCK_MAX_LINES
+            seen_content = bool(line[match.end():].strip(" \t:-–"))
+    return mask
 
 
 def sanitize_imprint_text_for_extraction(text: str) -> str:
-    """Remove fax and Datenschutzbeauftragter lines before LLM extraction."""
+    """Remove fax lines and Datenschutzbeauftragter blocks before LLM extraction."""
+    lines = text.splitlines()
+    mask = _privacy_block_mask(lines)
     cleaned_lines: List[str] = []
-    for line in text.splitlines():
-        if _FAX_ONLY_LINE_RE.match(line) or _PRIVACY_OFFICER_LINE_RE.match(line):
+    for line, in_privacy_block in zip(lines, mask):
+        if in_privacy_block or _FAX_ONLY_LINE_RE.match(line):
             continue
         stripped = _FAX_SEGMENT_RE.sub("", line).strip()
         if stripped:
@@ -70,8 +122,41 @@ def sanitize_imprint_text_for_extraction(text: str) -> str:
     return "\n".join(cleaned_lines)
 
 
-def filter_company_phones(phones: object) -> List[str]:
-    """Keep telephone numbers only; drop fax / telefax entries."""
+def _phone_key(value: str) -> str:
+    """Comparable form of a phone number: national digits without leading zeros."""
+    raw = value.strip()
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("0049"):
+        digits = digits[4:]
+    elif raw.startswith("+") and digits.startswith("49"):
+        digits = digits[2:]
+    return digits.lstrip("0")
+
+
+def _phone_keys_in(text: str) -> set[str]:
+    keys = {_phone_key(m.group(0)) for m in _PHONE_IN_TEXT_RE.finditer(text)}
+    return {k for k in keys if len(k) >= _MIN_PHONE_KEY_DIGITS}
+
+
+def _emails_in(text: str) -> set[str]:
+    return {m.group(0).lower().rstrip(".") for m in _EMAIL_IN_TEXT_RE.finditer(text)}
+
+
+def extract_privacy_contacts(text: str) -> tuple[set[str], set[str]]:
+    """Phone keys and emails that appear only inside Datenschutzbeauftragter blocks."""
+    lines = text.splitlines()
+    mask = _privacy_block_mask(lines)
+    inside = "\n".join(line for line, m in zip(lines, mask) if m)
+    outside = "\n".join(line for line, m in zip(lines, mask) if not m)
+    phone_keys = _phone_keys_in(inside) - _phone_keys_in(outside)
+    emails = _emails_in(inside) - _emails_in(outside)
+    return phone_keys, emails
+
+
+def filter_company_phones(
+    phones: object, exclude_keys: Optional[set[str]] = None
+) -> List[str]:
+    """Keep telephone numbers only; drop fax entries and excluded (privacy) numbers."""
     if not isinstance(phones, list):
         return []
     out: List[str] = []
@@ -80,6 +165,29 @@ def filter_company_phones(phones: object) -> List[str]:
             continue
         value = phone.strip()
         if not value or _PHONE_FAX_LABEL_RE.search(value):
+            continue
+        if exclude_keys and _phone_key(value) in exclude_keys:
+            continue
+        out.append(value)
+    return out
+
+
+def filter_company_emails(
+    emails: object, exclude: Optional[set[str]] = None
+) -> List[str]:
+    """Drop data-protection mailboxes (datenschutz@, dsb@, ...) and excluded emails."""
+    if not isinstance(emails, list):
+        return []
+    out: List[str] = []
+    for email in emails:
+        if not isinstance(email, str):
+            continue
+        value = email.strip()
+        if not value:
+            continue
+        if _PRIVACY_EMAIL_LOCAL_RE.match(value.split("@", 1)[0]):
+            continue
+        if exclude and value.lower() in exclude:
             continue
         out.append(value)
     return out
@@ -103,8 +211,18 @@ def filter_managing_directors(md_list: object) -> List[Dict[str, Any]]:
     return [md for md in md_list if isinstance(md, dict) and not is_privacy_officer_director(md)]
 
 
-def normalize_llm_extraction(data: Dict[str, Any]) -> Dict[str, Any]:
-    data["generic_company_phones"] = filter_company_phones(data.get("generic_company_phones"))
+def normalize_llm_extraction(
+    data: Dict[str, Any],
+    *,
+    privacy_phone_keys: Optional[set[str]] = None,
+    privacy_emails: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    data["generic_company_phones"] = filter_company_phones(
+        data.get("generic_company_phones"), privacy_phone_keys
+    )
+    data["generic_company_emails"] = filter_company_emails(
+        data.get("generic_company_emails"), privacy_emails
+    )
     data["managing_directors"] = filter_managing_directors(data.get("managing_directors"))
     return data
 
@@ -122,6 +240,7 @@ Extract:
 Important exclusions:
 - Do NOT include fax, Telefax, or Facsimile numbers in generic_company_phones. If a line lists both phone and fax, extract only the phone number.
 - Do NOT include Datenschutzbeauftragte/r, Datenschutzkoordinatoren, Privacy Officers, or other data-protection contacts in managing_directors. These are not managing directors.
+- Do NOT include phone numbers or email addresses of Datenschutzbeauftragte, external data-protection contacts, web agencies, hosting providers or supervisory authorities in generic_company_phones / generic_company_emails. Only the company's own general contact details belong there.
 
 Respond with a single JSON object only:
 {
@@ -202,6 +321,7 @@ class ImprintExtractor:
             pickle.dump(self._cache, f)
 
     def _call_llm(self, domain: str, company_name: str, imprint_text: str) -> Dict[str, Any]:
+        privacy_phone_keys, privacy_emails = extract_privacy_contacts(imprint_text)
         imprint_text = sanitize_imprint_text_for_extraction(imprint_text)
         user_prompt = f"""
 Extract company data from this website content.
@@ -214,7 +334,7 @@ Text from Impressum / Kontakt page:
 {imprint_text}
 \"\"\"
 
-Remember: exclude fax numbers from generic_company_phones and exclude Datenschutzbeauftragte from managing_directors.
+Remember: exclude fax numbers and data-protection contacts from generic_company_phones / generic_company_emails, and exclude Datenschutzbeauftragte from managing_directors.
 """.strip()
         content = self._llm.chat(
             system_prompt=SYSTEM_PROMPT,
@@ -223,7 +343,11 @@ Remember: exclude fax numbers from generic_company_phones and exclude Datenschut
             temperature=0.0,
         )
         try:
-            return normalize_llm_extraction(json.loads(content))
+            return normalize_llm_extraction(
+                json.loads(content),
+                privacy_phone_keys=privacy_phone_keys,
+                privacy_emails=privacy_emails,
+            )
         except json.JSONDecodeError:
             return {
                 "full_address": None,
@@ -310,8 +434,8 @@ Remember: exclude fax numbers from generic_company_phones and exclude Datenschut
             row.phone = str(phones[0])
             updated = True
 
-        emails = data.get("generic_company_emails") or []
-        if isinstance(emails, list) and emails and not row.email:
+        emails = filter_company_emails(data.get("generic_company_emails"))
+        if emails and not row.email:
             row.email = str(emails[0])
             updated = True
 
