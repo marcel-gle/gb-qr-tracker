@@ -30,7 +30,7 @@ def _normalize_company_name(name: Optional[str]) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def _address_key(row: BusinessRow) -> tuple[str, str, str, str] | None:
+def address_key(row: BusinessRow) -> tuple[str, str, str, str] | None:
     street = (row.street or "").strip().lower()
     house = (row.house_number or "").strip().lower()
     pc = normalize_postcode(row.postcode)
@@ -56,7 +56,7 @@ def dedupe_by_address(
     missing_key = 0
 
     for row in rows:
-        key = _address_key(row)
+        key = address_key(row)
         if key is None:
             kept.append(row)
             missing_key += 1

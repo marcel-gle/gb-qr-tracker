@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from campaign_pipeline.config import CampaignConfig, ScoreConfig
+from campaign_pipeline.env import load_project_env
 from campaign_pipeline.integrations import run_firestore_upload, run_pdf_generation
 from campaign_pipeline.naming import review_decisions_path, review_issues_path, stage_path
 from campaign_pipeline.pipeline import CampaignPipeline
@@ -23,6 +25,8 @@ from campaign_pipeline.ui.drive_helpers import (
     use_google_drive,
 )
 from campaign_pipeline.ui.runner import run_cmd_streaming
+
+load_project_env()
 
 DEFAULT_CAMPAIGN_BASE = str(Path.home() / "Desktop" / "Briefversand")
 
@@ -158,6 +162,7 @@ def _pipeline() -> CampaignPipeline | None:
         max_workers_llm=int(st.session_state.get("max_workers_llm", 5)),
         target_final_count=target,
         enable_northdata_fallback=bool(st.session_state.get("imprint_enable_northdata", True)),
+        enable_apollo_phones=bool(st.session_state.get("imprint_enable_apollo", False)),
     )
     return CampaignPipeline(cfg)
 
@@ -350,6 +355,12 @@ def _run_imprint_with_progress(
         frac = done / total
         progress_bar.progress(min(frac, 1.0))
         eta = (elapsed / done) * (total - done) if done else 0.0
+        if domain in _APOLLO_PHASE_LABELS:
+            status.markdown(
+                f"{_APOLLO_PHASE_LABELS[domain]} **{done}/{total}** ({frac * 100:.0f}%) · "
+                f"elapsed **{_format_duration(elapsed)}**"
+            )
+            return
         status.markdown(
             f"Scraped **{done}/{total}** ({frac * 100:.0f}%) · "
             f"elapsed **{_format_duration(elapsed)}** · "
@@ -370,7 +381,59 @@ def _run_imprint_with_progress(
             f"Finished imprint scrape for **{stats.get('scraped', 0)}** domains · "
             f"**{stats.get('output', 0)}** rows in output"
         )
+    if stats.get("apollo_enabled"):
+        _render_apollo_summary(stats)
     return stats
+
+
+_APOLLO_PHASE_LABELS = {
+    "apollo_match": "Apollo: Match & Prüfung (+ Freischaltung)",
+    "apollo_poll": "Apollo: Warte auf Nummern",
+}
+
+_APOLLO_REJECT_LABELS = {
+    "no_match": "kein Treffer",
+    "low_confidence": "Match-Confidence zu niedrig",
+    "domain_mismatch": "anderer aktueller Arbeitgeber / Domain",
+    "not_current": "nicht mehr bei der Firma",
+    "name_mismatch": "Name weicht ab",
+}
+
+
+def _render_apollo_summary(stats: dict) -> None:
+    if stats.get("apollo_skipped_no_key"):
+        st.warning("Apollo übersprungen: `APOLLO_API_KEY` ist nicht gesetzt (Shell oder `.env`).")
+        return
+    if stats.get("apollo_fatal_error"):
+        st.error(
+            f"Apollo abgebrochen ({stats['apollo_fatal_error']}): API-Key ungültig, fehlende "
+            "Berechtigung oder keine Credits mehr. Weitere Anfragen wurden nicht gesendet."
+        )
+    if stats.get("apollo_skipped_address_dup"):
+        st.caption(
+            f"{stats['apollo_skipped_address_dup']} Adress-Duplikate nicht bei Apollo abgefragt "
+            "(werden im Address-Dedupe ohnehin entfernt)."
+        )
+    st.markdown(
+        f"**Apollo:** {stats.get('apollo_candidates', 0)} Geschäftsführer geprüft · "
+        f"Nummer gefunden **{stats.get('apollo_ok', 0)}** · "
+        f"keine Nummer **{stats.get('apollo_none', 0)}** · "
+        f"abgelehnt **{stats.get('apollo_rejected', 0)}** · "
+        f"Fehler **{stats.get('apollo_error', 0)}** · "
+        f"aus Cache **{stats.get('apollo_cached', 0)}**"
+    )
+    reasons = [
+        f"{_APOLLO_REJECT_LABELS.get(k[len('apollo_rejected_'):], k[len('apollo_rejected_'):])}: {v}"
+        for k, v in stats.items()
+        if k.startswith("apollo_rejected_") and v
+    ]
+    if reasons:
+        st.caption("Abgelehnt (keine Freischaltung, keine Phone-Credits): " + " · ".join(reasons))
+    if stats.get("apollo_pending"):
+        st.info(
+            f"{stats['apollo_pending']} Apollo-Abfragen noch offen (Timeout). "
+            "Beim nächsten Imprint-Lauf werden sie ohne neue Kosten weiter abgefragt."
+        )
 
 
 def render_scoring() -> None:
@@ -540,6 +603,29 @@ def render_imprint() -> None:
             "current legal representative(s) on North Data."
         ),
     )
+    apollo_key_present = bool((os.environ.get("APOLLO_API_KEY") or "").strip())
+    st.checkbox(
+        "Apollo-Telefonnummern abfragen",
+        value=False,
+        key="imprint_enable_apollo",
+        help=(
+            "Für jeden gefundenen Geschäftsführer zuerst ein Apollo-Match ohne "
+            "Nummern-Freischaltung. Nur wenn Confidence high/medium ist, die aktuelle "
+            "Firmen-Domain übereinstimmt und der Name passt, wird die Nummer "
+            "freigeschaltet. Ergebnisse landen in apollo_phone_* (auch in _final.csv); "
+            "die Spalte phone bleibt Input/Impressum."
+        ),
+    )
+    if st.session_state.get("imprint_enable_apollo") and not apollo_key_present:
+        st.warning(
+            "`APOLLO_API_KEY` ist nicht gesetzt — Apollo-Anfragen werden übersprungen."
+        )
+    elif st.session_state.get("imprint_enable_apollo"):
+        st.caption(
+            "Kosten: ca. 1 Credit pro bestätigtem Match, +8 Credits pro gefundener "
+            "Mobilnummer. Abgelehnte Matches werden nicht freigeschaltet. "
+            "Ergebnisse werden gecacht — ein erneuter Lauf fragt dieselbe Person nicht nochmal ab."
+        )
     imprint_path = stage_path(pipe.config.campaign_dir, pipe.config.base_name, "imprint")
     only_missing_fields = st.checkbox(
         "Re-scrape only rows missing street/name",

@@ -69,6 +69,10 @@ def merge_raw_lists(
             row_out["domain"] = domain
             if canonical.get("company_name"):
                 row_out["company_name"] = canonical["company_name"]
+            if canonical.get("phone"):
+                row_out["phone"] = canonical["phone"]
+            if canonical.get("input_phone"):
+                row_out["input_phone"] = canonical["input_phone"]
             row_out["source_file"] = fp.name
             row_out["source_row"] = str(row_idx)
             for key, val in canonical.items():

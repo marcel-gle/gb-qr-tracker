@@ -36,6 +36,15 @@ def get_ci(row: dict, *names: str) -> Optional[str]:
     return None
 
 
+def get_ci_nonempty(row: dict, *names: str) -> Optional[str]:
+    """Mirrors functions/upload_processor/main.py:get_ci_nonempty."""
+    for name in names:
+        val = get_ci(row, name)
+        if val is not None and str(val).strip():
+            return val
+    return None
+
+
 def make_business_id(business_name: Optional[str], plz: Optional[str]) -> str:
     """
     Re-implementation of make_business_id from upload_processor.
@@ -114,12 +123,12 @@ def build_business_payloads_from_row(
     house_no = get_ci(row, "Hausnummer", "HNr", "Hnr", "Nr")
     plz = get_ci(row, "PLZ", "Postleitzahl")
     city = get_ci(row, "Ort", "Stadt", "City")
-    fname = get_ci(row, "Entscheider 1 Vorname", "Vorname", "Anrede Vorname")
-    lname = get_ci(row, "Entscheider 1 Nachname", "Nachname")
+    fname = get_ci_nonempty(row, "Entscheider 1 Vorname", "Vorname", "Anrede Vorname", "first_name", "first_name_1")
+    lname = get_ci_nonempty(row, "Entscheider 1 Nachname", "Nachname", "last_name", "last_name_1")
     prefix_tel = get_ci(row, "Vorwahl Telefon", "Vorwahl", "Telefon Vorwahl")
     tel = get_ci(row, "Telefonnummer", "Telefon", "Phone")
     email = get_ci(row, "E-Mail-Adresse", "Email", "E-Mail", "Mail")
-    salutation = get_ci(row, "Entscheider 1 Anrede", "Salutation")
+    salutation = get_ci_nonempty(row, "Entscheider 1 Anrede", "Salutation", "salutation_1")
 
     contact_name = " ".join(p for p in [fname, lname] if p)
     phone = " ".join(p for p in [prefix_tel, tel] if p)

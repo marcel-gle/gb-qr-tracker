@@ -77,6 +77,66 @@ company address, phone, email, and managing directors. Robustness features:
   director (common for logistics/holding companies), the current legal
   representative(s) are looked up on North Data via its public JSON-LD data.
   Disable with `--no-northdata` on the CLI, or the checkbox in the UI.
+- **Phone provenance** — stage CSVs keep sources separate:
+  - `input_phone` — number from the incoming list (e.g. ocean.io)
+  - `imprint_phone` — company number from the Impressum scrape
+  - `phone` — lettershop field: input wins; imprint fills only if empty
+  - `apollo_phone_{1..N}` — optional verified personal numbers from Apollo.io
+- **Apollo phones (optional)** — with `APOLLO_API_KEY` set and the UI checkbox
+  **Apollo-Telefonnummern abfragen** (or CLI `--apollo-phones`), each named
+  managing director is enriched via Apollo People Enrichment in two stages:
+  1. **Match** (no phone reveal) with name, domain, company name and LinkedIn URL.
+  2. **Verify**: accepted only if `match_confidence` is `high`/`medium`, the
+     person's *current* employer domain equals the row domain, and first/last
+     name match (umlauts, case and double first names normalized). Otherwise
+     `apollo_status_i = rejected` with `apollo_reject_reason_i`
+     (`no_match`, `low_confidence`, `domain_mismatch`, `not_current`,
+     `name_mismatch`) — no reveal, no phone credits.
+  3. **Reveal** by Apollo person id (`reveal_phone_number` + `poll_only`) and
+     **poll** `/webhook_result/{request_id}`. Only `valid_number` entries for
+     that person id are kept; best number (high confidence, mobile first) in
+     `apollo_phone_i`, all numbers in `apollo_phones_all_i`.
+
+  Stage CSVs also carry `apollo_status_i`, `apollo_match_confidence_i`,
+  `apollo_person_id_i` and `apollo_request_id_i`. Apollo never overwrites
+  `phone`. Decisions (including rejections) are cached under
+  `.pipeline/apollo_phones.cache.pkl`; reveals still outstanding after the
+  5-minute poll timeout stay `pending` and are polled (not re-billed) on the
+  next imprint run.
+
+  **Match details (no extra credits):** the match response that is already
+  paid for is stored too — only for verified matches, never for rejected ones.
+  Per director: `apollo_full_name_i`, `apollo_title_i`, `apollo_headline_i`,
+  `apollo_seniority_i`, `apollo_departments_i`, `apollo_position_start_i`,
+  `apollo_email_i`, `apollo_email_status_i`, `apollo_linkedin_url_i`,
+  `apollo_twitter_url_i`, `apollo_facebook_url_i`, `apollo_city_i`,
+  `apollo_state_i`, `apollo_country_i`. Per row (company): `apollo_org_name`,
+  `apollo_org_domain`, `apollo_org_phone`, `apollo_org_linkedin_url`,
+  `apollo_org_industry`, `apollo_org_keywords`, `apollo_org_employees`,
+  `apollo_org_annual_revenue`, `apollo_org_founded_year`, `apollo_org_street`,
+  `apollo_org_postcode`, `apollo_org_city`, `apollo_org_country`,
+  `apollo_org_description`, `apollo_org_technologies`, `apollo_org_id`.
+  Apollo values never overwrite `email`, `phone` or `linkedin_profile_url_i`.
+
+  `{base}_final.csv` contains `phone`, `input_phone`, `imprint_phone`,
+  `apollo_org_phone` and per director `apollo_phone_i`, `apollo_phone_type_i`,
+  `apollo_phones_all_i`, `apollo_title_i`, `apollo_email_i`,
+  `apollo_linkedin_url_i` (before the LinkedIn and `Template` columns).
+
+  Credit safeguards: each person is matched and revealed at most once (cache by
+  domain+name and by Apollo person id, saved after every row); rows that the
+  later address dedupe would drop are not queried; waterfall and personal-email
+  reveals are explicitly disabled; polling is free and transient poll errors
+  stay `pending`; on HTTP 401/402/403 (invalid key, no permission, no credits)
+  all further Apollo requests of the run are skipped.
+
+The key is read from the shell or from the repo-root `.env`
+(`APOLLO_API_KEY=...`, git-ignored); shell values take precedence. Both the
+Streamlit UI and the CLI load `.env` on start.
+
+```bash
+python -m campaign_pipeline.main ./my-campaign my-campaign imprint --apollo-phones
+```
 
 ### Re-scraping only incomplete rows
 
@@ -123,5 +183,3 @@ Configure per prompt in `scripts/business/prompts.json`:
 ```
 
 Scales: `0-5`, `0-10`, `binary` (also supports `verkauft`/`installiert` boolean fields).
-
-Legacy `list_processing` and `scripts/streamlit_app.py` remain unchanged.

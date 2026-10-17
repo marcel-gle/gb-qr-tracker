@@ -97,6 +97,72 @@ def director_field_names(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str
     return names
 
 
+# Apollo slot key -> CSV column prefix (column = f"{prefix}_{i}").
+APOLLO_SLOT_COLUMNS: Dict[str, str] = {
+    "phone": "apollo_phone",
+    "phone_type": "apollo_phone_type",
+    "phones_all": "apollo_phones_all",
+    # Person details from the (already paid) match response; verified matches only.
+    "full_name": "apollo_full_name",
+    "title": "apollo_title",
+    "headline": "apollo_headline",
+    "seniority": "apollo_seniority",
+    "departments": "apollo_departments",
+    "position_start": "apollo_position_start",
+    "email": "apollo_email",
+    "email_status": "apollo_email_status",
+    "linkedin_url": "apollo_linkedin_url",
+    "twitter_url": "apollo_twitter_url",
+    "facebook_url": "apollo_facebook_url",
+    "city": "apollo_city",
+    "state": "apollo_state",
+    "country": "apollo_country",
+    "status": "apollo_status",
+    "reject_reason": "apollo_reject_reason",
+    "match_confidence": "apollo_match_confidence",
+    "person_id": "apollo_person_id",
+    "request_id": "apollo_request_id",
+}
+
+# Apollo organization key -> CSV column (one set per row).
+APOLLO_ORG_COLUMNS: Dict[str, str] = {
+    "name": "apollo_org_name",
+    "domain": "apollo_org_domain",
+    "phone": "apollo_org_phone",
+    "linkedin_url": "apollo_org_linkedin_url",
+    "industry": "apollo_org_industry",
+    "keywords": "apollo_org_keywords",
+    "employees": "apollo_org_employees",
+    "annual_revenue": "apollo_org_annual_revenue",
+    "founded_year": "apollo_org_founded_year",
+    "street": "apollo_org_street",
+    "postcode": "apollo_org_postcode",
+    "city": "apollo_org_city",
+    "country": "apollo_org_country",
+    "description": "apollo_org_description",
+    "technologies": "apollo_org_technologies",
+    "id": "apollo_org_id",
+}
+
+# Subsets exported to {base}_final.csv.
+APOLLO_FINAL_SLOT_KEYS = (
+    "phone", "phone_type", "phones_all", "title", "email", "email_status", "linkedin_url",
+)
+APOLLO_FINAL_ORG_KEYS = ("phone",)
+
+
+def apollo_field_names(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str]:
+    return [
+        f"{prefix}_{i}"
+        for i in range(1, max_directors + 1)
+        for prefix in APOLLO_SLOT_COLUMNS.values()
+    ]
+
+
+def apollo_org_field_names() -> List[str]:
+    return list(APOLLO_ORG_COLUMNS.values())
+
+
 def final_csv_fieldnames(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str]:
     """Column order for {base}_final.csv (letter-ready export)."""
     fields = [
@@ -109,7 +175,10 @@ def final_csv_fieldnames(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str
     ]
     for i in range(1, max_directors + 1):
         fields.extend([f"first_name_{i}", f"last_name_{i}", f"salutation_{i}"])
-    fields.extend(["email", "phone"])
+    fields.extend(["email", "phone", "input_phone", "imprint_phone"])
+    fields.extend(APOLLO_ORG_COLUMNS[key] for key in APOLLO_FINAL_ORG_KEYS)
+    for i in range(1, max_directors + 1):
+        fields.extend(f"{APOLLO_SLOT_COLUMNS[key]}_{i}" for key in APOLLO_FINAL_SLOT_KEYS)
     for i in range(1, max_directors + 1):
         fields.append(f"linkedin_profile_url_{i}")
     fields.append("Template")
@@ -128,6 +197,8 @@ class BusinessRow:
     city: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    input_phone: Optional[str] = None
+    imprint_phone: Optional[str] = None
     legal_name: Optional[str] = None
 
     match_score: Optional[float] = None
@@ -145,6 +216,10 @@ class BusinessRow:
     branchencode: Optional[str] = None
 
     directors: List[Dict[str, Optional[str]]] = field(default_factory=list)
+    # Per director, keys from APOLLO_SLOT_COLUMNS; status: pending|ok|none|rejected|error
+    apollo: List[Dict[str, Optional[str]]] = field(default_factory=list)
+    # Keys from APOLLO_ORG_COLUMNS, taken from the first verified Apollo match of the row.
+    apollo_org: Dict[str, Optional[str]] = field(default_factory=dict)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def has_score_result(self) -> bool:
@@ -163,6 +238,7 @@ class BusinessRow:
             raise ValueError("Missing required field: domain")
 
         directors: List[Dict[str, Optional[str]]] = []
+        apollo: List[Dict[str, Optional[str]]] = []
         for i in range(1, max_directors + 1):
             d = {
                 "first_name": data.get(f"first_name_{i}"),
@@ -175,6 +251,12 @@ class BusinessRow:
                 directors.append(d)
             elif i == 1 and not directors:
                 directors.append(d)
+
+            apollo.append(
+                {key: (data.get(f"{prefix}_{i}") or None) for key, prefix in APOLLO_SLOT_COLUMNS.items()}
+            )
+        while len(apollo) > 1 and not any(apollo[-1].values()):
+            apollo.pop()
 
         known: Set[str] = {
             "domain",
@@ -190,6 +272,8 @@ class BusinessRow:
             "city",
             "email",
             "phone",
+            "input_phone",
+            "imprint_phone",
             "legal_name",
             "match_score",
             "score_raw",
@@ -208,6 +292,9 @@ class BusinessRow:
             "Branchencode WZ",
         }
         known.update(director_field_names(max_directors))
+        known.update(apollo_field_names(max_directors))
+        known.update(apollo_org_field_names())
+        apollo_org = {key: (data.get(col) or None) for key, col in APOLLO_ORG_COLUMNS.items()}
 
         extra = {k: v for k, v in data.items() if k not in known and not str(k).startswith("analysis_")}
 
@@ -228,6 +315,8 @@ class BusinessRow:
             city=data.get("city"),
             email=data.get("email"),
             phone=data.get("phone"),
+            input_phone=data.get("input_phone"),
+            imprint_phone=data.get("imprint_phone"),
             legal_name=data.get("legal_name"),
             match_score=_float_or_none(data.get("match_score")),
             score_raw=_float_or_none(data.get("score_raw")),
@@ -241,6 +330,8 @@ class BusinessRow:
             gegenstand=data.get("gegenstand") or data.get("Gegenstand"),
             branchencode=data.get("branchencode") or data.get("Branchencode WZ"),
             directors=directors or [{}],
+            apollo=apollo or [{}],
+            apollo_org={k: v for k, v in apollo_org.items() if v},
             extra=extra,
         )
 
@@ -265,6 +356,8 @@ class BusinessRow:
             "city": self.city or "",
             "email": self.email or "",
             "phone": self.phone or "",
+            "input_phone": self.input_phone or "",
+            "imprint_phone": self.imprint_phone or "",
             "legal_name": self.legal_name or "",
             "match_score": "" if self.match_score is None else self.match_score,
             "score_raw": "" if self.score_raw is None else self.score_raw,
@@ -284,6 +377,13 @@ class BusinessRow:
             data[f"salutation_{i}"] = (d or {}).get("salutation") or ""
             data[f"linkedin_profile_url_{i}"] = (d or {}).get("linkedin_profile_url") or ""
             data[f"imprint_managing_director_{i}"] = (d or {}).get("imprint_managing_director") or ""
+
+            a = self.apollo[i - 1] if i - 1 < len(self.apollo) else {}
+            for key, prefix in APOLLO_SLOT_COLUMNS.items():
+                data[f"{prefix}_{i}"] = (a or {}).get(key) or ""
+
+        for key, col in APOLLO_ORG_COLUMNS.items():
+            data[col] = (self.apollo_org or {}).get(key) or ""
 
         if isinstance(self.domain_analysis_raw, dict):
             data["domain_analysis_raw"] = json.dumps(self.domain_analysis_raw, ensure_ascii=False)

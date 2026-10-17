@@ -368,6 +368,69 @@ def test_imprint_only_missing_fields_targets_incomplete_rows(tmp_path: Path, mon
     assert reloaded["missing.de"].directors[0]["first_name"] == "Erika"
 
 
+def test_imprint_rerun_keeps_previous_results(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.imprint_scrape import run_imprint_step
+    from campaign_pipeline.imprint import extract as extract_mod
+    from unittest.mock import MagicMock
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test", enable_northdata_fallback=False)
+
+    scored = [
+        BusinessRow.from_dict({"domain": "done.de", "match_score": "5", "passed_score_filter": "True"}),
+        BusinessRow.from_dict({"domain": "dropped.de", "match_score": "5", "passed_score_filter": "True"}),
+        BusinessRow.from_dict({"domain": "new.de", "match_score": "4", "passed_score_filter": "True"}),
+    ]
+    write_business_rows(stage_path(campaign, "test", "scored"), scored)
+    write_business_rows(
+        stage_path(campaign, "test", "imprint"),
+        [
+            BusinessRow.from_dict(
+                {
+                    "domain": "done.de",
+                    "match_score": "3",
+                    "passed_score_filter": "True",
+                    "street": "Hauptstr.",
+                    "postcode": "10115",
+                    "first_name_1": "Max",
+                    "last_name_1": "Muster",
+                    "apollo_status_1": "ok",
+                    "apollo_phone_1": "+49170",
+                    "template": "t.pdf",
+                }
+            )
+        ],
+    )
+    registry = PipelineRegistry(campaign_dir=campaign)
+    registry.mark("done.de", "imprint")
+    registry.mark("dropped.de", "dropped", drop_reason="dropped_address_dup")
+    registry.mark("new.de", "scored")
+
+    scraped: list[str] = []
+
+    def fake_apply(self, row, max_directors=3, *, force=False):
+        scraped.append(row.domain)
+        row.street = "Neue Str."
+        return True
+
+    monkeypatch.setattr(extract_mod.ImprintExtractor, "apply_to_row", fake_apply)
+    run_imprint_step(cfg, MagicMock(), registry=registry)
+
+    assert scraped == ["new.de"]
+    out = {r.domain: r for r in load_rows_as_business(stage_path(campaign, "test", "imprint"))}
+    assert set(out) == {"done.de", "new.de"}
+    done = out["done.de"]
+    assert done.street == "Hauptstr."
+    assert done.directors[0]["first_name"] == "Max"
+    assert done.apollo[0]["phone"] == "+49170"
+    assert done.template == "t.pdf"
+    assert done.match_score == 5.0
+    assert out["new.de"].street == "Neue Str."
+
+
 def test_final_review_skip_score_filter_keeps_unscored(tmp_path: Path):
     from campaign_pipeline.io.writers import write_business_rows
     from campaign_pipeline.steps.final_review import run_final_review

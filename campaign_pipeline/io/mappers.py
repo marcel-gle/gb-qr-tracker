@@ -26,6 +26,7 @@ def map_row_to_canonical(row: Mapping[str, object]) -> Dict[str, object]:
             canonical["email"] = value
         elif "telefon" in key_norm or key_norm in {"tel", "tel.", "phone"}:
             canonical["phone"] = value
+            canonical["input_phone"] = value
         elif key_norm in {"straße", "strasse", "street"}:
             canonical["street"] = value
         elif key_norm in {"hausnummer", "nr", "no.", "house number"}:

@@ -4,7 +4,13 @@ import csv
 from pathlib import Path
 from typing import Dict, List
 
-from ..models import MAX_DIRECTORS_DEFAULT, BusinessRow, final_csv_fieldnames
+from ..models import (
+    MAX_DIRECTORS_DEFAULT,
+    BusinessRow,
+    apollo_field_names,
+    apollo_org_field_names,
+    final_csv_fieldnames,
+)
 
 
 def write_csv_rows(
@@ -50,6 +56,10 @@ def write_business_rows(path: Path, rows: List[BusinessRow], max_directors: int 
         "city",
         "email",
         "phone",
+        "input_phone",
+        "imprint_phone",
+        *apollo_field_names(max_directors),
+        *apollo_org_field_names(),
         "legal_name",
         "template",
         "source_file",

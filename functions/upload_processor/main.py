@@ -396,6 +396,50 @@ def get_ci(row: dict, *names: str) -> Optional[str]:
             return row.get(key)
     return None
 
+def get_ci_nonempty(row: dict, *names: str) -> Optional[str]:
+    """Like get_ci, but skips columns that exist with an empty value."""
+    for name in names:
+        val = get_ci(row, name)
+        if val is not None and str(val).strip():
+            return val
+    return None
+
+APOLLO_MAX_SLOTS = 3
+APOLLO_EMAIL_OK_STATUSES = {"verified"}
+
+def apollo_contact_from_row(row: dict) -> Dict[str, str]:
+    """
+    Personal contact of the first managing director with an Apollo phone or
+    verified Apollo email. Returns only non-empty keys so a re-upload without
+    Apollo data never wipes an existing overlay via merge=True.
+    """
+    for i in range(1, APOLLO_MAX_SLOTS + 1):
+        phone = (get_ci(row, f'apollo_phone_{i}') or '').strip()
+        email = (get_ci(row, f'apollo_email_{i}') or '').strip()
+        email_status = (get_ci(row, f'apollo_email_status_{i}') or '').strip().lower()
+        # Old final CSVs carry no status column; Apollo emails there are kept as-is.
+        if email and get_ci_key(row, f'apollo_email_status_{i}') and email_status not in APOLLO_EMAIL_OK_STATUSES:
+            email = ''
+        if not phone and not email:
+            continue
+        name = " ".join(
+            p.strip() for p in [get_ci(row, f'first_name_{i}'), get_ci(row, f'last_name_{i}')]
+            if p and p.strip()
+        )
+        out = {
+            "contact_phone": phone,
+            "contact_phone_type": (get_ci(row, f'apollo_phone_type_{i}') or '').strip(),
+            "contact_email": email,
+            "contact_name": name,
+            "contact_salutation": (get_ci(row, f'salutation_{i}') or '').strip(),
+            "contact_title": (get_ci(row, f'apollo_title_{i}') or '').strip(),
+            "contact_linkedin_url": (get_ci(row, f'apollo_linkedin_url_{i}') or '').strip(),
+        }
+        out = {k: v for k, v in out.items() if v}
+        out["contact_source"] = "apollo"
+        return out
+    return {}
+
 def get_ci_key(row: dict, *names: str) -> Optional[str]:
     lower_map = {}
     for k in row.keys():
@@ -727,14 +771,14 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
     house_no = get_ci(row, 'Hausnummer', 'HNr', 'Hnr', 'Nr', 'house_number', 'House number', 'house number')
     plz = get_ci(row, 'PLZ', 'Postleitzahl', 'postcode', 'Postcode')
     city = get_ci(row, 'Ort', 'Stadt', 'City')
-    fname = get_ci(row, 'Entscheider 1 Vorname', 'Vorname', 'Anrede Vorname', 'first_name', 'First name', 'first name')
-    lname = get_ci(row, 'Entscheider 1 Nachname', 'Nachname', 'last_name', 'Last name', 'last name')
+    fname = get_ci_nonempty(row, 'Entscheider 1 Vorname', 'Vorname', 'Anrede Vorname', 'first_name', 'first_name_1', 'First name', 'first name')
+    lname = get_ci_nonempty(row, 'Entscheider 1 Nachname', 'Nachname', 'last_name', 'last_name_1', 'Last name', 'last name')
     prefix_tel = get_ci(row, 'Vorwahl Telefon', 'Vorwahl', 'Telefon Vorwahl')
     tel = get_ci(row, 'Telefonnummer', 'Telefon', 'Phone', 'Tel.', 'Tel')
     email = get_ci(row, 'E-Mail-Adresse', 'Email', 'E-Mail', 'Mail')
-    salutation = get_ci(row, 'Entscheider 1 Anrede', 'Salutation')
+    salutation = get_ci_nonempty(row, 'Entscheider 1 Anrede', 'Salutation', 'salutation_1')
 
-    contact_name = " ".join(p for p in [fname, lname] if p)
+    contact_name = " ".join(p.strip() for p in [fname, lname] if p and p.strip())
     phone = " ".join(p for p in [prefix_tel, tel] if p)
     full_addr = compose_full_address(street, house_no, plz, city, "Germany")
 
@@ -776,7 +820,8 @@ def upsert_business_payload_from_row(row: dict, ownerId: str,
         "last_hit_at": None,
         "updated_at": firestore.SERVER_TIMESTAMP,
     }
-    
+    customer_payload.update(apollo_contact_from_row(row))
+
     return biz_id, canonical_payload, customer_payload
 
 def write_back_csv(input_path: str, rows: list, suffix="_with_links") -> str:

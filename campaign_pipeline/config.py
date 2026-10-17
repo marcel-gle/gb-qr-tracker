@@ -42,6 +42,7 @@ class CampaignConfig:
     pass_score_filter: bool = True
     enable_final_llm_review: bool = True
     enable_northdata_fallback: bool = True
+    enable_apollo_phones: bool = False
     resume: bool = True
 
     max_directors: int = 3

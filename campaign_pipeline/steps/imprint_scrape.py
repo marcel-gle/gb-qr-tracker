@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -12,9 +13,148 @@ from ..io.writers import write_business_rows
 from ..models import BusinessRow
 from ..naming import cache_path, stage_path
 from ..registry import PipelineRegistry
+from ..imprint.apollo import (
+    DEFAULT_POLL_TIMEOUT_S,
+    ApolloPhoneClient,
+    count_apollo_candidates,
+    get_api_key,
+    match_and_reveal_for_row,
+    poll_apollo_pending,
+)
 from ..imprint.extract import ImprintExtractor, run_imprint_scrape
+from .dedupe_address import address_key
 
 logger = logging.getLogger(__name__)
+
+
+def apollo_target_rows(all_rows: list[BusinessRow], scraped: list[BusinessRow]) -> list[BusinessRow]:
+    """Scraped rows that survive the later address dedupe (first occurrence wins)."""
+    scraped_ids = {id(r) for r in scraped}
+    seen: set = set()
+    targets: list[BusinessRow] = []
+    for row in all_rows:
+        key = address_key(row)
+        duplicate = key is not None and key in seen
+        if key is not None:
+            seen.add(key)
+        if id(row) in scraped_ids and not duplicate:
+            targets.append(row)
+    return targets
+
+
+def run_apollo_enrichment(
+    rows: list[BusinessRow],
+    client: ApolloPhoneClient,
+    *,
+    max_directors: int,
+    progress_callback: Callable[[int, int, float, str], None] | None = None,
+    poll_timeout_s: float = DEFAULT_POLL_TIMEOUT_S,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> dict:
+    """Match + verify, reveal verified people, then poll. Returns ``apollo_*`` stats."""
+    totals: dict = {}
+    total = count_apollo_candidates(rows, max_directors=max_directors)
+    started = time.monotonic()
+    done = 0
+    if progress_callback is not None:
+        progress_callback(0, max(total, 1), 0.0, "apollo_match")
+    for row in rows:
+        part = match_and_reveal_for_row(row, client, max_directors=max_directors)
+        for key, value in part.items():
+            totals[key] = totals.get(key, 0) + value
+        done += sum(part.get(k, 0) for k in ("rejected", "revealed", "resumed", "cached", "error"))
+        if part.get("matched") or part.get("rejected") or part.get("revealed"):
+            # Persist paid results immediately so an interrupted run never pays twice.
+            client.save_cache()
+        if progress_callback is not None:
+            progress_callback(min(done, total), max(total, 1), time.monotonic() - started, "apollo_match")
+    client.save_cache()
+
+    def on_poll(poll_done: int, poll_total: int, elapsed: float) -> None:
+        if progress_callback is not None:
+            progress_callback(poll_done, poll_total, elapsed, "apollo_poll")
+
+    poll_kwargs: dict = {"max_directors": max_directors, "timeout_s": poll_timeout_s, "progress_callback": on_poll}
+    if sleep_fn is not None:
+        poll_kwargs["sleep_fn"] = sleep_fn
+    poll_totals = poll_apollo_pending(rows, client, **poll_kwargs)
+    client.save_cache()
+
+    # Final counts come from the slots so cached and resumed results are included.
+    status_counts = {"ok": 0, "none": 0, "rejected": 0, "error": 0, "pending": 0}
+    rejected_by_reason: dict = {}
+    for row in rows:
+        for slot in (row.apollo or [])[:max_directors]:
+            status = (slot or {}).get("status")
+            if status in status_counts:
+                status_counts[status] += 1
+            if status == "rejected":
+                reason = slot.get("reject_reason") or "unknown"
+                rejected_by_reason[reason] = rejected_by_reason.get(reason, 0) + 1
+
+    stats = {
+        "apollo_candidates": total,
+        "apollo_matched": totals.get("matched", 0),
+        "apollo_revealed": totals.get("revealed", 0),
+        "apollo_cached": totals.get("cached", 0),
+        "apollo_timeout": poll_totals.get("timeout", 0),
+    }
+    if client.fatal_error:
+        stats["apollo_fatal_error"] = client.fatal_error
+    stats.update({f"apollo_{k}": v for k, v in status_counts.items()})
+    stats.update({f"apollo_rejected_{k}": v for k, v in rejected_by_reason.items()})
+    logger.info("Apollo enrichment: %s", stats)
+    return stats
+
+
+_SCORE_ATTRS = (
+    "match_score",
+    "score_raw",
+    "score_scale",
+    "score_field",
+    "passed_score_filter",
+    "domain_analysis_raw",
+)
+
+
+def keep_previous_imprint_rows(
+    rows: list[BusinessRow],
+    to_scrape: list[BusinessRow],
+    imprint_output: Path,
+    *,
+    registry: Optional[PipelineRegistry] = None,
+    max_directors: int,
+) -> list[BusinessRow]:
+    """Rows that are not scraped again keep their earlier imprint results.
+
+    ``rows`` is reloaded from the scored/raw input, which has no imprint data.
+    Without this, re-running the step would overwrite ``_imprint.csv`` with
+    empty address/director/Apollo fields for every already-processed domain.
+    Scores are taken from the fresh input; rows the registry dropped (e.g. by
+    the address dedupe) stay out.
+    """
+    if not imprint_output.exists():
+        return rows
+    previous = {
+        r.domain: r for r in load_rows_as_business(imprint_output, max_directors=max_directors)
+    }
+    scraped = {id(r) for r in to_scrape}
+    out: list[BusinessRow] = []
+    for row in rows:
+        if id(row) in scraped:
+            out.append(row)
+            continue
+        prev = previous.get(row.domain)
+        if prev is not None:
+            for attr in _SCORE_ATTRS:
+                setattr(prev, attr, getattr(row, attr))
+            out.append(prev)
+            continue
+        state = registry.domains.get(row.domain) if registry else None
+        if state is not None and state.stage == "dropped":
+            continue
+        out.append(row)
+    return out
 
 
 def row_is_missing_core_fields(row: BusinessRow) -> bool:
@@ -117,6 +257,13 @@ def run_imprint_step(
             if (only_domains is None or r.domain in only_domains)
             and (registry is None or registry.should_process(r.domain, "imprint"))
         ]
+        rows = keep_previous_imprint_rows(
+            rows,
+            to_scrape,
+            imprint_output,
+            registry=registry,
+            max_directors=config.max_directors,
+        )
 
     cache = cache_path(config.campaign_dir, "imprint")
     extractor = ImprintExtractor(
@@ -132,6 +279,31 @@ def run_imprint_step(
         progress_callback=progress_callback,
     )
 
+    apollo_stats: dict = {"apollo_enabled": bool(config.enable_apollo_phones)}
+    if config.enable_apollo_phones:
+        if not get_api_key():
+            logger.warning(
+                "Apollo phones enabled but APOLLO_API_KEY is not set; skipping enrichment."
+            )
+            apollo_stats["apollo_skipped_no_key"] = 1
+        else:
+            client = ApolloPhoneClient(
+                cache_path=cache_path(config.campaign_dir, "apollo_phones")
+            )
+            # Already-scraped rows are included so Apollo can be enabled on a later
+            # run; finished people come from the slot/cache without new credits.
+            pool = to_scrape if only_domains is not None else rows
+            targets = apollo_target_rows(rows, pool)
+            apollo_stats["apollo_skipped_address_dup"] = len(pool) - len(targets)
+            apollo_stats.update(
+                run_apollo_enrichment(
+                    targets,
+                    client,
+                    max_directors=config.max_directors,
+                    progress_callback=progress_callback,
+                )
+            )
+
     for row in to_scrape:
         if registry:
             registry.mark(row.domain, "imprint")
@@ -146,6 +318,7 @@ def run_imprint_step(
         "used_scored": using_scored,
         "score_filter_applied": apply_pass_filter,
         "only_missing_fields": only_missing_fields,
+        **apollo_stats,
     }
     logger.info("Imprint scrape complete: %s", stats)
     return imprint_output, stats

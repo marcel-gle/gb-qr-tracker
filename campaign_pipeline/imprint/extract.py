@@ -405,22 +405,28 @@ Remember: exclude fax numbers and data-protection contacts from generic_company_
             row.full_address = str(full_addr)
             updated = True
 
-        for src, dst in (
-            ("address_street", "street"),
-            ("address_house_number", "house_number"),
-            ("address_city", "city"),
-        ):
-            val = data.get(src)
-            if val and not getattr(row, dst):
-                setattr(row, dst, str(val))
-                updated = True
-
-        pc = data.get("address_postcode")
-        if pc:
-            norm = normalize_postcode(pc)
-            if norm and not row.postcode:
-                row.postcode = norm
-                updated = True
+        imprint_street = str(data.get("address_street") or "").strip()
+        imprint_postcode = normalize_postcode(data.get("address_postcode"))
+        imprint_city = str(data.get("address_city") or "").strip()
+        if imprint_street and imprint_postcode and imprint_city:
+            # A complete imprint address replaces the input address as a whole so
+            # street, postcode and city never come from different sources.
+            house = data.get("address_house_number")
+            row.street = imprint_street
+            row.house_number = str(house).strip() if house else None
+            row.postcode = imprint_postcode
+            row.city = imprint_city
+            updated = True
+        else:
+            for value, dst in (
+                (imprint_street, "street"),
+                (data.get("address_house_number"), "house_number"),
+                (imprint_city, "city"),
+                (imprint_postcode, "postcode"),
+            ):
+                if value and not getattr(row, dst):
+                    setattr(row, dst, str(value))
+                    updated = True
 
         legal = data.get("company_legal_name")
         if legal and not row.legal_name:
@@ -430,9 +436,12 @@ Remember: exclude fax numbers and data-protection contacts from generic_company_
             updated = True
 
         phones = filter_company_phones(data.get("generic_company_phones"))
-        if phones and not row.phone:
-            row.phone = str(phones[0])
+        if phones:
+            row.imprint_phone = str(phones[0])
             updated = True
+            if not row.phone:
+                row.phone = str(phones[0])
+
 
         emails = filter_company_emails(data.get("generic_company_emails"))
         if emails and not row.email:

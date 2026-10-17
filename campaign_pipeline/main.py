@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import CampaignConfig, ScoreConfig
+from .env import load_project_env
 from .pipeline import CampaignPipeline
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -56,10 +57,19 @@ def build_parser() -> argparse.ArgumentParser:
             "missing a street or managing-director name (forces a fresh fetch)"
         ),
     )
+    p.add_argument(
+        "--apollo-phones",
+        action="store_true",
+        help=(
+            "Imprint: enrich managing-director phone numbers via Apollo.io "
+            "(requires APOLLO_API_KEY; writes apollo_phone_* columns only)"
+        ),
+    )
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_project_env()
     args = build_parser().parse_args(argv)
     score_cfg = ScoreConfig()
     if args.pass_threshold is not None:
@@ -71,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         scoring_prompt_name=args.scoring_prompt,
         score_config=score_cfg,
         enable_northdata_fallback=not args.no_northdata,
+        enable_apollo_phones=bool(args.apollo_phones),
     )
     pipe = CampaignPipeline(config)
     pipe.ensure_campaign_dirs()
