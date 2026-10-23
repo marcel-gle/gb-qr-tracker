@@ -1,4 +1,4 @@
-"""Load API keys (e.g. ``APOLLO_API_KEY``, ``OPENAI_API_KEY``) from the repo ``.env``."""
+"""Load API keys / LLM settings (e.g. ``APOLLO_API_KEY``, ``OPENAI_API_KEY``, ``ANTHROPIC_API_KEY``, ``ANTHROPIC_MODEL``, ``ANTHROPIC_EFFORT``) from the repo ``.env``."""
 
 from __future__ import annotations
 

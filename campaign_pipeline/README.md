@@ -38,6 +38,30 @@ my-campaign/
     manifest.json
 ```
 
+## LLM backends (scoring / imprint extract)
+
+In the Streamlit **Scoring** step (or CLI `--backend`), choose:
+
+| Backend | Env | Notes |
+|---------|-----|--------|
+| `local` | `ML_STUDIO_BASE_URL`, `LOCAL_MODEL` | LM Studio / OpenAI-compatible local server |
+| `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` | Default model `gpt-4.1-mini` |
+| `claude` | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL`, `ANTHROPIC_EFFORT` | Default model `claude-sonnet-4-5`; effort `low` \| `medium` \| `high`; optional `ANTHROPIC_WORKSPACE_ID` |
+
+Keys can live in the repo `.env` (loaded automatically). Install cloud SDKs via `pip install -r requirements-dev.txt` (`openai`, `anthropic`).
+
+Example `.env` for Sonnet 5.5 with low effort:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-5-5
+ANTHROPIC_EFFORT=low
+```
+
+```bash
+python -m campaign_pipeline.main ./my-campaign my-campaign score --backend claude --scoring-prompt handwerk_analysis
+```
+
 ## CLI (secondary)
 
 ```bash
@@ -102,7 +126,7 @@ company address, phone, email, and managing directors. Robustness features:
   `phone`. Decisions (including rejections) are cached under
   `.pipeline/apollo_phones.cache.pkl`; reveals still outstanding after the
   5-minute poll timeout stay `pending` and are polled (not re-billed) on the
-  next imprint run.
+  next Apollo-only or imprint run.
 
   **Match details (no extra credits):** the match response that is already
   paid for is stored too — only for verified matches, never for rejected ones.
@@ -136,7 +160,17 @@ Streamlit UI and the CLI load `.env` on start.
 
 ```bash
 python -m campaign_pipeline.main ./my-campaign my-campaign imprint --apollo-phones
+# Or Apollo only on an existing CSV (same cache, no re-scrape):
+python -m campaign_pipeline.main ./my-campaign my-campaign apollo-phones
+python -m campaign_pipeline.main ./my-campaign my-campaign apollo-phones \
+  --input lists/other.csv --output lists/other_with_apollo.csv
 ```
+
+In the Streamlit UI use **Nur Apollo laufen lassen** on the imprint step and set
+the CSV path (defaults to `_imprint.csv`; `_scored.csv` works too when it has
+`Imprint: Managing director` — names are split into `first_name_*` /
+`last_name_*`). After Apollo, re-run address dedupe → template → final so
+`apollo_*` columns land in `_final.csv`.
 
 ### Re-scraping only incomplete rows
 

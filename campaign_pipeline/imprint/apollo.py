@@ -621,12 +621,43 @@ def _apply_phones(slot: Dict[str, Optional[str]], phones: List[PhoneNumber]) -> 
 
 
 def _named_directors(row: Any, max_directors: int) -> List[Tuple[int, str, str, Optional[str]]]:
+    from ..models import parse_managing_director_field
+
     out: List[Tuple[int, str, str, Optional[str]]] = []
     for i, d in enumerate((row.directors or [])[:max_directors]):
         first = str((d or {}).get("first_name") or "").strip()
         last = str((d or {}).get("last_name") or "").strip()
+        if not (first and last):
+            parsed = parse_managing_director_field(
+                (d or {}).get("imprint_managing_director"), max_directors=1
+            )
+            if parsed:
+                first, last, _display = parsed[0]
+                d["first_name"] = d.get("first_name") or first
+                d["last_name"] = d.get("last_name") or last
         if first and last:
             out.append((i, first, last, (d or {}).get("linkedin_profile_url")))
+    # Scored CSVs may only have Ocean "Imprint: Managing director" in extra.
+    if not out and getattr(row, "extra", None):
+        ocean = None
+        for key, val in (row.extra or {}).items():
+            if str(key).lower() in {
+                "imprint: managing director",
+                "imprint_managing_director",
+                "managing director",
+            }:
+                ocean = val
+                break
+        for i, (first, last, display) in enumerate(
+            parse_managing_director_field(ocean, max_directors=max_directors)
+        ):
+            while len(row.directors) <= i:
+                row.directors.append({})
+            d = row.directors[i]
+            d["first_name"] = d.get("first_name") or first
+            d["last_name"] = d.get("last_name") or last
+            d["imprint_managing_director"] = d.get("imprint_managing_director") or display
+            out.append((i, first, last, d.get("linkedin_profile_url")))
     return out
 
 
@@ -827,42 +858,60 @@ def poll_apollo_pending(
                 )
         return by_rid
 
-    total = sum(len(v) for v in _pending().values())
+    initial_slots = sum(len(v) for v in _pending().values())
+    # Progress reports (checked, total_rids) within each poll round so UIs update
+    # per HTTP call instead of freezing until the whole round finishes.
     while True:
         pending = _pending()
-        open_count = sum(len(v) for v in pending.values())
-        if progress_callback is not None:
-            progress_callback(total - open_count, max(total, 1), time.monotonic() - started)
         if not pending:
+            if progress_callback is not None and initial_slots:
+                progress_callback(initial_slots, max(initial_slots, 1), time.monotonic() - started)
             break
-        if client.fatal_error or time.monotonic() - started > timeout_s:
+        # Budget at least ~2s per outstanding request-id so large batches (500+)
+        # are not marked timed-out mid-first-round. Negative timeout_s = expire now (tests).
+        if float(timeout_s) < 0:
+            deadline = started + float(timeout_s)
+        else:
+            deadline = started + max(float(timeout_s), len(pending) * 2.0 + 60.0)
+        if client.fatal_error or time.monotonic() > deadline:
             for items in pending.values():
                 for _row, slot, _first, _last in items:
                     slot["reject_reason"] = POLL_TIMEOUT_REASON
                     stats["timeout"] += 1
+            if progress_callback is not None:
+                resolved = initial_slots - sum(len(v) for v in _pending().values())
+                progress_callback(max(resolved, 0), max(initial_slots, 1), time.monotonic() - started)
             break
 
+        rid_items = list(pending.items())
+        round_total = len(rid_items)
         next_sleep = float(DEFAULT_POLL_INTERVAL_S)
-        for rid, items in pending.items():
+        for idx, (rid, items) in enumerate(rid_items, start=1):
+            if progress_callback is not None:
+                progress_callback(idx - 1, max(round_total, 1), time.monotonic() - started)
             result = client.poll_once(rid, items[0][1].get("person_id"))
             if result.status == "pending":
                 if result.retry_after_seconds:
                     next_sleep = min(next_sleep, max(1.0, float(result.retry_after_seconds)))
-                continue
-            if client.fatal_error:
+            elif client.fatal_error:
+                if progress_callback is not None:
+                    progress_callback(idx, max(round_total, 1), time.monotonic() - started)
                 break
-            for row, slot, first, last in items:
-                if result.status in ("ok", "none"):
-                    _apply_phones(slot, result.phones)
-                    stats[result.status] += 1
-                    client.remember(row.domain, first, last, **{k: slot.get(k) for k in _RESULT_KEYS})
-                    client.remember_person(slot.get("person_id"), **{k: slot.get(k) for k in _RESULT_KEYS})
-                else:
-                    # Request id expired/unknown: allow exactly one new reveal on a later run.
-                    slot.update({"status": "error", "reject_reason": result.error, "request_id": None})
-                    stats["error"] += 1
-                    client.remember(row.domain, first, last, status="verified", request_id=None)
-                    client.remember_person(slot.get("person_id"), request_id=None)
+            else:
+                for row, slot, first, last in items:
+                    if result.status in ("ok", "none"):
+                        _apply_phones(slot, result.phones)
+                        stats[result.status] += 1
+                        client.remember(row.domain, first, last, **{k: slot.get(k) for k in _RESULT_KEYS})
+                        client.remember_person(slot.get("person_id"), **{k: slot.get(k) for k in _RESULT_KEYS})
+                    else:
+                        # Request id expired/unknown: allow exactly one new reveal on a later run.
+                        slot.update({"status": "error", "reject_reason": result.error, "request_id": None})
+                        stats["error"] += 1
+                        client.remember(row.domain, first, last, status="verified", request_id=None)
+                        client.remember_person(slot.get("person_id"), request_id=None)
+            if progress_callback is not None:
+                progress_callback(idx, max(round_total, 1), time.monotonic() - started)
 
         if _pending() and not client.fatal_error:
             sleep_fn(next_sleep)

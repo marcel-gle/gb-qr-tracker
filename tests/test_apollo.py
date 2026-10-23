@@ -507,3 +507,212 @@ def test_run_apollo_enrichment_stats_and_phases():
     assert stats["apollo_ok"] == 1
     assert stats["apollo_rejected"] == 0
     assert "apollo_match" in phases and "apollo_poll" in phases
+
+
+def test_poll_progress_updates_per_request_id():
+    """UI must see progress inside a poll round, not only between rounds."""
+    rows = []
+    session = FakeSession(
+        _person(),
+        [
+            _resp(404, {"error_code": "pending", "retry_after_seconds": 1}),
+            _resp(404, {"error_code": "pending", "retry_after_seconds": 1}),
+            _resp(200, _poll_ok(pid="p1")),
+            _resp(200, _poll_ok(pid="p2")),
+        ],
+    )
+    client = ApolloPhoneClient(api_key="k", session=session, sleep_fn=lambda s: None)
+
+    for i, (domain, pid, first, last) in enumerate(
+        [
+            ("a.de", "p1", "Eva", "Eins"),
+            ("b.de", "p2", "Max", "Zwei"),
+        ]
+    ):
+        row = BusinessRow.from_dict(
+            {"domain": domain, "company_name": "F", "first_name_1": first, "last_name_1": last}
+        )
+        row.apollo = [
+            {
+                "status": "pending",
+                "request_id": f"rid-{i}",
+                "person_id": pid,
+            }
+        ]
+        rows.append(row)
+
+    ticks: List[tuple] = []
+    poll_apollo_pending(
+        rows,
+        client,
+        sleep_fn=lambda s: None,
+        timeout_s=120,
+        progress_callback=lambda d, t, e: ticks.append((d, t)),
+    )
+    # First round: 0/2, 1/2, 2/2 (before/after each of 2 rids) while still pending,
+    # then second round resolves both.
+    assert any(d == 0 and t == 2 for d, t in ticks)
+    assert any(d == 1 and t == 2 for d, t in ticks)
+    assert any(d == 2 and t == 2 for d, t in ticks)
+    assert rows[0].apollo[0]["status"] == "ok"
+    assert rows[1].apollo[0]["status"] == "ok"
+
+
+def test_apollo_only_step_writes_imprint_and_reuses_cache(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.config import CampaignConfig
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.naming import stage_path
+    from campaign_pipeline.steps.imprint_scrape import run_apollo_only_step
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    (campaign / ".pipeline").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test")
+
+    addr = {
+        "company_name": "Firma GmbH",
+        "street": "Hauptstr.",
+        "house_number": "1",
+        "postcode": "10115",
+        "city": "Berlin",
+    }
+    write_business_rows(
+        stage_path(campaign, "test", "imprint"),
+        [
+            BusinessRow.from_dict(
+                {
+                    "domain": "firma.de",
+                    **addr,
+                    "first_name_1": "Eva",
+                    "last_name_1": "Beispiel",
+                }
+            ),
+            BusinessRow.from_dict(
+                {
+                    "domain": "dup.de",
+                    **addr,
+                    "first_name_1": "Max",
+                    "last_name_1": "Muster",
+                }
+            ),
+        ],
+    )
+
+    monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+    session = FakeSession(_person())
+    real_client = ApolloPhoneClient
+
+    def fake_client(**kwargs):
+        kwargs["api_key"] = "test-key"
+        kwargs["session"] = session
+        kwargs.setdefault("sleep_fn", lambda s: None)
+        return real_client(**kwargs)
+
+    monkeypatch.setattr("campaign_pipeline.steps.imprint_scrape.ApolloPhoneClient", fake_client)
+
+    out, stats = run_apollo_only_step(cfg, sleep_fn=lambda s: None)
+    assert out.exists()
+    assert stats["apollo_only"] is True
+    assert stats["scraped"] == 0
+    assert stats["apollo_skipped_address_dup"] == 1
+    assert stats["apollo_candidates"] == 1
+    assert stats["apollo_ok"] == 1
+
+    rows = load_rows_as_business(out)
+    by_domain = {r.domain: r for r in rows}
+    assert by_domain["firma.de"].apollo[0].get("phone") == "+491701234567"
+    # Address-dup row must not have been queried (no apollo slot filled via match).
+    assert not (by_domain["dup.de"].apollo and by_domain["dup.de"].apollo[0].get("person_id"))
+
+    # Second run must hit cache — no new HTTP calls for the same person.
+    calls_after_first = len(session.calls)
+    run_apollo_only_step(cfg, sleep_fn=lambda s: None)
+    assert len(session.calls) == calls_after_first
+
+
+def test_apollo_only_step_requires_imprint(tmp_path: Path):
+    from campaign_pipeline.config import CampaignConfig
+    from campaign_pipeline.steps.imprint_scrape import run_apollo_only_step
+    import pytest
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test")
+    with pytest.raises(FileNotFoundError):
+        run_apollo_only_step(cfg)
+
+
+def test_apollo_only_step_custom_input_and_output(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.config import CampaignConfig
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.imprint_scrape import run_apollo_only_step
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    (campaign / ".pipeline").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test")
+
+    custom_in = campaign / "lists" / "custom_source.csv"
+    custom_out = campaign / "lists" / "custom_with_apollo.csv"
+    write_business_rows(
+        custom_in,
+        [
+            BusinessRow.from_dict(
+                {
+                    "domain": "firma.de",
+                    "company_name": "Firma GmbH",
+                    "street": "Hauptstr.",
+                    "house_number": "1",
+                    "postcode": "10115",
+                    "first_name_1": "Eva",
+                    "last_name_1": "Beispiel",
+                }
+            )
+        ],
+    )
+
+    monkeypatch.setenv("APOLLO_API_KEY", "test-key")
+    session = FakeSession(_person())
+    real_client = ApolloPhoneClient
+
+    def fake_client(**kwargs):
+        kwargs["api_key"] = "test-key"
+        kwargs["session"] = session
+        kwargs.setdefault("sleep_fn", lambda s: None)
+        return real_client(**kwargs)
+
+    monkeypatch.setattr("campaign_pipeline.steps.imprint_scrape.ApolloPhoneClient", fake_client)
+
+    out, stats = run_apollo_only_step(
+        cfg,
+        input_path=custom_in,
+        output_path=custom_out,
+        sleep_fn=lambda s: None,
+    )
+    assert out == custom_out
+    assert stats["input_path"] == str(custom_in)
+    assert stats["output_path"] == str(custom_out)
+    assert custom_out.exists()
+    assert not (campaign / "lists" / "test_imprint.csv").exists()
+    row = load_rows_as_business(custom_out)[0]
+    assert row.apollo[0].get("phone") == "+491701234567"
+
+
+def test_apollo_only_step_skips_without_api_key(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.config import CampaignConfig
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.naming import stage_path
+    from campaign_pipeline.steps.imprint_scrape import run_apollo_only_step
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test")
+    write_business_rows(
+        stage_path(campaign, "test", "imprint"),
+        [BusinessRow.from_dict({"domain": "a.de", "first_name_1": "A", "last_name_1": "B"})],
+    )
+    monkeypatch.delenv("APOLLO_API_KEY", raising=False)
+    _, stats = run_apollo_only_step(cfg)
+    assert stats["apollo_skipped_no_key"] == 1

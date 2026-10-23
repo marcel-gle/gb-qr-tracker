@@ -22,4 +22,8 @@ def create_llm(config: CampaignConfig) -> LLMClient:
         from list_processing.llm.openai_client import OpenAIClient
 
         return OpenAIClient(max_concurrent_requests=config.max_workers_llm)
+    if config.backend == "claude":
+        from list_processing.llm.anthropic_client import AnthropicClient
+
+        return AnthropicClient(max_concurrent_requests=config.max_workers_llm)
     raise ValueError(f"Unknown backend: {config.backend}")

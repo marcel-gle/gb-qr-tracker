@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
             "dedupe-domain",
             "score",
             "imprint",
+            "apollo-phones",
             "dedupe-address",
             "final",
             "status",
@@ -31,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--incoming", nargs="*", type=Path, help="CSV files for merge step")
     p.add_argument("--append-new", action="store_true")
     p.add_argument("--scoring-prompt", default="handwerk_analysis")
-    p.add_argument("--backend", choices=["local", "openai"], default="local")
+    p.add_argument("--backend", choices=["local", "openai", "claude"], default="local")
     p.add_argument("--pass-threshold", type=float, default=None)
     p.add_argument("--only-new", action="store_true")
     p.add_argument(
@@ -58,12 +59,32 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--force-rescrape",
+        action="store_true",
+        help=(
+            "Imprint: re-scrape all selected rows (ignore registry, bypass imprint "
+            "HTTP cache). Apollo cache is kept when combined with --apollo-phones."
+        ),
+    )
+    p.add_argument(
         "--apollo-phones",
         action="store_true",
         help=(
             "Imprint: enrich managing-director phone numbers via Apollo.io "
             "(requires APOLLO_API_KEY; writes apollo_phone_* columns only)"
         ),
+    )
+    p.add_argument(
+        "--input",
+        type=Path,
+        default=None,
+        help="apollo-phones: CSV to enrich (default: {base}_imprint.csv)",
+    )
+    p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="apollo-phones: write result here (default: overwrite --input)",
     )
     return p
 
@@ -99,8 +120,11 @@ def main(argv: list[str] | None = None) -> int:
                 only_new=args.only_new,
                 skip_score_filter=args.skip_score_filter,
                 only_missing_fields=args.only_missing_fields,
+                force_rescrape=args.force_rescrape,
             )
         )
+    elif args.step == "apollo-phones":
+        print(pipe.apollo_phones(input_path=args.input, output_path=args.output))
     elif args.step == "dedupe-address":
         print(pipe.dedupe_address())
     elif args.step == "final":

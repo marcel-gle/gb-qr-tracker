@@ -58,6 +58,86 @@ def normalize_postcode(postcode: object | None) -> Optional[str]:
     return s
 
 
+# Ocean.io / lettershop: "Imprint: Managing director" = "Heike Fiebes" or
+# "Christopher Ahrens, Tristan Peveling".
+_MD_FIELD_ALIASES = (
+    "Imprint: Managing director",
+    "imprint_managing_director",
+    "managing_director",
+    "Managing director",
+)
+_MD_SPLIT_RE = re.compile(r"\s*(?:,|;|/|\bund\b|&)\s*", re.IGNORECASE)
+_MD_TITLE_RE = re.compile(
+    r"^(?:herr|frau|hr\.?|fr\.?|dr\.?|prof\.?|dipl\.?-?\w*|ing\.?|mag\.?|"
+    r"mba|msc|bsc|ll\.?m\.?)\s+",
+    re.IGNORECASE,
+)
+
+
+def _get_ci_value(data: Dict[str, Any], *names: str) -> Optional[str]:
+    lower_map = {str(k).lower(): k for k in data.keys() if isinstance(k, str)}
+    for name in names:
+        key = lower_map.get(name.lower())
+        if key is None:
+            continue
+        val = data.get(key)
+        if val is None:
+            continue
+        text = str(val).strip()
+        if text:
+            return text
+    return None
+
+
+def split_person_name(full: str) -> Optional[tuple[str, str]]:
+    """Split a single person display name into (first_name, last_name)."""
+    s = (full or "").strip()
+    if not s:
+        return None
+    while True:
+        nxt = _MD_TITLE_RE.sub("", s, count=1).strip(" ,")
+        if nxt == s:
+            break
+        s = nxt
+    if not s:
+        return None
+    # Northdata-style "Nachname, Vorname" (left side has no spaces).
+    if "," in s:
+        left, right = [p.strip() for p in s.split(",", 1)]
+        if left and right and " " not in left and " " in right:
+            return right, left
+        if left and right and " " not in left and " " not in right:
+            return right, left
+    tokens = s.split()
+    if len(tokens) < 2:
+        return None
+    return " ".join(tokens[:-1]), tokens[-1]
+
+
+def parse_managing_director_field(
+    raw: object | None,
+    *,
+    max_directors: int = MAX_DIRECTORS_DEFAULT,
+) -> List[tuple[str, str, str]]:
+    """Parse Ocean/imprint MD string into up to N (first, last, display) triples."""
+    text = str(raw or "").strip()
+    if not text:
+        return []
+    parts = [p.strip() for p in _MD_SPLIT_RE.split(text) if p and p.strip()]
+    if not parts:
+        parts = [text]
+    out: List[tuple[str, str, str]] = []
+    for part in parts:
+        split = split_person_name(part)
+        if not split:
+            continue
+        first, last = split
+        out.append((first, last, part))
+        if len(out) >= max_directors:
+            break
+    return out
+
+
 def _sanitize_key(value: str) -> str:
     key = re.sub(r"[^0-9A-Za-z_]+", "_", value.strip()).strip("_").lower()
     return key or "value"
@@ -144,6 +224,9 @@ APOLLO_ORG_COLUMNS: Dict[str, str] = {
     "id": "apollo_org_id",
 }
 
+# Letter body text. First non-empty alias wins.
+PARAGRAPH_FIELD_ALIASES = ("Paragraph", "paragraph", "absatz", "Absatz")
+
 # Subsets exported to {base}_final.csv.
 APOLLO_FINAL_SLOT_KEYS = (
     "phone", "phone_type", "phones_all", "title", "email", "email_status", "linkedin_url",
@@ -181,6 +264,7 @@ def final_csv_fieldnames(max_directors: int = MAX_DIRECTORS_DEFAULT) -> List[str
         fields.extend(f"{APOLLO_SLOT_COLUMNS[key]}_{i}" for key in APOLLO_FINAL_SLOT_KEYS)
     for i in range(1, max_directors + 1):
         fields.append(f"linkedin_profile_url_{i}")
+    fields.append("Paragraph")
     fields.append("Template")
     return fields
 
@@ -209,6 +293,7 @@ class BusinessRow:
     domain_analysis_raw: Optional[Dict[str, Any]] = None
 
     template: Optional[str] = None
+    paragraph: Optional[str] = None
 
     source_file: Optional[str] = None
     source_row: Optional[int] = None
@@ -258,6 +343,32 @@ class BusinessRow:
         while len(apollo) > 1 and not any(apollo[-1].values()):
             apollo.pop()
 
+        # _scored / Ocean.io often only has "Imprint: Managing director" (full names).
+        # Fill empty first_name/last_name so Apollo and later steps can use them.
+        ocean_md = _get_ci_value(data, *_MD_FIELD_ALIASES)
+        parsed_mds = parse_managing_director_field(ocean_md, max_directors=max_directors)
+        if not parsed_mds:
+            # Fall back to per-slot imprint_managing_director_* already loaded.
+            for i, d in enumerate(directors[:max_directors]):
+                if (d.get("first_name") or "").strip() and (d.get("last_name") or "").strip():
+                    continue
+                one = parse_managing_director_field(
+                    d.get("imprint_managing_director"), max_directors=1
+                )
+                if one:
+                    parsed_mds.append(one[0])
+        if parsed_mds:
+            while len(directors) < len(parsed_mds):
+                directors.append({})
+            for i, (first, last, display) in enumerate(parsed_mds):
+                d = directors[i]
+                if not (d.get("first_name") or "").strip():
+                    d["first_name"] = first
+                if not (d.get("last_name") or "").strip():
+                    d["last_name"] = last
+                if not (d.get("imprint_managing_director") or "").strip():
+                    d["imprint_managing_director"] = display
+
         known: Set[str] = {
             "domain",
             "Domain",
@@ -294,6 +405,15 @@ class BusinessRow:
         known.update(director_field_names(max_directors))
         known.update(apollo_field_names(max_directors))
         known.update(apollo_org_field_names())
+        known.update(_MD_FIELD_ALIASES)
+        known.update(PARAGRAPH_FIELD_ALIASES)
+        paragraph_alias_keys = {a.lower() for a in PARAGRAPH_FIELD_ALIASES}
+        # Case variants of Ocean MD column already in the row.
+        for k in list(data.keys()):
+            if not isinstance(k, str):
+                continue
+            if k.lower() in {a.lower() for a in _MD_FIELD_ALIASES} or k.lower() in paragraph_alias_keys:
+                known.add(k)
         apollo_org = {key: (data.get(col) or None) for key, col in APOLLO_ORG_COLUMNS.items()}
 
         extra = {k: v for k, v in data.items() if k not in known and not str(k).startswith("analysis_")}
@@ -325,6 +445,7 @@ class BusinessRow:
             passed_score_filter=_bool_or_none(data.get("passed_score_filter")),
             domain_analysis_raw=analysis_raw if isinstance(analysis_raw, dict) else None,
             template=data.get("template") or data.get("Template"),
+            paragraph=_get_ci_value(data, *PARAGRAPH_FIELD_ALIASES),
             source_file=data.get("source_file"),
             source_row=_int_or_none(data.get("source_row")),
             gegenstand=data.get("gegenstand") or data.get("Gegenstand"),
@@ -341,6 +462,8 @@ class BusinessRow:
         for key in final_csv_fieldnames(max_directors):
             if key == "Template":
                 out[key] = full.get("template") or ""
+            elif key == "Paragraph":
+                out[key] = full.get("paragraph") or ""
             else:
                 out[key] = full.get(key, "")
         return out
@@ -365,6 +488,7 @@ class BusinessRow:
             "score_field": self.score_field or "",
             "passed_score_filter": "" if self.passed_score_filter is None else self.passed_score_filter,
             "template": self.template or "",
+            "paragraph": self.paragraph or "",
             "source_file": self.source_file or "",
             "source_row": "" if self.source_row is None else self.source_row,
             "gegenstand": self.gegenstand or "",

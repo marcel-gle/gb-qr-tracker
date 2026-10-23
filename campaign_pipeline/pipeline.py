@@ -19,7 +19,7 @@ from .steps.final_review import (
     run_final_review,
     save_review_decisions,
 )
-from .steps.imprint_scrape import run_imprint_step
+from .steps.imprint_scrape import run_apollo_only_step, run_imprint_step
 from .steps.merge_raw import merge_raw_lists
 from .steps.run_scoring import run_scoring
 from .steps.template import add_template_column
@@ -115,10 +115,11 @@ class CampaignPipeline:
         only_new: bool = False,
         skip_score_filter: bool = False,
         only_missing_fields: bool = False,
+        force_rescrape: bool = False,
         progress_callback: Callable[[int, int, float, str], None] | None = None,
     ) -> dict:
         only_domains = None
-        if only_new and not only_missing_fields:
+        if only_new and not only_missing_fields and not force_rescrape:
             # Include raw domains so imprint works when scoring was skipped.
             only_domains = {
                 d
@@ -132,9 +133,26 @@ class CampaignPipeline:
             only_domains=only_domains,
             skip_score_filter=skip_score_filter,
             only_missing_fields=only_missing_fields,
+            force_rescrape=force_rescrape,
             progress_callback=progress_callback,
         )
         self.save_registry()
+        return stats
+
+    def apollo_phones(
+        self,
+        *,
+        input_path: Path | None = None,
+        output_path: Path | None = None,
+        progress_callback: Callable[[int, int, float, str], None] | None = None,
+    ) -> dict:
+        """Run Apollo enrichment on a CSV (default: imprint) without re-scrape."""
+        _, stats = run_apollo_only_step(
+            self.config,
+            input_path=input_path,
+            output_path=output_path,
+            progress_callback=progress_callback,
+        )
         return stats
 
     def dedupe_address(self) -> dict:

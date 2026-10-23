@@ -344,6 +344,7 @@ def _run_imprint_with_progress(
     only_new: bool,
     skip_score_filter: bool,
     only_missing_fields: bool,
+    force_rescrape: bool = False,
 ) -> dict:
     progress_bar = st.progress(0.0)
     status = st.empty()
@@ -371,6 +372,7 @@ def _run_imprint_with_progress(
         only_new=only_new,
         skip_score_filter=skip_score_filter,
         only_missing_fields=only_missing_fields,
+        force_rescrape=force_rescrape,
         progress_callback=on_imprint_progress,
     )
     progress_bar.progress(1.0)
@@ -388,7 +390,7 @@ def _run_imprint_with_progress(
 
 _APOLLO_PHASE_LABELS = {
     "apollo_match": "Apollo: Match & Prüfung (+ Freischaltung)",
-    "apollo_poll": "Apollo: Warte auf Nummern",
+    "apollo_poll": "Apollo: Nummern abfragen (Poll-Runde)",
 }
 
 _APOLLO_REJECT_LABELS = {
@@ -432,8 +434,43 @@ def _render_apollo_summary(stats: dict) -> None:
     if stats.get("apollo_pending"):
         st.info(
             f"{stats['apollo_pending']} Apollo-Abfragen noch offen (Timeout). "
-            "Beim nächsten Imprint-Lauf werden sie ohne neue Kosten weiter abgefragt."
+            "Beim nächsten Apollo- oder Imprint-Lauf werden sie ohne neue Kosten weiter abgefragt."
         )
+
+
+def _run_apollo_only_with_progress(
+    pipe: CampaignPipeline,
+    *,
+    input_path: Path,
+    output_path: Path | None = None,
+) -> dict:
+    progress_bar = st.progress(0.0)
+    status = st.empty()
+
+    def on_apollo_progress(done: int, total: int, elapsed: float, phase: str) -> None:
+        if total == 0:
+            status.caption("Keine Apollo-Kandidaten (keine Geschäftsführer mit Namen).")
+            return
+        frac = min(done / total, 1.0)
+        progress_bar.progress(frac)
+        label = _APOLLO_PHASE_LABELS.get(phase, phase)
+        status.markdown(
+            f"{label} **{done}/{total}** ({frac * 100:.0f}%) · "
+            f"elapsed **{_format_duration(elapsed)}**"
+        )
+
+    stats = pipe.apollo_phones(
+        input_path=input_path,
+        output_path=output_path,
+        progress_callback=on_apollo_progress,
+    )
+    progress_bar.progress(1.0)
+    out_label = Path(stats.get("output_path") or input_path).name
+    status.markdown(
+        f"Apollo fertig · **{stats.get('output', 0)}** Zeilen → `{out_label}`"
+    )
+    _render_apollo_summary(stats)
+    return stats
 
 
 def render_scoring() -> None:
@@ -461,7 +498,7 @@ def render_scoring() -> None:
         )
     st.caption(f"Scale: **{score_cfg.scale}** | default threshold: **{score_cfg.pass_threshold}**")
     st.number_input("Pass threshold", value=float(score_cfg.pass_threshold), step=0.5, key="pass_threshold")
-    st.selectbox("Backend", ["local", "openai"], key="backend")
+    st.selectbox("Backend", ["local", "openai", "claude"], key="backend")
     st.number_input("Max workers HTTP", min_value=1, max_value=50, value=10, key="max_workers_http")
     st.number_input("Max workers LLM", min_value=1, max_value=20, value=5, key="max_workers_llm")
     only_missing = st.checkbox(
@@ -584,7 +621,22 @@ def render_imprint() -> None:
             "(scoring step can be skipped)."
         )
 
-    only_new = st.checkbox("Scrape only new domains", value=False, key="imprint_only_new")
+    force_rescrape = st.checkbox(
+        "Alles neu scrapen (Force re-scrape)",
+        value=False,
+        key="imprint_force_rescrape",
+        help=(
+            "Holt Impressum/Adresse/GF für alle ausgewählten Zeilen erneut (ignoriert Registry "
+            "und Imprint-HTTP-Cache). Der Apollo-Cache bleibt: bereits gefundene Nummern/"
+            "Mails werden nicht nochmal berechnet."
+        ),
+    )
+    only_new = st.checkbox(
+        "Scrape only new domains",
+        value=False,
+        key="imprint_only_new",
+        disabled=force_rescrape,
+    )
     skip_score_filter = st.checkbox(
         "Ignore score pass filter (scrape all rows)",
         value=not using_scored,
@@ -631,7 +683,7 @@ def render_imprint() -> None:
         "Re-scrape only rows missing street/name",
         value=False,
         key="imprint_only_missing_fields",
-        disabled=not imprint_path.exists(),
+        disabled=not imprint_path.exists() or force_rescrape,
         help=(
             "Re-runs only the rows in the existing `_imprint.csv` that still lack a "
             "street or a managing-director name. Forces a fresh fetch (ignores the "
@@ -649,12 +701,60 @@ def render_imprint() -> None:
             st.caption(f"{_missing} of {len(_existing)} rows are missing street/name.")
         except Exception:
             pass
+    if force_rescrape:
+        st.info(
+            "Force re-scrape: alle Domains werden neu geladen. "
+            "Apollo-Cache (`.pipeline/apollo_phones.cache.pkl`) bleibt erhalten — "
+            "aktiviere dafür auch **Apollo-Telefonnummern abfragen**."
+        )
     if st.button("Run imprint scrape"):
         stats = _run_imprint_with_progress(
             pipe,
-            only_new=only_new,
+            only_new=only_new and not force_rescrape,
             skip_score_filter=skip_score_filter,
-            only_missing_fields=only_missing_fields,
+            only_missing_fields=only_missing_fields and not force_rescrape,
+            force_rescrape=force_rescrape,
+        )
+        maybe_push_active_campaign()
+        st.success("Done")
+        st.json(stats)
+
+    st.divider()
+    st.markdown("**Nur Apollo** (ohne Impressum neu zu scrapen)")
+    st.caption(
+        "Fragt Apollo für Geschäftsführer mit Namen in der gewählten CSV ab und "
+        "schreibt die Ergebnisse zurück (in-place, außer du setzt eine Output-Datei). "
+        "Nutzt denselben Cache wie der Imprint-Lauf — bereits abgefragte Personen "
+        "werden nicht nochmal berechnet."
+    )
+    default_apollo_csv = str(imprint_path)
+    apollo_csv = st.text_input(
+        "Apollo CSV (Input)",
+        value=default_apollo_csv,
+        key="imprint_apollo_only_input",
+        help="Beliebige Pipeline-CSV mit first_name_1 / last_name_1 / domain.",
+    )
+    apollo_out = st.text_input(
+        "Apollo CSV (Output, optional)",
+        value="",
+        key="imprint_apollo_only_output",
+        help="Leer lassen = Input-Datei überschreiben.",
+        placeholder="(gleich wie Input)",
+    )
+    apollo_input_path = Path((apollo_csv or "").strip())
+    apollo_output_path = Path(apollo_out.strip()) if (apollo_out or "").strip() else None
+    apollo_only_disabled = (not apollo_input_path.exists()) or (not apollo_key_present)
+    if not apollo_input_path.exists():
+        st.caption(f"Datei nicht gefunden: `{apollo_input_path}`")
+    if st.button(
+        "Nur Apollo laufen lassen",
+        disabled=apollo_only_disabled,
+        key="imprint_apollo_only_btn",
+    ):
+        stats = _run_apollo_only_with_progress(
+            pipe,
+            input_path=apollo_input_path,
+            output_path=apollo_output_path,
         )
         maybe_push_active_campaign()
         st.success("Done")

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-BackendType = Literal["local", "openai"]
+BackendType = Literal["local", "openai", "claude"]
 ScoreScale = Literal["0-5", "0-10", "binary"]
 
 

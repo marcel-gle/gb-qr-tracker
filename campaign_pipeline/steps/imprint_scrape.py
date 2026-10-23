@@ -8,6 +8,7 @@ from typing import Callable, Optional
 from list_processing.llm.base import LLMClient
 
 from ..config import CampaignConfig
+from ..email_fill import fill_rows_email
 from ..io.readers import load_rows_as_business
 from ..io.writers import write_business_rows
 from ..models import BusinessRow
@@ -199,9 +200,12 @@ def run_imprint_step(
     only_domains: set[str] | None = None,
     skip_score_filter: bool = False,
     only_missing_fields: bool = False,
+    force_rescrape: bool = False,
     progress_callback: Callable[[int, int, float, str], None] | None = None,
 ) -> tuple[Path, dict]:
     imprint_output = stage_path(config.campaign_dir, config.base_name, "imprint")
+    if force_rescrape and only_missing_fields:
+        raise ValueError("force_rescrape and only_missing_fields cannot be combined")
 
     if only_missing_fields:
         # Re-scrape rows from a previous imprint run that are still missing a
@@ -229,6 +233,12 @@ def run_imprint_step(
     )
     if only_missing_fields:
         logger.info("Imprint re-scrape: only rows missing street/name from %s.", path.name)
+    elif force_rescrape:
+        logger.info(
+            "Imprint force re-scrape of all selected rows from %s "
+            "(imprint HTTP cache bypassed; Apollo cache kept).",
+            path.name,
+        )
     elif not using_scored:
         logger.info(
             "Imprint using %s (no _scored.csv) — score pass filter disabled.",
@@ -249,6 +259,13 @@ def run_imprint_step(
             for r in rows
             if (only_domains is None or r.domain in only_domains)
             and row_is_missing_core_fields(r)
+        ]
+    elif force_rescrape:
+        # Re-fetch every selected row; ignore registry stage so already-imprinted
+        # domains are scraped again. Apollo enrichment afterwards reuses
+        # .pipeline/apollo_phones.cache.pkl and does not re-bill finished people.
+        to_scrape = [
+            r for r in rows if (only_domains is None or r.domain in only_domains)
         ]
     else:
         to_scrape = [
@@ -275,7 +292,7 @@ def run_imprint_step(
         to_scrape,
         extractor,
         max_workers=config.max_workers_http,
-        force=only_missing_fields,
+        force=only_missing_fields or force_rescrape,
         progress_callback=progress_callback,
     )
 
@@ -304,6 +321,8 @@ def run_imprint_step(
                 )
             )
 
+    apollo_stats["email_filled"] = fill_rows_email(rows)
+
     for row in to_scrape:
         if registry:
             registry.mark(row.domain, "imprint")
@@ -318,7 +337,72 @@ def run_imprint_step(
         "used_scored": using_scored,
         "score_filter_applied": apply_pass_filter,
         "only_missing_fields": only_missing_fields,
+        "force_rescrape": force_rescrape,
         **apollo_stats,
     }
     logger.info("Imprint scrape complete: %s", stats)
     return imprint_output, stats
+
+
+def run_apollo_only_step(
+    config: CampaignConfig,
+    *,
+    input_path: Path | None = None,
+    output_path: Path | None = None,
+    progress_callback: Callable[[int, int, float, str], None] | None = None,
+    poll_timeout_s: float = DEFAULT_POLL_TIMEOUT_S,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> tuple[Path, dict]:
+    """Enrich a CSV with Apollo phones — no imprint re-scrape.
+
+    Defaults to ``{base}_imprint.csv`` for both read and write. Optional
+    ``input_path`` / ``output_path`` let you enrich another stage file in place
+    or write to a different path. Uses the campaign
+    ``.pipeline/apollo_phones.cache.pkl`` so already matched/revealed people
+    are never billed twice.
+    """
+    source = Path(input_path) if input_path is not None else stage_path(
+        config.campaign_dir, config.base_name, "imprint"
+    )
+    dest = Path(output_path) if output_path is not None else source
+    if not source.exists():
+        raise FileNotFoundError(
+            f"Apollo input not found: {source}. Run imprint scrape first or pick another CSV."
+        )
+
+    rows = load_rows_as_business(source, max_directors=config.max_directors)
+    stats: dict = {
+        "apollo_only": True,
+        "apollo_enabled": True,
+        "input": len(rows),
+        "output": len(rows),
+        "input_path": str(source),
+        "output_path": str(dest),
+        "scraped": 0,
+    }
+
+    if not get_api_key():
+        logger.warning(
+            "Apollo phones requested but APOLLO_API_KEY is not set; skipping enrichment."
+        )
+        stats["apollo_skipped_no_key"] = 1
+        return dest, stats
+
+    client_kwargs: dict = {"cache_path": cache_path(config.campaign_dir, "apollo_phones")}
+    if sleep_fn is not None:
+        client_kwargs["sleep_fn"] = sleep_fn
+    client = ApolloPhoneClient(**client_kwargs)
+    targets = apollo_target_rows(rows, rows)
+    stats["apollo_skipped_address_dup"] = len(rows) - len(targets)
+    enrich_kwargs: dict = {
+        "max_directors": config.max_directors,
+        "progress_callback": progress_callback,
+        "poll_timeout_s": poll_timeout_s,
+    }
+    if sleep_fn is not None:
+        enrich_kwargs["sleep_fn"] = sleep_fn
+    stats.update(run_apollo_enrichment(targets, client, **enrich_kwargs))
+    stats["email_filled"] = fill_rows_email(rows)
+    write_business_rows(dest, rows, max_directors=config.max_directors)
+    logger.info("Apollo-only enrichment complete: %s", stats)
+    return dest, stats

@@ -211,7 +211,51 @@ def test_final_review_respects_keep_decisions(tmp_path: Path):
     assert "domain" not in header
     assert "match_score" not in header
     assert "Template" in header
+    assert "Paragraph" in header
     assert final_path.read_text(encoding="utf-8").splitlines()[1].endswith("t.pdf")
+
+
+def test_final_csv_keeps_paragraph_alias(tmp_path: Path):
+    import csv
+
+    from campaign_pipeline.io.writers import write_final_business_rows
+    from campaign_pipeline.models import final_csv_fieldnames
+
+    text = "Persönlicher Absatz mit Komma, und einem Semikolon; für den Brief."
+    with_text = BusinessRow.from_dict(
+        {
+            "domain": "a.de",
+            "company_name": "A GmbH",
+            "absatz": text,
+            "template": "t.pdf",
+        }
+    )
+    assert with_text.paragraph == text
+    assert "absatz" not in with_text.extra
+    assert "Paragraph" not in with_text.extra
+
+    preferred = BusinessRow.from_dict(
+        {
+            "domain": "c.de",
+            "Paragraph": "Aus Paragraph.",
+            "absatz": "Aus absatz.",
+        }
+    )
+    assert preferred.paragraph == "Aus Paragraph."
+
+    without = BusinessRow.from_dict({"domain": "b.de", "template": "t.pdf"})
+    assert not without.paragraph
+
+    path = tmp_path / "out_final.csv"
+    write_final_business_rows(path, [with_text, without])
+    header = path.read_text(encoding="utf-8").splitlines()[0].split(";")
+    assert header == final_csv_fieldnames()
+    assert header[header.index("Template") - 1] == "Paragraph"
+
+    with path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle, delimiter=";"))
+    assert rows[0]["Paragraph"] == text
+    assert rows[1]["Paragraph"] == ""
 
 
 def test_business_row_has_score_result():
@@ -429,6 +473,64 @@ def test_imprint_rerun_keeps_previous_results(tmp_path: Path, monkeypatch):
     assert done.template == "t.pdf"
     assert done.match_score == 5.0
     assert out["new.de"].street == "Neue Str."
+
+
+def test_imprint_force_rescrape_ignores_registry(tmp_path: Path, monkeypatch):
+    from campaign_pipeline.io.readers import load_rows_as_business
+    from campaign_pipeline.io.writers import write_business_rows
+    from campaign_pipeline.steps.imprint_scrape import run_imprint_step
+    from campaign_pipeline.imprint import extract as extract_mod
+    from unittest.mock import MagicMock
+
+    campaign = tmp_path / "camp"
+    (campaign / "lists").mkdir(parents=True)
+    cfg = CampaignConfig(campaign_dir=campaign, base_name="test", enable_northdata_fallback=False)
+    write_business_rows(
+        stage_path(campaign, "test", "scored"),
+        [
+            BusinessRow.from_dict(
+                {"domain": "done.de", "match_score": "5", "passed_score_filter": "True"}
+            ),
+            BusinessRow.from_dict(
+                {"domain": "new.de", "match_score": "4", "passed_score_filter": "True"}
+            ),
+        ],
+    )
+    write_business_rows(
+        stage_path(campaign, "test", "imprint"),
+        [
+            BusinessRow.from_dict(
+                {
+                    "domain": "done.de",
+                    "street": "Altstr.",
+                    "first_name_1": "Max",
+                    "last_name_1": "Muster",
+                    "apollo_phone_1": "+49170",
+                    "passed_score_filter": "True",
+                    "match_score": "5",
+                }
+            )
+        ],
+    )
+    registry = PipelineRegistry(campaign_dir=campaign)
+    registry.mark("done.de", "imprint")
+    registry.mark("new.de", "scored")
+
+    scraped: list[tuple[str, bool]] = []
+
+    def fake_apply(self, row, max_directors=3, *, force=False):
+        scraped.append((row.domain, force))
+        row.street = "Neu"
+        return True
+
+    monkeypatch.setattr(extract_mod.ImprintExtractor, "apply_to_row", fake_apply)
+    _, stats = run_imprint_step(cfg, MagicMock(), registry=registry, force_rescrape=True)
+
+    assert stats["force_rescrape"] is True
+    assert {(d, f) for d, f in scraped} == {("done.de", True), ("new.de", True)}
+    out = {r.domain: r for r in load_rows_as_business(stage_path(campaign, "test", "imprint"))}
+    assert out["done.de"].street == "Neu"
+    assert out["new.de"].street == "Neu"
 
 
 def test_final_review_skip_score_filter_keeps_unscored(tmp_path: Path):
