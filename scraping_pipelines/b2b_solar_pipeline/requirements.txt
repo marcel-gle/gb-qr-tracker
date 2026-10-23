@@ -1,0 +1,2 @@
+open-mastr>=0.17
+pandas>=2.0

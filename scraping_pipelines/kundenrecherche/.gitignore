@@ -1,0 +1,3 @@
+# Rohdaten-Dumps (können hunderte MB werden) und der lokale Store
+data/raw/
+storage/*.db
