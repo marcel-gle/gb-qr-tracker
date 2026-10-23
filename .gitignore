@@ -130,3 +130,20 @@ Thumbs.db
 .env.dev
 .env.prod
 data/
+
+
+# Generated local data (same idea as *.csv / *.xlsx)
+*.pdf
+*.gml
+*.geojson
+*.bak
+
+debug_files/
+ergebnis/
+lod2_daten/
+output/
+pdf_cache_nrw/
+scan_ergebnis.json
+
+scripts/letter_custom_paragraphs/**/*.json
+scripts/letter_custom_paragraphs/**/*.jsonl
