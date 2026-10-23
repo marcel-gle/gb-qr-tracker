@@ -1,0 +1,92 @@
+# Brave Search: Social-Recruiting-Agenturen nach Stadt (DE)
+# 80 größte Städte = alle Großstädte mit >100.000 Einwohnern, Rangfolge 31.12.2024
+# Quelle: Destatis-Fortschreibung Zensus 2022 / Liste der Großstädte in Deutschland
+# Nutzung: siehe brave_search_api.py --queries-file
+#
+#   python scripts/scrapers/brave_search_api.py \
+#       --api-key KEY \
+#       --queries-file scripts/scrapers/queries_social_recruiting_agenturen_de.txt \
+#       --num-results 20 \
+#       --output output/brave_social_recruiting_agenturen_de.csv
+
+# --- 80 größte Städte (Rang 2024) ---
+Social Recruiting Agentur Berlin
+Social Recruiting Agentur Hamburg
+Social Recruiting Agentur München
+Social Recruiting Agentur Köln
+Social Recruiting Agentur Frankfurt
+Social Recruiting Agentur Düsseldorf
+Social Recruiting Agentur Stuttgart
+Social Recruiting Agentur Leipzig
+Social Recruiting Agentur Dortmund
+Social Recruiting Agentur Bremen
+Social Recruiting Agentur Essen
+Social Recruiting Agentur Dresden
+Social Recruiting Agentur Nürnberg
+Social Recruiting Agentur Hannover
+Social Recruiting Agentur Duisburg
+Social Recruiting Agentur Bochum
+Social Recruiting Agentur Wuppertal
+Social Recruiting Agentur Bielefeld
+Social Recruiting Agentur Bonn
+Social Recruiting Agentur Mannheim
+Social Recruiting Agentur Karlsruhe
+Social Recruiting Agentur Münster
+Social Recruiting Agentur Augsburg
+Social Recruiting Agentur Wiesbaden
+Social Recruiting Agentur Gelsenkirchen
+Social Recruiting Agentur Mönchengladbach
+Social Recruiting Agentur Aachen
+Social Recruiting Agentur Braunschweig
+Social Recruiting Agentur Kiel
+Social Recruiting Agentur Chemnitz
+Social Recruiting Agentur Magdeburg
+Social Recruiting Agentur Freiburg
+Social Recruiting Agentur Krefeld
+Social Recruiting Agentur Halle
+Social Recruiting Agentur Mainz
+Social Recruiting Agentur Erfurt
+Social Recruiting Agentur Lübeck
+Social Recruiting Agentur Oberhausen
+Social Recruiting Agentur Rostock
+Social Recruiting Agentur Kassel
+Social Recruiting Agentur Hagen
+Social Recruiting Agentur Potsdam
+Social Recruiting Agentur Saarbrücken
+Social Recruiting Agentur Hamm
+Social Recruiting Agentur Oldenburg
+Social Recruiting Agentur Ludwigshafen
+Social Recruiting Agentur Mülheim
+Social Recruiting Agentur Leverkusen
+Social Recruiting Agentur Darmstadt
+Social Recruiting Agentur Osnabrück
+Social Recruiting Agentur Solingen
+Social Recruiting Agentur Paderborn
+Social Recruiting Agentur Herne
+Social Recruiting Agentur Heidelberg
+Social Recruiting Agentur Neuss
+Social Recruiting Agentur Regensburg
+Social Recruiting Agentur Ingolstadt
+Social Recruiting Agentur Pforzheim
+Social Recruiting Agentur Würzburg
+Social Recruiting Agentur Offenbach
+Social Recruiting Agentur Fürth
+Social Recruiting Agentur Heilbronn
+Social Recruiting Agentur Ulm
+Social Recruiting Agentur Wolfsburg
+Social Recruiting Agentur Göttingen
+Social Recruiting Agentur Reutlingen
+Social Recruiting Agentur Bremerhaven
+Social Recruiting Agentur Bottrop
+Social Recruiting Agentur Erlangen
+Social Recruiting Agentur Recklinghausen
+Social Recruiting Agentur Remscheid
+Social Recruiting Agentur Koblenz
+Social Recruiting Agentur Bergisch Gladbach
+Social Recruiting Agentur Jena
+Social Recruiting Agentur Salzgitter
+Social Recruiting Agentur Trier
+Social Recruiting Agentur Siegen
+Social Recruiting Agentur Moers
+Social Recruiting Agentur Gütersloh
+Social Recruiting Agentur Kaiserslautern
