@@ -1,0 +1,6 @@
+anthropic>=0.40
+requests
+beautifulsoup4
+trafilatura
+pyyaml
+openpyxl

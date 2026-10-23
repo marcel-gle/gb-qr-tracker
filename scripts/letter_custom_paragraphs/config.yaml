@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------
+# Config for paragraphs.py
+# ---------------------------------------------------------------
+
+# Column names in the recipient list (case-insensitive, first match wins)
+columns:
+  url: [domain, website, webseite, homepage, url]   # domain first: "url" may hold a search-result deep link
+  agency: [agentur, agenturname, firma, unternehmen, company, agency, company_name, companyname]
+  first_name: [vorname, first_name, firstname, first_name_1]
+
+crawl:
+  max_subpages: 3           # in addition to the homepage
+  max_chars_per_page: 4000  # after cleaning
+  max_chars_total: 12000    # ~3,000 tokens
+  timeout: 15               # seconds per request
+  workers: 8                # parallel website fetches
+  # Match in URL path or link text -> subpage gets this score (highest match wins)
+  keywords:
+    10: [leistung, branche, zielgruppe, spezialis, fokus, loesung, lösung]
+    8:  [referenz, case, fallstud, kunden, erfolg, ergebnis, projekte, bewertung]
+    6:  [ueber-uns, über uns, about, wer-wir, warum, ablauf, so-funktioniert, methode, recruiting]
+  # Never fetched
+  exclude: [impressum, datenschutz, privacy, agb, cookie, login, warenkorb, cart,
+            newsletter, karriere, jobs, stellenangebote, sitemap, wp-admin, feed]
+
+# Validation rules (produce flags, never change the text)
+validation:
+  max_words: 55
+  max_sentences: 3
+  forbidden_chars: ["!", "–", "—", " - "]
+  forbidden_phrases: ["Ich habe", "begeistert", "spannend", "revolution", "Game-Changer"]
+
+# ---------------------------------------------------------------
+# Model profiles: select with --profile <name>, repeatable
+# Prices in USD per 1M tokens (only used for the cost estimate)
+# Optional per profile: temperature, extra (dict merged into the request)
+# ---------------------------------------------------------------
+profiles:
+
+  sonnet:
+    backend: anthropic
+    model: claude-sonnet-5-5
+    max_tokens: 8000              # thinking counts toward max_tokens
+    effort: medium                # low | medium | high (default high) - controls thinking
+    workers: 4
+    price_input: 2.0
+    price_output: 10.0
+
+  opus:
+    backend: anthropic
+    model: claude-opus-5-5
+    max_tokens: 8000
+    effort: medium                # Opus always thinks; default is medium
+    workers: 4
+    price_input: 4.0
+    price_output: 20.0
+
+  haiku:
+    backend: anthropic
+    model: claude-haiku-5-5
+    max_tokens: 4000
+    workers: 6
+    price_input: 0.10
+    price_output: 0.50
+
+  # LM Studio: load the model, start the server under "Developer"
+  qwen-lmstudio:
+    backend: openai
+    base_url: http://localhost:1234/v1
+    model: qwen3.6-35b-a3b        # exact name as shown in LM Studio
+    max_tokens: 4000
+    temperature: 0.6
+    workers: 1                    # local: one request at a time
+    timeout: 300
+
+  # Ollama: server runs automatically after install
+  qwen-ollama:
+    backend: openai
+    base_url: http://localhost:11434/v1
+    model: qwen3.6:35b-a3b        # name as shown by "ollama list"
+    max_tokens: 4000
+    temperature: 0.6
+    workers: 1
+    timeout: 300
+
+  gemma-ollama:
+    backend: openai
+    base_url: http://localhost:11434/v1
+    model: gemma4:27b             # name as shown by "ollama list"
+    max_tokens: 4000
+    temperature: 0.6
+    workers: 1
+    timeout: 300
+
+  # Cheaper/faster Sonnet variant for comparison
+  sonnet-low:
+    backend: anthropic
+    model: claude-sonnet-5-5
+    max_tokens: 8000
+    effort: low
+    workers: 4
+    price_input: 2.0
+    price_output: 10.0
+
+default_profiles: [sonnet]

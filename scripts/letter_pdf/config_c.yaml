@@ -1,0 +1,127 @@
+# Variant C layout: no headline, leading 1.38, paragraph spacing 0.6
+# ---------------------------------------------------------------
+# Config for generate_letters.py
+# All positions in millimetres from the top-left corner of the page.
+# ---------------------------------------------------------------
+
+brand:
+  # Taken from rocket-letter.de
+  colors:
+    text: "#152842"          # navy: body text
+    heading: "#152842"       # navy: headline, names
+    accent: "#00B0CA"        # cyan: accent bar, bullets
+    accent_text: "#008198"   # dark cyan: QR link (cyan on white is too light for text)
+    muted: "#62657C"         # grey: sender block, captions, footer
+    light_bg: "#F5F8FB"      # light surface: QR box
+    rule: "#E9EDF1"          # hairlines
+    highlight: "#D3F1F6"     # marker colour for ==text== when layout.highlight is "marker"
+  fonts:                     # Sora + Source Serif 4 (SIL Open Font License, see assets/fonts)
+    heading_light: assets/fonts/sora-300.ttf
+    heading_regular: assets/fonts/sora-400.ttf
+    heading_semibold: assets/fonts/sora-600.ttf
+    heading_bold: assets/fonts/sora-700.ttf
+    body_regular: assets/fonts/source-serif-4-400.ttf
+    body_bold: assets/fonts/source-serif-4-600.ttf
+    body_heavy: assets/fonts/source-serif-4-700.ttf     # ==highlights== in the copy
+    body_italic: assets/fonts/source-serif-4-400-italic.ttf
+  body_font: serif           # serif (Source Serif 4) | sans (Sora)
+
+sender:
+  # Logo top left. PNG, JPG or SVG. Put the file into assets/ and enter the name here.
+  logo: assets/logo.png
+  logo_position: right         # right = small logo above the sender block, left = classic letterhead
+  logo_height_mm: 7.5
+  name_size: 10.5                # wordmark size next to the icon
+  subline_muted: true           # subline in grey instead of cyan
+  logo_with_text: true        # icon logo: also print name + subline next to it
+  # Used as text letterhead while no logo file exists
+  name: "Rocket Letter"
+  subline: "by Gleich & Brother GmbH"
+  # Sender block top right (first line is set bold)
+  block_bold_first: false       # the company name is already in the logo subline
+  block:
+    - "Am Georgenstein 14"
+    - "82065 Baierbrunn"
+    - "0176 4554 0806"
+    - "info@gleich-brother.de"
+    - "rocket-letter.de"
+  # Return line above the address window (DIN 5008 "Rücksendeangabe")
+  return_line: "Benjamin Gleich · Am Georgenstein 14 · 82065 Baierbrunn"
+  footer:
+    - "Gleich & Brother GmbH · Am Georgenstein 14 · 82065 Baierbrunn · rocket-letter.de"
+    - "Geschäftsführer: Benjamin Gleich, Marcel Gleich · Registergericht München, HRB 253 821 · USt-IdNr. DE328959714"
+
+signatures:
+  # Shown where {signatures} appears in the template.
+  name: "Benjamin & Marcel Gleich"
+  caption: "Gründer von Rocket Letter"
+  images:                       # optional transparent PNGs, shown side by side above the name
+    - assets/signature_benjamin.png
+    - assets/signature_marcel.png
+  image_height_mm: 8               # space for the handwritten signature above the names
+  align: bottom                    # names sit higher, level with the upper part of the link box
+  # CTA box right of the signature: question, instruction, personal link in large bold type.
+  # The link leads to the booking page for the Erstgespräch, so the CTA promises exactly that.
+  cta:
+    enabled: false              # false = no link box next to the signature
+    title: "Was bringen 1.000 Reports für {agency_name}?"
+    title_fallback: "Was bringen 1.000 Reports für deine Agentur?"   # used if the name does not fit one line
+    label: "Im kurzen Erstgespräch mit deinen Zahlen durchrechnen:"
+
+qr:
+  base_url: "https://go.rocket-letter.de/"
+  display_prefix: "go.rocket-letter.de/"
+  # Use this CSV column as slug if it exists; otherwise the slug is generated
+  # from the last name, with "-firstname" (and then "-2", "-3") on collisions.
+  slug_column: "qr_slug"
+  style: inline                 # inline = next to the signature, plain = top right without box, box = coloured box
+  size_mm: 20
+  top_mm: 47                    # top edge of the QR code (plain style)
+  caption_title: "Lohnt sich Print für euch?"
+  inline_title: "Plattform live ansehen"
+  caption: "und durchrechnen, was 1.000 Reports für {agency_name} bringen:"
+  caption_width_mm: 62
+  show_link: true               # print the personal link under the code (plain style)
+
+columns:
+  # CSV column names (first existing one wins)
+  company: [legal_name, company_name, AgencyName]        # line 1 in the address window
+  company_max_chars: 42                                  # longer legal names fall back to the next column
+  agency_name: [AgencyName, company_name, legal_name]     # used in the letter text
+  salutation: [salutation_1]
+  first_name: [first_name_1]
+  last_name: [last_name_1]
+  street: [street]
+  house_number: [house_number]
+  postcode: [postcode]
+  city: [city]
+  full_address: [full_address]                           # only used to detect a "c/o ..." line
+  paragraph: [Paragraph, paragraph]
+  domain: [domain]
+
+layout:
+  font_size: 10                 # starting size; shrinks in 0.25-pt steps to font_size_min to fit one page
+  font_size_min: 9
+  leading_factor: 1.38
+  headline_size: 12.5
+  bullet_style: plain           # plain = normal text bullet, accent = cyan square
+  headline_accent: false        # short cyan bar above the headline
+  highlight: bold               # ==text== in the copy: bold | marker (bold + light cyan background)
+  label_scale: 0.9              # size of the **bold labels** (Sora) relative to the body text
+  cta_gap_mm: 3.5                 # white space above and below the signature / CTA box
+  paragraph_spacing: 0.6       # space after each paragraph, relative to line height
+  bullet_spacing: 0.4          # space between bullets, relative to line height
+  margin_left: 25
+  margin_right: 20
+  body_top: 93                  # where the accent bar / headline starts on page 1
+  body_bottom: 17               # space kept free above the bottom edge (footer)
+  fold_marks: true              # DIN marks at 105 / 210 mm + hole mark at 148.5 mm
+  duplex_padding: false         # pad each letter to an even page count (only for duplex printing)
+
+options:
+  # Recipients without an individual paragraph: "skip" (default) or "fallback"
+  missing_paragraph: skip
+  fallback_paragraph: >-
+    Wir haben uns euren Auftritt vorab angeschaut. Kandidaten erreicht ihr digital sehr gut,
+    eure eigenen Wunschkunden, Geschäftsführer mit offenen Stellen, klicken aber kaum auf Ads
+    und blocken am Telefon ab, außer vorher liegt ein gedruckter Report von euch auf dem Tisch.
