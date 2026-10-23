@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from ..config import CampaignConfig
+from ..email_fill import fill_rows_email
 from ..io.readers import load_rows_as_business
 from ..io.writers import write_final_business_rows
 from ..models import BusinessRow
@@ -150,6 +151,8 @@ def run_final_review(
         kept.append(row)
         if registry:
             registry.mark(row.domain, "final")
+
+    stats["email_filled"] = fill_rows_email(kept)
 
     output = stage_path(config.campaign_dir, config.base_name, "final")
     write_final_business_rows(output, kept, max_directors=config.max_directors)

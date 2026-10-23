@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from list_processing.llm.base import LLMClient
 
+from ..email_fill import fill_row_email
 from ..models import MAX_DIRECTORS_DEFAULT, BusinessRow, normalize_postcode
 from .fetch import close_browser_pool, get_imprint_text_for_domain
 
@@ -444,8 +445,7 @@ Remember: exclude fax numbers and data-protection contacts from generic_company_
 
 
         emails = filter_company_emails(data.get("generic_company_emails"))
-        if emails and not row.email:
-            row.email = str(emails[0])
+        if fill_row_email(row, extra_candidates=emails):
             updated = True
 
         md_list = filter_managing_directors(data.get("managing_directors"))
