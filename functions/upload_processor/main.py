@@ -45,12 +45,6 @@ def _agent_log(hypothesis_id: str, location: str, message: str, data: Dict):
         # Never let logging break the function
         pass
 # #endregion agent log helper
-try:
-    # Preferred public path in recent releases
-    from google.cloud.firestore_v1.field_path import FieldPath
-except Exception:  # fallback for older/packaged versions
-    FieldPath = None
-
 
 import tldextract
 
@@ -314,65 +308,38 @@ def _normalize_domain_for_id(value: Optional[str]) -> str:
     return remove_tld_suffix(slug)
 
 
-def existing_variants_for_base(COL_LINKS, base_id: str) -> set[str]:
+# Highest numeric prefix written for a colliding base (`100-beispiel`). The bare
+# base id does not count. The next collision after that raises.
+MAX_LINK_ID_NUMBER = 100
+
+
+def create_unique_link(base_id: str, payload: dict, next_n_by_base: Dict[str, int]) -> str:
     """
-    Return all doc IDs that start with base_id: { base_id, base_id-1, base_id-2, ... }.
-    Uses a range query on document ID (aka __name__).
-    - Compares against DocumentReferences, not strings.
-    - Falls back to '__name__' if FieldPath isn't importable.
-    - Guards empty base to avoid scanning whole collection.
+    Create links/{id}. A free base stays `base_id`. Collisions become `{n}-{base_id}`
+    for the smallest n >= 1 whose document does not exist yet.
+
+    `create()` is the occupancy check, so two uploads cannot claim the same id.
+    `next_n_by_base` remembers the next n for this upload, so later rows of the
+    same base skip ids already created in this run. Raises once n would pass
+    MAX_LINK_ID_NUMBER.
     """
-    base_id = (base_id or "").strip()
-    if not base_id:
-        print("[DEBUG existing_variants_for_base] empty base_id received, returning empty set")
-        return set()
+    base_id = (base_id or "").strip() or "link"
+    n = next_n_by_base.get(base_id, 0)
 
-    # Build DocumentReference bounds
-    start_ref = COL_LINKS.document(base_id)
-    end_ref = COL_LINKS.document(base_id + u"\uf8ff")
+    while n <= MAX_LINK_ID_NUMBER:
+        candidate = base_id if n == 0 else f"{n}-{base_id}"
+        try:
+            print(f"Creating link with ID: {candidate}")
+            COL_LINKS.document(candidate).create({**payload, "short_code": candidate})
+            next_n_by_base[base_id] = n + 1
+            return candidate
+        except AlreadyExists:
+            print(f"[warn] Link ID collision for '{candidate}', trying next prefix")
+            n += 1
 
-    # Field path for document id
-    fp = FieldPath.document_id() if FieldPath else "__name__"
-
-    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - building query")
-
-    # Query only IDs (tiny payload)
-    q = (
-        COL_LINKS
-        .where(fp, ">=", start_ref)
-        .where(fp, "<=", end_ref)   # '<=' is fine here; can use '<' if you prefer
-        .select([])                 # no fields, just names
+    raise RuntimeError(
+        f"no free link id for base {base_id!r} after {MAX_LINK_ID_NUMBER} numbered variants"
     )
-
-    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - starting stream()")
-    taken_ids: set[str] = set()
-    for doc in q.stream():
-        taken_ids.add(doc.id)
-    print(f"[DEBUG existing_variants_for_base] base_id={base_id!r} - finished stream(), count={len(taken_ids)}")
-
-    return taken_ids
-
-
-def next_id_from_cache(base_id: str, taken: set[str]) -> str:
-    """Pick base_id if free, else base_id-<n> with the smallest available n >= 1."""
-    # Guard against empty base_id - never return empty string
-    if not base_id or not base_id.strip():
-        base_id = "link"
-        print(f"[warn] Empty base_id detected in next_id_from_cache, using fallback: 'link'")
-    
-    if base_id not in taken:
-        taken.add(base_id)
-        return base_id
-    # Find the max numeric suffix already taken for this base
-    pat = re.compile(rf"^{re.escape(base_id)}-(\d+)$")
-    max_n = 0
-    for did in taken:
-        m = pat.match(did)
-        if m:
-            max_n = max(max_n, int(m.group(1)))
-    candidate = f"{base_id}-{max_n + 1}"
-    taken.add(candidate)
-    return candidate
 
 
 def template_with_qr_suffix(template: Optional[str]) -> Optional[str]:
@@ -450,6 +417,41 @@ def get_ci_key(row: dict, *names: str) -> Optional[str]:
         if key is not None:
             return key
     return None
+
+
+PARAGRAPH_COLUMN = "Paragraph"
+# First non-empty alias wins. Output and Firestore always use Paragraph / paragraph.
+PARAGRAPH_ALIASES = ("Paragraph", "paragraph", "absatz", "Absatz")
+_PARAGRAPH_ALIAS_KEYS = {name.lower() for name in PARAGRAPH_ALIASES}
+
+
+def paragraph_from_row(row: dict) -> str:
+    """Letter body from Paragraph or absatz. Empty when the column is absent or blank."""
+    return (get_ci_nonempty(row, *PARAGRAPH_ALIASES) or "").strip()
+
+
+def normalize_paragraph_column(row: dict) -> Optional[str]:
+    """
+    Collapse Paragraph/absatz aliases onto a single Paragraph column.
+    Returns the text, or None when the row has no such column.
+    """
+    if get_ci_key(row, *PARAGRAPH_ALIASES) is None:
+        return None
+    text = paragraph_from_row(row)
+    for key in list(row.keys()):
+        if isinstance(key, str) and key.lower() in _PARAGRAPH_ALIAS_KEYS:
+            row.pop(key, None)
+    row[PARAGRAPH_COLUMN] = text
+    return text
+
+
+def paragraph_field_for_target(row: dict) -> Optional[str]:
+    """Campaign-target value. None when the column is absent or blank."""
+    if PARAGRAPH_COLUMN not in row and get_ci_key(row, *PARAGRAPH_ALIASES) is None:
+        return None
+    text = row.get(PARAGRAPH_COLUMN) if PARAGRAPH_COLUMN in row else paragraph_from_row(row)
+    text = (text or "").strip()
+    return text or None
 
 
 def csv_fieldnames_union(rows: List[dict]) -> List[str]:
@@ -873,8 +875,8 @@ def assign_final_ids(precomputed: List[Dict]) -> None:
     We no longer pre-scan Firestore for existing variants here, to avoid
     long-running range queries. Instead we:
     - Use base_id (or a 'link' fallback) as the initial final_id.
-    - Rely on Firestore's AlreadyExists error in the link-creation path
-      to detect and resolve rare collisions by allocating a new suffix.
+    - Rely on create_unique_link() to detect collisions via AlreadyExists
+      and allocate `{n}-{base_id}` (number at the front).
     This keeps the function responsive even when Firestore scans are slow.
     """
     total_items = len(precomputed)
@@ -891,8 +893,7 @@ def assign_final_ids(precomputed: List[Dict]) -> None:
             print(f"[warn] Empty base_id in assign_final_ids at index={idx}, using fallback: 'link'")
 
         # Use the base_id directly as the initial final_id.
-        # If this collides with an existing link, the link-creation code
-        # will catch AlreadyExists and allocate a new suffix.
+        # create_unique_link() replaces it when that document already exists.
         item["final_id"] = base_id
 
     print("[DEBUG assign_final_ids] finished assigning provisional final_ids")
@@ -1023,6 +1024,7 @@ def assign_links_from_business_file(path: str, base_url: str,
     print("Total rows in input file:", total_rows)
     precomputed: List[Dict] = []
     for i, row in enumerate(rows):
+        normalize_paragraph_column(row)
         in_limit = (limit <= 0) or (i < limit)
         
         # Check if business is blacklisted BEFORE other processing
@@ -1162,6 +1164,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                 batch = db.batch()
                 ops = 0
 
+    # Next numeric prefix to try per base id, for this upload only.
+    next_n_by_base: Dict[str, int] = {}
+
     pbar = tqdm(precomputed, desc="Processing rows", unit="row")
     try:
         for item_idx, item in enumerate(pbar):
@@ -1224,7 +1229,7 @@ def assign_links_from_business_file(path: str, base_url: str,
                 # Only create links, update ownerIds, and create customer overlay if destination exists.
                 # This prevents creating overlays for businesses without tracking links.
                 if dest and final_id and final_id.strip():
-                    # Common payload shared between base ID and any retry suffix.
+                    # Common payload shared between the base ID and any numeric prefix.
                     base_link_payload = {
                         "campaign_ref": campaign_ref,
                         "business_ref": biz_ref,
@@ -1244,42 +1249,19 @@ def assign_links_from_business_file(path: str, base_url: str,
                     if allowed_hosts:
                         base_link_payload["allowed_hosts"] = allowed_hosts
 
-                    # Try to create link with final_id via a direct create() so that
-                    # AlreadyExists is raised here (not deferred to batch.commit()).
-                    try:
-                        print(f"Creating link with ID: {final_id}")
-                        link_ref = COL_LINKS.document(final_id)
-                        link_ref.create({
-                            **base_link_payload,
-                            "short_code": final_id,   # mirror the human-readable ID
-                        })
-                        created_links += 1
-                    except AlreadyExists:
-                        # Link with this ID already exists -> allocate a new suffix-based ID.
-                        print(f"[warn] Link ID collision for '{final_id}', retrying with next suffix")
-                        base = item.get("base_id") or final_id or "link"
-                        if not base or not base.strip():
-                            base = "link"
-                            print(f"[warn] Empty base in retry logic, using fallback: 'link'")
-                        taken = existing_variants_for_base(COL_LINKS, base)
-                        retry_id = next_id_from_cache(base, taken)
+                    # create() raises AlreadyExists immediately, so collisions are resolved
+                    # here instead of at batch.commit(). final_id becomes the id that
+                    # was actually written (`beispiel`, or `1-beispiel` on collision).
+                    final_id = create_unique_link(
+                        item.get("base_id") or final_id,
+                        base_link_payload,
+                        next_n_by_base,
+                    )
+                    link_ref = COL_LINKS.document(final_id)
+                    created_links += 1
 
-                        # Double-check retry_id is not empty
-                        if not retry_id or not retry_id.strip():
-                            retry_id = f"link-{len(taken) + 1}"
-                            print(f"[warn] retry_id was empty, using fallback: '{retry_id}'")
-
-                        print(f"Creating link with retry ID: {retry_id}")
-                        link_ref = COL_LINKS.document(retry_id)
-                        link_ref.create({
-                            **base_link_payload,
-                            "short_code": retry_id,
-                        })
-                        created_links += 1
-                        final_id = retry_id             # make sure output and targets use the actual created ID
-
-                    # At this point, a link doc definitely exists (either base_id or suffixed),
-                    # so grant the user access to the business and upsert the customer overlay.
+                    # A link doc exists now, so grant the user access to the business
+                    # and upsert the customer overlay.
                     batch.set(biz_ref, {"ownerIds": ArrayUnion([ownerId])}, merge=True); ops += 1
 
                     customer_business_ref = db.collection('customers').document(ownerId).collection('businesses').document(biz_id)
@@ -1302,6 +1284,9 @@ def assign_links_from_business_file(path: str, base_url: str,
                     "created_at": firestore.SERVER_TIMESTAMP,
                     "updated_at": firestore.SERVER_TIMESTAMP
                 }
+                paragraph_value = paragraph_field_for_target(row)
+                if PARAGRAPH_COLUMN in row:
+                    target_payload["paragraph"] = paragraph_value
                 batch.set(target_ref, target_payload); ops += 1
                 created_targets += 1
 

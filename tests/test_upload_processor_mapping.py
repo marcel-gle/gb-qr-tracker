@@ -142,6 +142,38 @@ def test_unverified_apollo_email_is_dropped(up):
     assert "contact_source" not in customer
 
 
+def test_absatz_alias_becomes_paragraph_on_target_and_output(up, tmp_path):
+    text = "Ein längerer Briefabsatz, mit Komma; und Semikolon."
+    row = {"company_name": "A GmbH", "absatz": text, "Paragraph": ""}
+    assert up.normalize_paragraph_column(row) == text
+    assert row["Paragraph"] == text
+    assert "absatz" not in row
+    assert up.paragraph_field_for_target(row) == text
+
+    names = up.csv_fieldnames_union([
+        {**row, "tracking_link": "https://x/a", "tracking_url": "https://x/a", "tracking_id": "a"}
+    ])
+    assert "Paragraph" in names
+    assert "absatz" not in names
+    assert names[-3:] == ["tracking_link", "tracking_url", "tracking_id"]
+
+    src = tmp_path / "list.csv"
+    src.write_text("company_name,Paragraph\n", encoding="utf-8")
+    out = up.write_back_csv(str(src), [row])
+    written = Path(out).read_text(encoding="utf-8")
+    assert "Paragraph" in written.splitlines()[0]
+    assert text in written
+
+
+def test_paragraph_column_is_optional(up):
+    row = {"company_name": "A GmbH"}
+    assert up.normalize_paragraph_column(row) is None
+    assert "Paragraph" not in row
+    assert up.paragraph_field_for_target(row) is None
+    _, canonical, _customer = up.upsert_business_payload_from_row(row, "owner", None)
+    assert canonical["business_name"] == "A GmbH"
+
+
 def test_apollo_contact_uses_director_with_data(up):
     row = _final_row(apollo_phone_2="+49 171 222")
     _, _, customer = up.upsert_business_payload_from_row(row, "owner", None)
@@ -149,3 +181,66 @@ def test_apollo_contact_uses_director_with_data(up):
     assert customer["contact_phone"] == "+49 171 222"
     assert customer["contact_name"] == "Erika Muster"
     assert customer["contact_salutation"] == "Frau"
+
+
+class _LinkDoc:
+    def __init__(self, store, doc_id, already_exists):
+        self.store = store
+        self.doc_id = doc_id
+        self.already_exists = already_exists
+
+    def create(self, payload):
+        if self.doc_id in self.store:
+            raise self.already_exists()
+        self.store[self.doc_id] = payload
+
+
+class _Links:
+    def __init__(self, store, already_exists):
+        self.store = store
+        self.already_exists = already_exists
+
+    def document(self, doc_id):
+        return _LinkDoc(self.store, doc_id, self.already_exists)
+
+
+@pytest.fixture
+def link_store(up):
+    previous = up.COL_LINKS
+    store = {}
+    up.COL_LINKS = _Links(store, up.AlreadyExists)
+    yield store
+    up.COL_LINKS = previous
+
+
+def test_free_base_id_is_used_as_is(up, link_store):
+    assert up.create_unique_link("beispiel", {"destination": "https://x"}, {}) == "beispiel"
+    assert link_store["beispiel"]["short_code"] == "beispiel"
+
+
+def test_collision_puts_the_number_in_front(up, link_store):
+    link_store["beispiel"] = {"short_code": "beispiel"}
+    link_store["1-beispiel"] = {"short_code": "1-beispiel"}
+    next_n = {}
+
+    assert up.create_unique_link("beispiel", {"destination": "https://x"}, next_n) == "2-beispiel"
+    assert up.create_unique_link("beispiel", {"destination": "https://y"}, next_n) == "3-beispiel"
+    assert link_store["2-beispiel"]["short_code"] == "2-beispiel"
+    assert link_store["3-beispiel"]["destination"] == "https://y"
+    assert next_n["beispiel"] == 4
+
+
+def test_empty_base_falls_back_to_link(up, link_store):
+    assert up.create_unique_link("  ", {}, {}) == "link"
+    assert "link" in link_store
+
+
+def test_hundredth_prefix_is_allowed_and_the_next_one_fails(up, link_store):
+    link_store["cap"] = {}
+    for n in range(1, 100):
+        link_store[f"{n}-cap"] = {}
+
+    assert up.create_unique_link("cap", {}, {}) == "100-cap"
+
+    with pytest.raises(RuntimeError, match="after 100 numbered variants"):
+        up.create_unique_link("cap", {}, {})
