@@ -13,7 +13,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from campaign_pipeline.config import CampaignConfig, ScoreConfig
 from campaign_pipeline.env import load_project_env
-from campaign_pipeline.integrations import run_firestore_upload, run_pdf_generation
+from campaign_pipeline.integrations import parse_tracking_domain, run_firestore_upload, run_pdf_generation
 from campaign_pipeline.naming import review_decisions_path, review_issues_path, stage_path
 from campaign_pipeline.pipeline import CampaignPipeline
 from campaign_pipeline.ui.drive_helpers import (
@@ -916,6 +916,10 @@ def render_upload() -> None:
     campaign_name = st.text_input("Campaign name")
     campaign_id = st.text_input("Campaign ID", value=pipe.config.base_name)
     destination = st.text_input("Destination URL")
+    tracking_domain = st.text_input(
+        "Tracking domain",
+        help='Domain printed on the letter, e.g. go.rocket-letter.de. Type "none" to print on ihr-brief.de.',
+    )
     do_upload = st.checkbox("Upload to GCS", value=False)
 
     if st.button("Prepare / upload"):
@@ -924,6 +928,10 @@ def render_upload() -> None:
             return
         if not all([(owner_id or "").strip(), (campaign_code or "").strip(), (destination or "").strip()]):
             st.error("Owner ID, campaign code, and destination URL are required.")
+            return
+        tracking_url_prefix, domain_error = parse_tracking_domain(tracking_domain)
+        if domain_error:
+            st.error(domain_error)
             return
         code, out, err = run_firestore_upload(
             env=env,
@@ -935,6 +943,7 @@ def render_upload() -> None:
             campaign_name=campaign_name.strip(),
             campaign_id=campaign_id,
             upload=do_upload,
+            tracking_url_prefix=tracking_url_prefix,
         )
         st.code(out + err)
         if code != 0:

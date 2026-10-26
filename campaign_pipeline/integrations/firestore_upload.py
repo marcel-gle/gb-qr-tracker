@@ -4,8 +4,31 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+NO_TRACKING_DOMAIN = "none"
+
+
+def parse_tracking_domain(raw: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """
+    Read the required tracking domain field.
+
+    Returns (tracking_url_prefix, error). "none" gives (None, None): no prefix,
+    so upload_processor prints the default ihr-brief.de. Otherwise the value is
+    kept as typed, because it is printed on the letter as "<value>/<code>".
+    """
+    value = (raw or "").strip()
+    if not value:
+        return None, 'Tracking domain is required. Type "none" to print on ihr-brief.de.'
+    if value.lower() == NO_TRACKING_DOMAIN:
+        return None, None
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    host = parsed.hostname or ""
+    if parsed.scheme not in ("http", "https") or "." not in host or " " in value:
+        return None, f"Tracking domain {raw!r} is not a domain like go.rocket-letter.de."
+    return value.rstrip("/"), None
 
 
 def run_firestore_upload(
@@ -19,6 +42,7 @@ def run_firestore_upload(
     destination: str,
     campaign_id: str = "",
     upload: bool = False,
+    tracking_url_prefix: Optional[str] = None,
 ) -> tuple[int, str, str]:
     cmd: List[str] = [
         sys.executable,
@@ -40,6 +64,8 @@ def run_firestore_upload(
     ]
     if campaign_id:
         cmd.extend(["--campaign-id", campaign_id])
+    if tracking_url_prefix:
+        cmd.extend(["--tracking-url-prefix", tracking_url_prefix])
     if upload:
         cmd.append("--upload")
 

@@ -226,11 +226,8 @@ def _upload_to_gcs(
     client = storage.Client()
     bucket = client.bucket(bucket_name)
 
-    # Upload CSV/XLSX
-    blob = bucket.blob(object_name)
-    blob.upload_from_filename(str(local_path))
-
-    # Upload manifest.json next to the object
+    # Upload manifest.json first: the CSV upload triggers upload_processor,
+    # which reads the manifest right away.
     prefix_dir = os.path.dirname(object_name)
     manifest_blob_name = f"{prefix_dir}/manifest.json"
     manifest_blob = bucket.blob(manifest_blob_name)
@@ -238,6 +235,10 @@ def _upload_to_gcs(
         json.dumps(manifest, ensure_ascii=False, indent=2),
         content_type="application/json",
     )
+
+    # Upload CSV/XLSX
+    blob = bucket.blob(object_name)
+    blob.upload_from_filename(str(local_path))
 
     csv_uri = f"gs://{bucket_name}/{object_name}"
     manifest_uri = f"gs://{bucket_name}/{manifest_blob_name}"
@@ -434,6 +435,15 @@ def main(argv: List[str] | None = None) -> int:
         required=True,
         help="Destination URL to store in manifest (used by upload_processor).",
     )
+    parser.add_argument(
+        "--tracking-url-prefix",
+        default=None,
+        help=(
+            "Domain printed on the letter, e.g. https://go.rocket-letter.de. "
+            "upload_processor uses it for tracking_url and the link namespace. "
+            "Omit to print on ihr-brief.de."
+        ),
+    )
     args = parser.parse_args(argv)
 
     input_csv: Path = args.input_csv
@@ -520,6 +530,8 @@ def main(argv: List[str] | None = None) -> int:
             "skip_existing": True,
             "geocode": False,
         }
+        if args.tracking_url_prefix:
+            manifest["tracking_url_prefix"] = args.tracking_url_prefix
 
         csv_uri, manifest_uri = _upload_to_gcs(
             bucket_name=bucket_name,
