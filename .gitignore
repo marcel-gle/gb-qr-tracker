@@ -147,3 +147,8 @@ scan_ergebnis.json
 
 scripts/letter_custom_paragraphs/**/*.json
 scripts/letter_custom_paragraphs/**/*.jsonl
+
+*.db
+
+scraping_pipelines/kundenrecherche/analyse_*.md
+scraping_pipelines/hps-pflege/pflegeheim_scraper/heimaufsicht_pdf_links.txt
