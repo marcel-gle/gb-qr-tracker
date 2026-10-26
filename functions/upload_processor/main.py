@@ -187,8 +187,75 @@ except Exception:
 class DuplicateCampaignCodeError(RuntimeError):
     pass
 
-def build_tracking_link(base_url: str, doc_id: str) -> str:
-    return f"{base_url.rstrip('/')}/?id={doc_id}"
+_TENANT_POOL_RE = re.compile(r"^[a-z0-9-]{1,40}$")
+
+
+def tenant_pool(tenant_id: Optional[str]) -> Optional[str]:
+    """Pool name used in links/{pool}__{code}. None when the value cannot be a pool."""
+    if not isinstance(tenant_id, str):
+        return None
+    pool = tenant_id.strip().lower()
+    if not pool or not _TENANT_POOL_RE.fullmatch(pool):
+        return None
+    return pool
+
+
+def link_document_id(tenant_id: Optional[str], short_code: str) -> str:
+    """Firestore id for a short code. Unscoped codes stay links/{short_code}."""
+    pool = tenant_pool(tenant_id)
+    if not pool:
+        return short_code
+    return f"{pool}__{short_code}"
+
+
+# Host printed on the letter when the upload has no tracking_url_prefix.
+DEFAULT_TRACKING_HOST = "ihr-brief.de"
+
+
+class TenantDomainMismatchError(RuntimeError):
+    pass
+
+
+def printed_host_pool(tenant_id: Optional[str], shared: bool) -> Optional[str]:
+    """
+    Pool the redirector opens first on this domain. Shared domains have none.
+    Must match redirector tenant_utils.domain_link_pool.
+    """
+    if shared:
+        return None
+    return tenant_pool(tenant_id)
+
+
+def resolve_link_pool(manifest_tenant: Optional[str], tracking_url_prefix: Optional[str]) -> Optional[str]:
+    """
+    Pool for this upload's link ids, taken from the domain printed on the letter.
+
+    The Worker looks a code up under that domain's pool, so a link stored in
+    any other pool would never be found. A shared or unknown domain gives None
+    (bare links/{code}, as before). A manifest tenant that names a different
+    tenant than a dedicated printed domain raises instead of printing letters
+    that cannot resolve.
+    """
+    host = _hostname_from_tracking_url_prefix(tracking_url_prefix) or DEFAULT_TRACKING_HOST
+    snap = db.collection(CUSTOMER_DOMAINS_COLLECTION).document(host).get()
+    if not snap.exists:
+        return None
+    data = snap.to_dict() or {}
+    pool = printed_host_pool(data.get("tenant_id"), bool(data.get("shared")))
+    if pool and manifest_tenant and str(manifest_tenant).strip() and tenant_pool(str(manifest_tenant)) != pool:
+        raise TenantDomainMismatchError(
+            f"tenant_id {manifest_tenant!r} does not match {host!r}, which belongs to tenant {pool!r}"
+        )
+    return pool
+
+
+def build_tracking_link(base_url: str, short_code: str, tenant_id: Optional[str] = None) -> str:
+    """QR target. Adds &tenant= only when the link was stored under that pool."""
+    url = f"{base_url.rstrip('/')}/?id={short_code}"
+    pool = tenant_pool(tenant_id)
+    if pool:
+        return f"{url}&tenant={pool}"
+    return url
 
 def build_tracking_url(tracking_url_prefix: Optional[str], final_id: str) -> str:
     """
@@ -200,7 +267,7 @@ def build_tracking_url(tracking_url_prefix: Optional[str], final_id: str) -> str
     """
     if tracking_url_prefix:
         return f"{tracking_url_prefix.rstrip('/')}/{final_id}"
-    return f"ihr-brief.de/{final_id}"
+    return f"{DEFAULT_TRACKING_HOST}/{final_id}"
 
 def sanitize_id(value: str) -> str:
     if value is None:
@@ -313,10 +380,38 @@ def _normalize_domain_for_id(value: Optional[str]) -> str:
 MAX_LINK_ID_NUMBER = 100
 
 
-def create_unique_link(base_id: str, payload: dict, next_n_by_base: Dict[str, int]) -> str:
+def _legacy_short_code_reserved(short_code: str, pool: str) -> bool:
     """
-    Create links/{id}. A free base stays `base_id`. Collisions become `{n}-{base_id}`
-    for the smallest n >= 1 whose document does not exist yet.
+    True when links/{short_code} exists and is not another tenant's.
+
+    A new links/{pool}__{short_code} would be opened first on this pool's
+    domain and would hide an already printed letter with that code. Links
+    without a tenant_id may have been printed anywhere, so they count as taken.
+    Only a bare document with another tenant's id leaves the code free.
+    """
+    snap = COL_LINKS.document(short_code).get()
+    if not snap.exists:
+        return False
+    data = snap.to_dict() or {}
+    legacy_tenant = data.get("tenant_id")
+    if not isinstance(legacy_tenant, str) or not legacy_tenant.strip():
+        return True
+    return tenant_pool(legacy_tenant) == pool
+
+
+def create_unique_link(
+    base_id: str,
+    payload: dict,
+    next_n_by_base: Dict[str, int],
+    tenant_id: Optional[str] = None,
+) -> str:
+    """
+    Create a link document and return the printed short code.
+
+    Without a usable tenant_id this stores links/{short_code}, as before.
+    With one it stores links/{tenant}__{short_code}. Collisions become
+    `{n}-{base_id}` inside that same tenant. A bare links/{short_code} that
+    already has this tenant_id also counts as taken.
 
     `create()` is the occupancy check, so two uploads cannot claim the same id.
     `next_n_by_base` remembers the next n for this upload, so later rows of the
@@ -324,17 +419,29 @@ def create_unique_link(base_id: str, payload: dict, next_n_by_base: Dict[str, in
     MAX_LINK_ID_NUMBER.
     """
     base_id = (base_id or "").strip() or "link"
-    n = next_n_by_base.get(base_id, 0)
+    pool = tenant_pool(tenant_id)
+    if tenant_id and not pool:
+        print(f"[warn] Ignoring unusable tenant_id {tenant_id!r}; creating a global link id")
+    counter_key = f"{pool}__{base_id}" if pool else base_id
+    n = next_n_by_base.get(counter_key, 0)
 
     while n <= MAX_LINK_ID_NUMBER:
-        candidate = base_id if n == 0 else f"{n}-{base_id}"
+        short_code = base_id if n == 0 else f"{n}-{base_id}"
+        doc_id = link_document_id(pool, short_code)
+        if pool and _legacy_short_code_reserved(short_code, pool):
+            print(f"[warn] Legacy link '{short_code}' is not another tenant's, trying next prefix")
+            n += 1
+            continue
         try:
-            print(f"Creating link with ID: {candidate}")
-            COL_LINKS.document(candidate).create({**payload, "short_code": candidate})
-            next_n_by_base[base_id] = n + 1
-            return candidate
+            print(f"Creating link with ID: {doc_id}")
+            body = {**payload, "short_code": short_code}
+            if pool:
+                body.setdefault("tenant_id", pool)
+            COL_LINKS.document(doc_id).create(body)
+            next_n_by_base[counter_key] = n + 1
+            return short_code
         except AlreadyExists:
-            print(f"[warn] Link ID collision for '{candidate}', trying next prefix")
+            print(f"[warn] Link ID collision for '{doc_id}', trying next prefix")
             n += 1
 
     raise RuntimeError(
@@ -917,7 +1024,8 @@ def assign_links_from_business_file(path: str, base_url: str,
                                     geocode: bool = True,
                                     tracking_url_prefix: Optional[str] = None,
                                     tenant_id: Optional[str] = None,
-                                    allowed_hosts: Optional[List[str]] = None):
+                                    allowed_hosts: Optional[List[str]] = None,
+                                    link_pool: Optional[str] = None):
     created_links, created_targets = 0, 0
     skipped, errors = 0, 0
     blacklisted_count = 0
@@ -1250,14 +1358,17 @@ def assign_links_from_business_file(path: str, base_url: str,
                         base_link_payload["allowed_hosts"] = allowed_hosts
 
                     # create() raises AlreadyExists immediately, so collisions are resolved
-                    # here instead of at batch.commit(). final_id becomes the id that
-                    # was actually written (`beispiel`, or `1-beispiel` on collision).
-                    final_id = create_unique_link(
+                    # here instead of at batch.commit(). The printed code stays
+                    # `beispiel` (or `1-beispiel`). With a link pool (dedicated printed
+                    # domain) the document id is `{pool}__{code}`; otherwise the bare code.
+                    short_code = create_unique_link(
                         item.get("base_id") or final_id,
                         base_link_payload,
                         next_n_by_base,
+                        tenant_id=link_pool,
                     )
-                    link_ref = COL_LINKS.document(final_id)
+                    final_id = short_code
+                    link_ref = COL_LINKS.document(link_document_id(link_pool, short_code))
                     created_links += 1
 
                     # A link doc exists now, so grant the user access to the business
@@ -1299,7 +1410,7 @@ def assign_links_from_business_file(path: str, base_url: str,
 
                 # write back tracking info + template into the row
                 if dest and final_id:
-                    row['tracking_link'] = build_tracking_link(base_url, final_id)
+                    row['tracking_link'] = build_tracking_link(base_url, final_id, link_pool)
                     row['tracking_url'] = build_tracking_url(tracking_url_prefix, final_id)
                     row['tracking_id'] = final_id
                 else:
@@ -1771,6 +1882,9 @@ def process_business_upload(cloud_event):
     if resolved_allowed_hosts:
         print(f"[allowed_hosts] resolved={resolved_allowed_hosts!r}")
 
+    link_pool = resolve_link_pool(params.get("tenant_id"), params.get("tracking_url_prefix"))
+    print(f"[link_pool] {link_pool!r} (None = bare links/{{code}})")
+
     # Download uploaded file to /tmp
     local_in = os.path.join("/tmp", os.path.basename(object_name))
     _download_blob(bucket, object_name, local_in)
@@ -1797,6 +1911,7 @@ def process_business_upload(cloud_event):
             tracking_url_prefix=params.get("tracking_url_prefix"),
             tenant_id=resolved_tenant_id,
             allowed_hosts=resolved_allowed_hosts or None,
+            link_pool=link_pool,
         )
 
         out_path = result["output_path"]

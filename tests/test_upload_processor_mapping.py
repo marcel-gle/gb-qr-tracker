@@ -183,11 +183,27 @@ def test_apollo_contact_uses_director_with_data(up):
     assert customer["contact_salutation"] == "Frau"
 
 
+class _LinkSnap:
+    def __init__(self, data):
+        self.exists = data is not None
+        self._data = data
+
+    def to_dict(self):
+        if not self.exists:
+            return None
+        return dict(self._data)
+
+
 class _LinkDoc:
     def __init__(self, store, doc_id, already_exists):
         self.store = store
         self.doc_id = doc_id
         self.already_exists = already_exists
+
+    def get(self):
+        if self.doc_id in self.store:
+            return _LinkSnap(self.store[self.doc_id])
+        return _LinkSnap(None)
 
     def create(self, payload):
         if self.doc_id in self.store:
@@ -244,3 +260,132 @@ def test_hundredth_prefix_is_allowed_and_the_next_one_fails(up, link_store):
 
     with pytest.raises(RuntimeError, match="after 100 numbered variants"):
         up.create_unique_link("cap", {}, {})
+
+
+def test_tenant_stores_pool_prefix_and_prints_the_short_code(up, link_store):
+    assert up.create_unique_link("abc", {"destination": "https://x"}, {}, tenant_id="Rocket-Letter") == "abc"
+    assert link_store["rocket-letter__abc"]["short_code"] == "abc"
+    assert link_store["rocket-letter__abc"]["tenant_id"] == "rocket-letter"
+    assert "abc" not in link_store
+    assert up.link_document_id("rocket-letter", "abc") == "rocket-letter__abc"
+    assert up.build_tracking_link("https://fn.example", "abc", "rocket-letter") == (
+        "https://fn.example/?id=abc&tenant=rocket-letter"
+    )
+    assert up.build_tracking_link("https://fn.example", "abc") == "https://fn.example/?id=abc"
+
+
+def test_same_short_code_is_free_in_another_tenant(up, link_store):
+    link_store["rocket-letter__abc"] = {"short_code": "abc", "tenant_id": "rocket-letter"}
+
+    assert up.create_unique_link("abc", {}, {}, tenant_id="ihr-brief") == "abc"
+    assert link_store["ihr-brief__abc"]["short_code"] == "abc"
+
+
+def test_collision_inside_a_tenant_still_prefixes(up, link_store):
+    link_store["rocket-letter__abc"] = {"short_code": "abc", "tenant_id": "rocket-letter"}
+
+    assert up.create_unique_link("abc", {}, {}, tenant_id="rocket-letter") == "1-abc"
+    assert link_store["rocket-letter__1-abc"]["short_code"] == "1-abc"
+
+
+def test_legacy_code_owned_by_the_same_tenant_is_not_reused(up, link_store):
+    link_store["abc"] = {"short_code": "abc", "tenant_id": "rocket-letter"}
+
+    assert up.create_unique_link("abc", {}, {}, tenant_id="rocket-letter") == "1-abc"
+    assert "rocket-letter__abc" not in link_store
+    assert link_store["rocket-letter__1-abc"]["short_code"] == "1-abc"
+
+
+def test_legacy_code_owned_by_another_tenant_does_not_block(up, link_store):
+    link_store["abc"] = {"short_code": "abc", "tenant_id": "other-customer"}
+
+    assert up.create_unique_link("abc", {}, {}, tenant_id="rocket-letter") == "abc"
+    assert link_store["rocket-letter__abc"]["short_code"] == "abc"
+
+
+def test_unusable_tenant_keeps_the_global_id(up, link_store):
+    assert up.create_unique_link("abc", {}, {}, tenant_id="not a tenant") == "abc"
+    assert link_store["abc"]["short_code"] == "abc"
+    assert "tenant_id" not in link_store["abc"]
+
+
+def test_untenanted_legacy_code_is_not_reused(up, link_store):
+    # Printed as ihr-brief.de/abc before tenants existed; a tenant link with the
+    # same code must not take over that letter.
+    link_store["abc"] = {"short_code": "abc"}
+
+    assert up.create_unique_link("abc", {}, {}, tenant_id="rocket-letter") == "1-abc"
+    assert "rocket-letter__abc" not in link_store
+
+
+def test_payload_tenant_id_is_kept(up, link_store):
+    up.create_unique_link("abc", {"tenant_id": "Rocket-Letter"}, {}, tenant_id="rocket-letter")
+    assert link_store["rocket-letter__abc"]["tenant_id"] == "Rocket-Letter"
+
+
+class _DomainCollection:
+    def __init__(self, domains):
+        self.domains = domains
+
+    def document(self, doc_id):
+        store = self.domains
+
+        class _Doc:
+            def get(self):
+                return _LinkSnap(store.get(doc_id))
+
+        return _Doc()
+
+
+class _DomainDb:
+    def __init__(self, domains):
+        self.domains = domains
+
+    def collection(self, name):
+        assert name == "customer_domains"
+        return _DomainCollection(self.domains)
+
+
+@pytest.fixture
+def domains(up):
+    previous = up.db
+    store = {
+        "ihr-brief.de": {"tenant_id": "ihr-brief", "shared": True},
+        "go.rocket-letter.de": {"tenant_id": "rocket-letter", "shared": False},
+    }
+    up.db = _DomainDb(store)
+    yield store
+    up.db = previous
+
+
+def test_dedicated_printed_domain_sets_the_pool(up, domains):
+    assert up.resolve_link_pool(None, "https://go.rocket-letter.de") == "rocket-letter"
+    assert up.resolve_link_pool("Rocket-Letter", "go.rocket-letter.de/") == "rocket-letter"
+
+
+def test_shared_or_unknown_printed_domain_keeps_bare_ids(up, domains):
+    assert up.resolve_link_pool(None, "https://ihr-brief.de") is None
+    assert up.resolve_link_pool("ihr-brief", "https://ihr-brief.de") is None
+    assert up.resolve_link_pool("rocket-letter", "https://unknown.example") is None
+
+
+def test_default_printed_domain_is_ihr_brief(up, domains):
+    # UI uploads send neither tenant nor prefix; they print on ihr-brief.de.
+    assert up.resolve_link_pool(None, None) is None
+    assert up.resolve_link_pool("demo", None) is None
+
+
+def test_manifest_tenant_for_another_domain_is_rejected(up, domains):
+    with pytest.raises(up.TenantDomainMismatchError):
+        up.resolve_link_pool("demo", "https://go.rocket-letter.de")
+
+
+def test_upload_and_redirector_agree_on_the_domain_pool(up):
+    spec = importlib.util.spec_from_file_location(
+        "tenant_utils_parity", MAIN.parents[1] / "redirector" / "tenant_utils.py"
+    )
+    tu = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tu)
+    for tenant in (None, "", "rocket-letter", "Rocket-Letter", "not a tenant"):
+        for shared in (True, False):
+            assert up.printed_host_pool(tenant, shared) == tu.domain_link_pool(tenant, shared)

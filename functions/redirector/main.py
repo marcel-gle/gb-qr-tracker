@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 from cachetools import TTLCache
 from google.api_core.exceptions import AlreadyExists
 
-from tenant_utils import normalize_original_host
+from tenant_utils import domain_link_pool, domain_tenant_check_mode, link_doc_ids_to_try, normalize_original_host
 from flask import Request, redirect
 import requests
 from google.cloud import firestore
@@ -60,8 +60,8 @@ SERVER_TIMESTAMP = firestore.SERVER_TIMESTAMP
 
 HMAC_SECRET = os.environ.get("WORKER_HMAC_SECRET", "")
 
-# off | log_only | enforce — only applies to Cloudflare Worker traffic (valid HMAC)
-REDIRECTOR_DOMAIN_TENANT_CHECK = "enforce"
+# off | log_only | enforce — env REDIRECTOR_DOMAIN_TENANT_CHECK, default off.
+# Only applies to Cloudflare Worker traffic (valid HMAC).
 
 # Firestore: customer_domains/{hostname} -> { tenant_id?, shared? }
 CUSTOMER_DOMAINS_COLLECTION = "customer_domains"
@@ -318,7 +318,7 @@ def _apply_worker_domain_tenant_enforcement(
     - Dedicated domain: link tenant_id must match domain tenant_id.
     Returns Flask tuple to short-circuit, or None to continue.
     """
-    mode = REDIRECTOR_DOMAIN_TENANT_CHECK
+    mode = domain_tenant_check_mode(os.getenv("REDIRECTOR_DOMAIN_TENANT_CHECK"))
     if mode not in ("log_only", "enforce") or source != "cloudflare_worker":
         return None
 
@@ -404,6 +404,50 @@ def _is_from_worker(request: Request, link_id: str) -> bool:
         return False
 
 
+def _host_tenant_id(request: Request) -> str | None:
+    """
+    Link pool of customer_domains/{X-Original-Host}. None when that doc is
+    missing or the domain is shared.
+    """
+    host = normalize_original_host(request.headers.get("X-Original-Host") or "")
+    info = _get_customer_domain_info(host) if host else None
+    if info is None or not info.exists:
+        return None
+    return domain_link_pool(info.tenant_id, info.shared)
+
+
+def _resolve_link_document(request: Request, source: str, short_code: str):
+    """
+    Open the link document for this visit.
+
+    Returns (ref, snap, doc_id) for the first existing candidate, or
+    (None, None, None) when none exist. See link_doc_ids_to_try.
+    """
+    if source == "cloudflare_worker":
+        host_tenant = _host_tenant_id(request)
+        request_tenant = None
+    else:
+        host_tenant = None
+        request_tenant = request.args.get("tenant")
+
+    doc_ids = link_doc_ids_to_try(source, short_code, host_tenant, request_tenant)
+    print(
+        "Resolving link:",
+        f"source={source}",
+        f"short_code={short_code!r}",
+        f"host_tenant={host_tenant!r}",
+        f"candidates={doc_ids!r}",
+    )
+    for doc_id in doc_ids:
+        link_ref = _db.collection("links").document(doc_id)
+        snap = link_ref.get()
+        if snap.exists:
+            print("Fetching LINK:", doc_id)
+            print("Link ref path:", link_ref.path)
+            return link_ref, snap, doc_id
+    return None, None, None
+
+
 def redirector(request: Request):
     if _request_has_forbidden_explicit_port(request):
         return (
@@ -424,11 +468,8 @@ def redirector(request: Request):
     if not link_id or not ID_PATTERN.match(link_id):
         return ('Missing or invalid "id" query parameter.', 400)
 
-    link_ref = _db.collection('links').document(link_id)
-    print("Fetching LINK:", link_id)
-    print("Link ref path:", link_ref.path)
-    snap = link_ref.get()
-    if not snap.exists:
+    link_ref, snap, link_doc_id = _resolve_link_document(request, source, link_id)
+    if snap is None or not snap.exists:
         return ('Link not found.', 404)
 
     data = snap.to_dict() or {}
@@ -542,6 +583,11 @@ def redirector(request: Request):
             "campaign_name": campaign_name,
             "hit_origin": source, #shows if it is from link or qr code
         }
+        if link_doc_id and link_doc_id != link_id:
+            hit["link_doc_id"] = link_doc_id
+            stored_tenant = data.get("tenant_id")
+            if isinstance(stored_tenant, str) and stored_tenant.strip():
+                hit["tenant_id"] = stored_tenant.strip()
         if is_bot:
             hit['suspected_bot'] = True
         hit['ip-address'] = client_ip
